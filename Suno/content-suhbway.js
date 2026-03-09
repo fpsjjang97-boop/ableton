@@ -52,12 +52,26 @@
 
     btn.addEventListener('mouseenter', function() {
       var data = extractDetailData();
-      preview.innerHTML =
-        '<div class="suno-preview-title">Will send to Suno:</div>' +
-        '<div class="suno-preview-item"><b>Style:</b> ' + (data.prompt || '(none)').slice(0, 80) + '</div>' +
-        '<div class="suno-preview-item"><b>Lyrics:</b> ' + (data.lyrics ? data.lyrics.slice(0, 60) + '...' : '(none)') + '</div>' +
-        '<div class="suno-preview-item"><b>Exclude:</b> ' + (data.excludeStyles || '(none)').slice(0, 60) + '</div>' +
-        '<div class="suno-preview-item"><b>Params:</b> W:' + (data.params.weirdness || '-') + '% S:' + (data.params.styleInfluence || '-') + '% A:' + (data.params.audioInfluence || '-') + '%</div>';
+      preview.textContent = '';
+      var title = document.createElement('div');
+      title.className = 'suno-preview-title';
+      title.textContent = 'Will send to Suno:';
+      preview.appendChild(title);
+      var items = [
+        ['Style', (data.prompt || '(none)').slice(0, 80)],
+        ['Lyrics', data.lyrics ? data.lyrics.slice(0, 60) + '...' : '(none)'],
+        ['Exclude', (data.excludeStyles || '(none)').slice(0, 60)],
+        ['Params', 'W:' + (data.params.weirdness || '-') + '% S:' + (data.params.styleInfluence || '-') + '% A:' + (data.params.audioInfluence || '-') + '%']
+      ];
+      for (var k = 0; k < items.length; k++) {
+        var row = document.createElement('div');
+        row.className = 'suno-preview-item';
+        var b = document.createElement('b');
+        b.textContent = items[k][0] + ': ';
+        row.appendChild(b);
+        row.appendChild(document.createTextNode(items[k][1]));
+        preview.appendChild(row);
+      }
       preview.style.display = 'block';
     });
 

@@ -4,154 +4,37 @@
   var selectedSongs = new Map();
   var panelInjected = false;
 
-  // Suno's actual CSS class for form inputs
-  var SUNO_INPUT_CLASS = 'bg-background-glass-thin';
-
   // ═══════════════════════════════════════
-  //  FIELD DETECTION
-  //  Uses Suno's actual class names + position
+  //  FETCH SONG DATA FROM SUNO API
+  //  /api/clip/{clip_id} returns full song data
+  //  (lyrics, style, tags, etc.)
   // ═══════════════════════════════════════
 
-  function findSunoFields() {
-    var fields = {
-      lyrics: null,
-      style: null,
-      title: null,
-      exclude: null,
-      sliders: []
-    };
-
-    // 1) Find ALL Suno form inputs (they all use bg-background-glass-thin)
-    var allInputs = document.querySelectorAll(
-      'textarea.' + SUNO_INPUT_CLASS +
-      ', textarea[class*="background-glass"]' +
-      ', input[type="text"].' + SUNO_INPUT_CLASS +
-      ', input[type="text"][class*="background-glass"]' +
-      ', input:not([type]).' + SUNO_INPUT_CLASS +
-      ', input:not([type])[class*="background-glass"]'
-    );
-
-    // Fallback: any visible textarea/input in the main content area
-    if (allInputs.length === 0) {
-      allInputs = document.querySelectorAll('textarea, input[type="text"], input:not([type])');
-    }
-
-    var textareas = [];
-    var inputs = [];
-
-    for (var i = 0; i < allInputs.length; i++) {
-      var el = allInputs[i];
-      if (el.offsetParent === null) continue; // skip hidden
-      if (el.closest('#suno-git-panel')) continue; // skip our panel
-      if (el.closest('[role="dialog"]')) continue; // skip modals
-
-      if (el.tagName === 'TEXTAREA') {
-        textareas.push(el);
-      } else {
-        inputs.push(el);
-      }
-    }
-
-    // LYRICS = the main textarea (usually first/largest)
-    if (textareas.length > 0) {
-      fields.lyrics = textareas[0];
-    }
-
-    // Sort inputs by vertical position
-    inputs.sort(function(a, b) {
-      return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
+  async function fetchSongData(clipId) {
+    var res = await fetch('/api/clip/' + clipId, {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
     });
 
-    // Identify each input by nearby label text
-    for (var j = 0; j < inputs.length; j++) {
-      var inp = inputs[j];
-      var label = getSurroundingText(inp).toLowerCase();
-      var ph = (inp.placeholder || '').toLowerCase();
+    if (!res.ok) throw new Error('Suno API error: ' + res.status);
 
-      if (label.includes('exclude') || label.includes('제외') ||
-          ph.includes('exclude') || ph.includes('negative')) {
-        fields.exclude = inp;
-      } else if (label.includes('title') || label.includes('제목') ||
-                 ph.includes('title')) {
-        fields.title = inp;
-      } else if (label.includes('style') || label.includes('스타일') ||
-                 label.includes('genre') || label.includes('장르') ||
-                 label.includes('tag') ||
-                 ph.includes('style') || ph.includes('genre') || ph.includes('tag')) {
-        if (!fields.style) fields.style = inp;
-      } else if (!fields.style && j === 0) {
-        // First unidentified input is likely Style
-        fields.style = inp;
-      } else if (!fields.title) {
-        fields.title = inp;
-      }
-    }
+    var data = await res.json();
+    // The API may return the clip directly or nested
+    var clip = data.clip || data;
 
-    // SLIDERS
-    var sliders = document.querySelectorAll('input[type="range"]');
-    for (var k = 0; k < sliders.length; k++) {
-      if (sliders[k].offsetParent === null) continue;
-      var sLabel = getSurroundingText(sliders[k]).toLowerCase();
-      fields.sliders.push({
-        el: sliders[k],
-        label: sLabel,
-        type: sLabel.includes('weird') ? 'weirdness' :
-              sLabel.includes('style') ? 'styleInfluence' :
-              sLabel.includes('audio') ? 'audioInfluence' : 'unknown'
-      });
-    }
-
-    return fields;
-  }
-
-  function getSurroundingText(el) {
-    var texts = [];
-
-    // Check placeholder
-    if (el.placeholder) texts.push(el.placeholder);
-
-    // Check aria-label
-    var aria = el.getAttribute('aria-label');
-    if (aria) texts.push(aria);
-
-    // Walk up parents looking for label text
-    var parent = el.parentElement;
-    for (var i = 0; i < 5 && parent; i++) {
-      var children = parent.children;
-      for (var j = 0; j < children.length; j++) {
-        var child = children[j];
-        if (child === el || child.contains(el)) continue;
-        var tag = child.tagName;
-        if (tag === 'LABEL' || tag === 'SPAN' || tag === 'P' ||
-            tag === 'H3' || tag === 'H4' || tag === 'DIV') {
-          var t = (child.textContent || '').trim();
-          if (t.length > 0 && t.length < 50) {
-            texts.push(t);
-          }
-        }
-      }
-      // Also check parent's own preceding sibling text
-      var prev = parent.previousElementSibling;
-      if (prev) {
-        var pt = (prev.textContent || '').trim();
-        if (pt.length > 0 && pt.length < 50) texts.push(pt);
-      }
-      parent = parent.parentElement;
-    }
-
-    return texts.join(' ');
-  }
-
-  function readCurrentValues() {
-    var fields = findSunoFields();
     return {
-      lyrics: fields.lyrics ? (fields.lyrics.value || '').trim() : '',
-      style: fields.style ? (fields.style.value || '').trim() : '',
-      title: fields.title ? (fields.title.value || '').trim() : '',
-      exclude: fields.exclude ? (fields.exclude.value || '').trim() : '',
-      weirdness: '',
-      styleInfluence: '',
-      audioInfluence: ''
+      id: clip.id || clipId,
+      title: clip.title || clip.display_name || 'Untitled',
+      lyrics: clip.metadata?.prompt || clip.lyrics || '',
+      style: clip.metadata?.tags || clip.style || clip.tags || '',
+      exclude: clip.metadata?.negative_tags || clip.negative_tags || '',
+      prompt: clip.metadata?.gpt_description_prompt || '',
+      audioUrl: clip.audio_url || '',
+      imageUrl: clip.image_url || '',
+      duration: clip.duration || '',
+      model: clip.model_name || clip.major_model_version || '',
+      createdAt: clip.created_at || '',
+      url: 'https://suno.com/song/' + clipId
     };
   }
 
@@ -247,8 +130,6 @@
       var cb = document.createElement('div');
       cb.className = 'suno-git-checkbox';
       cb.setAttribute('data-song-id', songId);
-      cb.setAttribute('data-song-url', link.href.startsWith('http') ? link.href : 'https://suno.com' + link.getAttribute('href'));
-      cb.setAttribute('data-song-title', (link.textContent || '').trim() || 'Untitled');
       cb.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
 
       cb.addEventListener('click', onCheckboxClick);
@@ -267,11 +148,8 @@
     if (cont) cont.classList.toggle('suno-git-selected', isSelected);
 
     if (isSelected) {
-      selectedSongs.set(id, {
-        id: id,
-        title: cb.getAttribute('data-song-title'),
-        url: cb.getAttribute('data-song-url')
-      });
+      // Just store the ID - actual data fetched at save time from Suno API
+      selectedSongs.set(id, { id: id });
     } else {
       selectedSongs.delete(id);
     }
@@ -279,19 +157,16 @@
   }
 
   function findSongContainer(link) {
-    // Try Suno's actual class names first
     var selectors = ['.clip-row', 'div[class*="clip"]', 'div[style*="grid-template-columns"]'];
     for (var i = 0; i < selectors.length; i++) {
       var match = link.closest(selectors[i]);
       if (match) return match;
     }
-    // Walk up looking for grid/row/card containers
     var el = link.parentElement;
     for (var j = 0; j < 6 && el; j++) {
       var s = el.getAttribute('style') || '';
       var c = (typeof el.className === 'string') ? el.className : '';
-      if (s.includes('grid') || c.includes('clip') || c.includes('row') ||
-          c.includes('card') || c.includes('song')) {
+      if (s.includes('grid') || c.includes('clip') || c.includes('row') || c.includes('card') || c.includes('song')) {
         return el;
       }
       el = el.parentElement;
@@ -328,115 +203,176 @@
     var tryFill = setInterval(function() {
       attempts++;
       var result = doFill(fill);
-      if (result.filled || attempts > 40) {
+      if ((result.filled && result.allDone) || attempts > 40) {
         clearInterval(tryFill);
         if (result.filled) {
           chrome.storage.local.remove('suno_pending_fill');
-          showToast('Auto-fill complete!', result.details);
+          var msg = 'Auto-fill complete!';
+          if (!result.allDone) msg = 'Partial fill (missing: ' + result.pending + ')';
+          showToast(msg, result.details);
         } else {
-          showToast('Auto-fill failed', 'Could not find Suno input fields. Try switching to Advanced mode.');
+          showToast('Auto-fill failed', 'Could not find input fields. Switch to Advanced mode.');
         }
       }
     }, 500);
   }
 
   function doFill(fill) {
-    var fields = findSunoFields();
     var filled = false;
     var details = [];
+    var pending = [];
 
-    // First: if Exclude Styles is needed, try to reveal it
+    // Find all visible textareas and inputs (excluding our panel)
+    var textareas = [];
+    var inputs = [];
+    document.querySelectorAll('textarea').forEach(function(el) {
+      if (el.offsetParent !== null && !el.closest('#suno-git-panel') && !el.closest('[role="dialog"]')) {
+        textareas.push(el);
+      }
+    });
+    document.querySelectorAll('input[type="text"], input:not([type])').forEach(function(el) {
+      if (el.offsetParent !== null && !el.closest('#suno-git-panel') && !el.closest('[role="dialog"]')) {
+        inputs.push(el);
+      }
+    });
+
+    // Sort inputs by position
+    inputs.sort(function(a, b) { return a.getBoundingClientRect().top - b.getBoundingClientRect().top; });
+
+    // Reveal exclude styles if needed (async - toggle may take time to render)
+    if (fill.excludeStyles) revealExcludeStyles();
+
+    // LYRICS → first visible textarea
+    if (fill.lyrics) {
+      if (textareas.length > 0) {
+        setReactValue(textareas[0], fill.lyrics);
+        filled = true;
+        details.push('Lyrics');
+      } else {
+        pending.push('Lyrics');
+      }
+    }
+
+    // Categorize inputs by label
+    var styleInput = null;
+    var excludeInput = null;
+    var titleInput = null;
+
+    for (var i = 0; i < inputs.length; i++) {
+      var label = getSurroundingText(inputs[i]).toLowerCase();
+      var ph = (inputs[i].placeholder || '').toLowerCase();
+
+      if (label.includes('exclude') || ph.includes('exclude') || label.includes('제외')) {
+        excludeInput = inputs[i];
+      } else if (label.includes('style') || ph.includes('style') || label.includes('genre') || ph.includes('genre') || label.includes('tag')) {
+        if (!styleInput) styleInput = inputs[i];
+      } else if (label.includes('title') || ph.includes('title')) {
+        titleInput = inputs[i];
+      }
+    }
+
+    // Fallback: first input = style, second = title (if not identified)
+    if (!styleInput && inputs.length > 0) styleInput = inputs[0];
+    if (!titleInput && inputs.length > 1) {
+      for (var j = 0; j < inputs.length; j++) {
+        if (inputs[j] !== styleInput && inputs[j] !== excludeInput) {
+          titleInput = inputs[j];
+          break;
+        }
+      }
+    }
+
+    // PROMPT → Style of Music
+    if (fill.prompt) {
+      if (styleInput) {
+        setReactValue(styleInput, fill.prompt);
+        filled = true;
+        details.push('Style');
+      } else {
+        pending.push('Style');
+      }
+    }
+
+    // EXCLUDE → Exclude Styles
     if (fill.excludeStyles) {
-      revealExcludeStyles();
-    }
-
-    // Re-detect after possible toggle
-    setTimeout(function() {
-      fields = findSunoFields();
-    }, 300);
-
-    // LYRICS → lyrics textarea
-    if (fill.lyrics && fields.lyrics) {
-      setReactValue(fields.lyrics, fill.lyrics);
-      filled = true;
-      details.push('Lyrics');
-    }
-
-    // PROMPT → Style of Music input
-    if (fill.prompt && fields.style) {
-      setReactValue(fields.style, fill.prompt);
-      filled = true;
-      details.push('Style');
+      if (excludeInput) {
+        setReactValue(excludeInput, fill.excludeStyles);
+        filled = true;
+        details.push('Exclude');
+      } else {
+        pending.push('Exclude');
+      }
     }
 
     // TITLE
-    if (fill.title && fields.title) {
-      setReactValue(fields.title, fill.title);
-      filled = true;
-      details.push('Title');
-    }
-
-    // EXCLUDE STYLES → negativeTags input
-    if (fill.excludeStyles && fields.exclude) {
-      setReactValue(fields.exclude, fill.excludeStyles);
-      filled = true;
-      details.push('Exclude');
+    if (fill.title) {
+      if (titleInput) {
+        setReactValue(titleInput, fill.title);
+        filled = true;
+        details.push('Title');
+      } else {
+        pending.push('Title');
+      }
     }
 
     // SLIDERS
     if (fill.params) {
-      for (var i = 0; i < fields.sliders.length; i++) {
-        var s = fields.sliders[i];
-        var val = null;
-        if (s.type === 'weirdness' && fill.params.weirdness != null) val = fill.params.weirdness;
-        if (s.type === 'styleInfluence' && fill.params.styleInfluence != null) val = fill.params.styleInfluence;
-        if (s.type === 'audioInfluence' && fill.params.audioInfluence != null) val = fill.params.audioInfluence;
-        if (val != null) {
-          setReactValue(s.el, String(val));
-          filled = true;
-          details.push(s.type);
+      var sliders = document.querySelectorAll('input[type="range"]');
+      sliders.forEach(function(slider) {
+        if (slider.offsetParent === null) return;
+        var sLabel = getSurroundingText(slider).toLowerCase();
+        if (sLabel.includes('weird') && fill.params.weirdness != null) {
+          setReactValue(slider, String(fill.params.weirdness));
+          details.push('Weirdness');
+        } else if (sLabel.includes('style') && fill.params.styleInfluence != null) {
+          setReactValue(slider, String(fill.params.styleInfluence));
+          details.push('StyleInfl');
+        } else if (sLabel.includes('audio') && fill.params.audioInfluence != null) {
+          setReactValue(slider, String(fill.params.audioInfluence));
+          details.push('AudioInfl');
         }
-      }
+      });
     }
 
-    return { filled: filled, details: details.join(', ') };
+    return { filled: filled, allDone: pending.length === 0, details: details.join(', '), pending: pending.join(', ') };
+  }
+
+  function getSurroundingText(el) {
+    var texts = [];
+    if (el.placeholder) texts.push(el.placeholder);
+    var aria = el.getAttribute('aria-label');
+    if (aria) texts.push(aria);
+
+    var parent = el.parentElement;
+    for (var i = 0; i < 4 && parent; i++) {
+      var children = parent.children;
+      for (var j = 0; j < children.length; j++) {
+        if (children[j] === el || children[j].contains(el)) continue;
+        var t = (children[j].textContent || '').trim();
+        if (t.length > 0 && t.length < 50) texts.push(t);
+      }
+      parent = parent.parentElement;
+    }
+    return texts.join(' ');
   }
 
   function revealExcludeStyles() {
-    // Click the "Exclude Styles" toggle/button to reveal the input
     var buttons = document.querySelectorAll('button, [role="button"], [role="switch"], div[tabindex]');
     for (var i = 0; i < buttons.length; i++) {
       var text = (buttons[i].textContent || '').toLowerCase();
       var aria = (buttons[i].getAttribute('aria-label') || '').toLowerCase();
-      if (text.includes('exclude') || aria.includes('exclude') ||
-          text.includes('제외') || aria.includes('제외')) {
-        // Check if it's currently hidden/off
+      if (text.includes('exclude') || aria.includes('exclude')) {
         var isChecked = buttons[i].getAttribute('aria-checked');
-        if (isChecked === 'false' || !isChecked) {
-          buttons[i].click();
-        }
+        if (isChecked === 'false' || !isChecked) buttons[i].click();
         return;
       }
     }
-
-    // Also try: look for "More Options" and click it first
-    var moreButtons = document.querySelectorAll('button, [role="button"]');
-    for (var j = 0; j < moreButtons.length; j++) {
-      var mtext = (moreButtons[j].textContent || '').toLowerCase();
-      if (mtext.includes('more option') || mtext.includes('advanced') || mtext.includes('더보기')) {
-        moreButtons[j].click();
-        // After opening more options, try exclude again after a delay
-        setTimeout(function() {
-          var btns = document.querySelectorAll('button, [role="button"], [role="switch"]');
-          for (var k = 0; k < btns.length; k++) {
-            var t = (btns[k].textContent || '').toLowerCase();
-            if (t.includes('exclude') || t.includes('제외')) {
-              var checked = btns[k].getAttribute('aria-checked');
-              if (checked === 'false' || !checked) btns[k].click();
-              return;
-            }
-          }
-        }, 500);
+    // Try "More Options" first
+    for (var j = 0; j < buttons.length; j++) {
+      var mt = (buttons[j].textContent || '').toLowerCase();
+      if (mt.includes('more option') || mt.includes('advanced')) {
+        buttons[j].click();
+        setTimeout(revealExcludeStyles, 500);
         return;
       }
     }
@@ -445,18 +381,13 @@
   function setReactValue(el, value) {
     var proto = (el.tagName === 'TEXTAREA') ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     var nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value');
-
     if (nativeSetter && nativeSetter.set) {
       nativeSetter.set.call(el, value);
     } else {
       el.value = value;
     }
-
-    // Reset React's internal value tracker
     var tracker = el._valueTracker;
     if (tracker) tracker.setValue('');
-
-    // Fire all relevant events for React to pick up the change
     el.dispatchEvent(new Event('focus', { bubbles: true }));
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -466,29 +397,24 @@
   function showToast(title, sub) {
     var existing = document.getElementById('suno-fill-toast');
     if (existing) existing.remove();
-
     var toast = document.createElement('div');
     toast.id = 'suno-fill-toast';
-    toast.innerHTML =
-      '<div style="font-weight:700;margin-bottom:4px;">' + title + '</div>' +
-      '<div style="font-size:11px;color:#aaa;">' + (sub || '') + '</div>';
-    toast.style.cssText =
-      'position:fixed;top:20px;right:20px;z-index:999999;' +
-      'padding:14px 20px;background:#1a1a2e;color:#fff;' +
-      'border:1px solid #6c63ff;border-radius:10px;' +
-      'box-shadow:0 8px 30px rgba(0,0,0,0.5);' +
-      'font-family:-apple-system,BlinkMacSystemFont,sans-serif;' +
-      'font-size:13px;transition:opacity 0.3s;';
+    var titleDiv = document.createElement('div');
+    titleDiv.style.cssText = 'font-weight:700;margin-bottom:4px;';
+    titleDiv.textContent = title;
+    var subDiv = document.createElement('div');
+    subDiv.style.cssText = 'font-size:11px;color:#aaa;';
+    subDiv.textContent = sub || '';
+    toast.appendChild(titleDiv);
+    toast.appendChild(subDiv);
+    toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:999999;padding:14px 20px;background:#1a1a2e;color:#fff;border:1px solid #6c63ff;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.5);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;transition:opacity 0.3s;';
     document.body.appendChild(toast);
-    setTimeout(function() {
-      toast.style.opacity = '0';
-      setTimeout(function() { toast.remove(); }, 300);
-    }, 3500);
+    setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 3500);
   }
 
   // ═══════════════════════════════════════
   //  SAVE TO GITHUB
-  //  Reads ALL values from the page at save time
+  //  Fetches each song's ACTUAL data from Suno API
   // ═══════════════════════════════════════
 
   async function handleSave() {
@@ -510,37 +436,34 @@
       var scoreEl = document.getElementById('suno-git-score');
       var score = scoreEl ? scoreEl.value.trim() : '-';
 
-      // READ ALL current values from Suno's form fields NOW
-      var fields = findSunoFields();
-      var currentLyrics = fields.lyrics ? (fields.lyrics.value || '').trim() : '';
-      var currentStyle = fields.style ? (fields.style.value || '').trim() : '';
-      var currentExclude = fields.exclude ? (fields.exclude.value || '').trim() : '';
-      var currentTitle = fields.title ? (fields.title.value || '').trim() : '';
-      var sliderValues = {};
-      for (var s = 0; s < fields.sliders.length; s++) {
-        sliderValues[fields.sliders[s].type] = fields.sliders[s].el.value;
-      }
-
       var saved = 0;
       var total = selectedSongs.size;
 
       for (var entry of selectedSongs) {
-        var songData = entry[1];
+        var clipId = entry[0];
+        saved++;
+        statusEl.textContent = 'Fetching ' + saved + '/' + total + '...';
 
-        // Merge LIVE page data
-        songData.lyrics = currentLyrics;
-        songData.style = currentStyle;
-        songData.exclude = currentExclude;
-        songData.score = score || '-';
-        songData.weirdness = sliderValues.weirdness || '';
-        songData.styleInfluence = sliderValues.styleInfluence || '';
-        songData.audioInfluence = sliderValues.audioInfluence || '';
-        songData.savedAt = new Date().toISOString();
-        if (currentTitle && songData.title === 'Untitled') {
-          songData.title = currentTitle;
+        // FETCH ACTUAL SONG DATA FROM SUNO API
+        var songData;
+        try {
+          songData = await fetchSongData(clipId);
+        } catch (fetchErr) {
+          // Fallback: use basic info from checkbox
+          songData = {
+            id: clipId,
+            title: entry[1].title || 'Untitled',
+            lyrics: '(could not fetch - ' + fetchErr.message + ')',
+            style: '',
+            exclude: '',
+            prompt: '',
+            url: 'https://suno.com/song/' + clipId
+          };
         }
 
-        saved++;
+        songData.score = score || '-';
+        songData.savedAt = new Date().toISOString();
+
         statusEl.textContent = 'Saving ' + saved + '/' + total + '...';
         var markdown = buildMarkdown(songData);
         await saveToGitHub(settings, songData, markdown);
@@ -576,38 +499,45 @@
       '- **Date**: ' + data.savedAt,
       '- **URL**: [' + data.url + '](' + data.url + ')',
       '- **Song ID**: `' + data.id + '`',
-      '- **Score**: ' + (data.score || '-') + ' / 100',
-      ''
+      '- **Score**: ' + (data.score || '-') + ' / 100'
     ];
 
-    lines.push('## Lyrics', '');
+    if (data.model) lines.push('- **Model**: ' + data.model);
+    if (data.duration) lines.push('- **Duration**: ' + Math.round(data.duration) + 's');
+    if (data.audioUrl) lines.push('- **Audio**: [MP3](' + data.audioUrl + ')');
+    lines.push('');
+
+    // Style / Tags
+    lines.push('## Style of Music');
+    lines.push('');
+    lines.push(data.style || '(no style)');
+    lines.push('');
+
+    // GPT Description Prompt
+    if (data.prompt) {
+      lines.push('## Prompt (GPT Description)');
+      lines.push('');
+      lines.push(data.prompt);
+      lines.push('');
+    }
+
+    // Lyrics
+    lines.push('## Lyrics');
+    lines.push('');
     if (data.lyrics) {
       lines.push('```');
       lines.push(data.lyrics);
       lines.push('```');
     } else {
-      lines.push('(no lyrics)');
+      lines.push('(no lyrics / instrumental)');
     }
     lines.push('');
 
-    lines.push('## Style of Music', '');
-    lines.push(data.style || '(no style)');
-    lines.push('');
-
+    // Exclude Styles
     if (data.exclude) {
-      lines.push('## Exclude Styles', '');
-      lines.push(data.exclude);
+      lines.push('## Exclude Styles');
       lines.push('');
-    }
-
-    var hasParams = data.weirdness || data.styleInfluence || data.audioInfluence;
-    if (hasParams) {
-      lines.push('## Parameters', '');
-      lines.push('| Parameter | Value |');
-      lines.push('|-----------|-------|');
-      if (data.weirdness) lines.push('| Weirdness | ' + data.weirdness + ' |');
-      if (data.styleInfluence) lines.push('| Style Influence | ' + data.styleInfluence + ' |');
-      if (data.audioInfluence) lines.push('| Audio Influence | ' + data.audioInfluence + ' |');
+      lines.push(data.exclude);
       lines.push('');
     }
 
@@ -617,7 +547,7 @@
   async function saveToGitHub(settings, songData, markdown) {
     var date = new Date().toISOString().split('T')[0];
     var safeName = songData.title.replace(/[^a-zA-Z0-9\uAC00-\uD7A3\s-]/g, '').trim().replace(/\s+/g, '-') || 'untitled';
-    var path = 'songs/' + date + '_' + safeName + '_' + songData.id.slice(0, 8) + '.md';
+    var path = 'songs/' + date + '_' + safeName.slice(0, 50) + '_' + songData.id.slice(0, 8) + '.md';
     var content = btoa(unescape(encodeURIComponent(markdown)));
 
     var res = await fetch(
@@ -629,10 +559,7 @@
           'Content-Type': 'application/json',
           'Accept': 'application/vnd.github+json'
         },
-        body: JSON.stringify({
-          message: 'Add: ' + songData.title + ' (' + date + ')',
-          content: content
-        })
+        body: JSON.stringify({ message: 'Add: ' + songData.title + ' (' + date + ')', content: content })
       }
     );
 
