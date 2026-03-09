@@ -2,28 +2,157 @@
   'use strict';
 
   // ─── State ───
-  const selectedSongs = new Map();
-  let panelInjected = false;
+  var selectedSongs = new Map();
+  var panelInjected = false;
 
-  // ─── Selectors ───
-  const SEL = {
-    songContainers: [
-      '.clip-row',
-      'div[class*="clip"]',
-      'div[style*="grid-template-columns"]',
-    ],
-    songLink: 'a[href*="/song/"]',
-  };
+  // ═══════════════════════════════════════
+  //  FIELD DETECTION (label-based)
+  //  Finds inputs by looking at nearby label text
+  // ═══════════════════════════════════════
 
-  // ─── Init: inject panel + start observers ───
+  function findAllPageFields() {
+    var fields = {
+      lyrics: null,       // textarea for lyrics
+      style: null,        // input for Style of Music
+      title: null,        // input for Title
+      exclude: null,      // input for Exclude Styles
+      sliders: {}         // weirdness, styleInfluence, audioInfluence
+    };
+
+    // Find textareas - the lyrics field is the main/largest textarea
+    var textareas = document.querySelectorAll('textarea');
+    for (var i = 0; i < textareas.length; i++) {
+      var ta = textareas[i];
+      var taLabel = getLabelText(ta);
+      if (taLabel.includes('lyric') || taLabel.includes('가사') ||
+          ta.placeholder.toLowerCase().includes('lyric') ||
+          ta.placeholder.toLowerCase().includes('write')) {
+        fields.lyrics = ta;
+        break;
+      }
+    }
+    // Fallback: first visible textarea
+    if (!fields.lyrics && textareas.length > 0) {
+      for (var t = 0; t < textareas.length; t++) {
+        if (textareas[t].offsetParent !== null) {
+          fields.lyrics = textareas[t];
+          break;
+        }
+      }
+    }
+
+    // Find text inputs
+    var inputs = document.querySelectorAll('input[type="text"], input:not([type])');
+    for (var j = 0; j < inputs.length; j++) {
+      var inp = inputs[j];
+      if (inp.offsetParent === null) continue; // skip hidden
+      var label = getLabelText(inp);
+      var ph = (inp.placeholder || '').toLowerCase();
+
+      // Exclude Styles field
+      if (label.includes('exclude') || label.includes('제외') ||
+          ph.includes('exclude') || ph.includes('제외')) {
+        fields.exclude = inp;
+        continue;
+      }
+
+      // Style of Music field (NOT exclude)
+      if (label.includes('style') || label.includes('스타일') ||
+          ph.includes('style') || ph.includes('genre') ||
+          label.includes('genre') || label.includes('장르')) {
+        if (!fields.style) fields.style = inp;
+        continue;
+      }
+
+      // Title field
+      if (label.includes('title') || label.includes('제목') ||
+          ph.includes('title') || ph.includes('제목')) {
+        fields.title = inp;
+        continue;
+      }
+    }
+
+    // Find sliders
+    var sliders = document.querySelectorAll('input[type="range"]');
+    for (var k = 0; k < sliders.length; k++) {
+      var slider = sliders[k];
+      var sLabel = getLabelText(slider);
+      if (sLabel.includes('weird')) {
+        fields.sliders.weirdness = slider;
+      } else if (sLabel.includes('style') && sLabel.includes('influ')) {
+        fields.sliders.styleInfluence = slider;
+      } else if (sLabel.includes('audio') && sLabel.includes('influ')) {
+        fields.sliders.audioInfluence = slider;
+      }
+    }
+    // Fallback: assign by position
+    if (sliders.length >= 3 && !fields.sliders.weirdness) {
+      fields.sliders.weirdness = sliders[0];
+      fields.sliders.styleInfluence = sliders[1];
+      fields.sliders.audioInfluence = sliders[2];
+    }
+
+    return fields;
+  }
+
+  function getLabelText(el) {
+    var text = '';
+
+    // 1) aria-label
+    text = (el.getAttribute('aria-label') || '').toLowerCase();
+    if (text.length > 2) return text;
+
+    // 2) Associated <label>
+    var id = el.id;
+    if (id) {
+      var labelFor = document.querySelector('label[for="' + id + '"]');
+      if (labelFor) return (labelFor.textContent || '').toLowerCase();
+    }
+
+    // 3) Walk up parents and check for label/span/div text
+    var parent = el.parentElement;
+    for (var i = 0; i < 4 && parent; i++) {
+      var labels = parent.querySelectorAll('label, span, div, p, h3, h4');
+      for (var j = 0; j < labels.length; j++) {
+        // Don't pick up the element itself or its children
+        if (labels[j].contains(el)) continue;
+        var t = (labels[j].textContent || '').trim().toLowerCase();
+        if (t.length > 1 && t.length < 60) return t;
+      }
+      parent = parent.parentElement;
+    }
+
+    return '';
+  }
+
+  // ═══════════════════════════════════════
+  //  READ current values from Suno page
+  // ═══════════════════════════════════════
+
+  function readCurrentPageData() {
+    var fields = findAllPageFields();
+    return {
+      lyrics: fields.lyrics ? (fields.lyrics.value || '').trim() : '',
+      style: fields.style ? (fields.style.value || '').trim() : '',
+      title: fields.title ? (fields.title.value || '').trim() : '',
+      exclude: fields.exclude ? (fields.exclude.value || '').trim() : '',
+      weirdness: fields.sliders.weirdness ? fields.sliders.weirdness.value : '',
+      styleInfluence: fields.sliders.styleInfluence ? fields.sliders.styleInfluence.value : '',
+      audioInfluence: fields.sliders.audioInfluence ? fields.sliders.audioInfluence.value : '',
+    };
+  }
+
+  // ═══════════════════════════════════════
+  //  INIT
+  // ═══════════════════════════════════════
+
   init();
 
   function init() {
     injectPanel();
     injectCheckboxes();
 
-    // Observe DOM for new song cards (React re-renders)
-    const observer = new MutationObserver(() => {
+    var observer = new MutationObserver(function() {
       if (!document.getElementById('suno-git-panel')) {
         panelInjected = false;
         injectPanel();
@@ -33,8 +162,8 @@
     observer.observe(document.body, { childList: true, subtree: true });
 
     // SPA navigation detection
-    let lastUrl = location.href;
-    setInterval(() => {
+    var lastUrl = location.href;
+    setInterval(function() {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
         panelInjected = false;
@@ -44,7 +173,7 @@
     }, 1000);
 
     // Auto-fill listener
-    chrome.runtime.onMessage.addListener((msg) => {
+    chrome.runtime.onMessage.addListener(function(msg) {
       if (msg.action === 'fillFromStorage') {
         checkAndFill();
       }
@@ -53,13 +182,14 @@
   }
 
   // ═══════════════════════════════════════
-  //  PANEL (Save to Git)
+  //  PANEL
   // ═══════════════════════════════════════
+
   function injectPanel() {
     if (panelInjected || document.getElementById('suno-git-panel')) return;
     panelInjected = true;
 
-    const panel = document.createElement('div');
+    var panel = document.createElement('div');
     panel.id = 'suno-git-panel';
     panel.innerHTML = [
       '<div class="suno-git-header">',
@@ -87,7 +217,7 @@
 
     document.body.appendChild(panel);
 
-    document.getElementById('suno-git-toggle').addEventListener('click', () => {
+    document.getElementById('suno-git-toggle').addEventListener('click', function() {
       panel.classList.toggle('minimized');
       document.getElementById('suno-git-toggle').textContent =
         panel.classList.contains('minimized') ? '+' : '_';
@@ -97,22 +227,26 @@
   }
 
   // ═══════════════════════════════════════
-  //  CHECKBOXES on song cards
+  //  CHECKBOXES
   // ═══════════════════════════════════════
-  function injectCheckboxes() {
-    const songLinks = document.querySelectorAll(SEL.songLink);
 
-    songLinks.forEach(function(link) {
-      const container = findSongContainer(link);
-      if (!container || container.hasAttribute('data-suno-git')) return;
+  function injectCheckboxes() {
+    var songLinks = document.querySelectorAll('a[href*="/song/"]');
+
+    for (var i = 0; i < songLinks.length; i++) {
+      var link = songLinks[i];
+      var container = findSongContainer(link);
+      if (!container || container.hasAttribute('data-suno-git')) continue;
       container.setAttribute('data-suno-git', 'true');
 
-      const songId = extractSongId(link.href);
-      if (!songId) return;
+      var songId = extractSongId(link.href);
+      if (!songId) continue;
 
-      const checkbox = document.createElement('div');
+      var checkbox = document.createElement('div');
       checkbox.className = 'suno-git-checkbox';
       checkbox.setAttribute('data-song-id', songId);
+      checkbox.setAttribute('data-song-url', link.href);
+      checkbox.setAttribute('data-song-title', (link.textContent || '').trim());
       checkbox.innerHTML =
         '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">' +
         '<polyline points="20 6 9 17 4 12"/>' +
@@ -121,25 +255,40 @@
       checkbox.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        toggleSong(checkbox, container, link);
+        var cb = e.currentTarget;
+        var cont = cb.closest('[data-suno-git]');
+        var id = cb.getAttribute('data-song-id');
+        var isSelected = cb.classList.toggle('selected');
+        cont.classList.toggle('suno-git-selected', isSelected);
+
+        if (isSelected) {
+          selectedSongs.set(id, {
+            id: id,
+            title: cb.getAttribute('data-song-title') || 'Untitled',
+            url: cb.getAttribute('data-song-url') || ''
+          });
+        } else {
+          selectedSongs.delete(id);
+        }
+        updateCount();
       });
 
       container.style.position = 'relative';
       container.appendChild(checkbox);
-    });
+    }
   }
 
   function findSongContainer(link) {
-    for (var i = 0; i < SEL.songContainers.length; i++) {
-      var match = link.closest(SEL.songContainers[i]);
+    var selectors = ['.clip-row', 'div[class*="clip"]', 'div[style*="grid-template-columns"]'];
+    for (var i = 0; i < selectors.length; i++) {
+      var match = link.closest(selectors[i]);
       if (match) return match;
     }
     var el = link.parentElement;
-    for (var j = 0; j < 5; j++) {
-      if (!el) break;
-      var style = el.getAttribute('style') || '';
-      var cls = (typeof el.className === 'string') ? el.className : '';
-      if (style.includes('grid') || cls.includes('clip') || cls.includes('row') || cls.includes('card')) {
+    for (var j = 0; j < 5 && el; j++) {
+      var s = el.getAttribute('style') || '';
+      var c = (typeof el.className === 'string') ? el.className : '';
+      if (s.includes('grid') || c.includes('clip') || c.includes('row') || c.includes('card')) {
         return el;
       }
       el = el.parentElement;
@@ -148,85 +297,8 @@
   }
 
   function extractSongId(href) {
-    var match = href.match(/\/song\/([a-f0-9-]+)/);
-    return match ? match[1] : null;
-  }
-
-  function toggleSong(checkbox, container, link) {
-    var songId = checkbox.getAttribute('data-song-id');
-    var isSelected = checkbox.classList.toggle('selected');
-    container.classList.toggle('suno-git-selected', isSelected);
-
-    if (isSelected) {
-      var title = (link.textContent || '').trim() || 'Untitled';
-      var songUrl = link.href;
-      if (!songUrl.startsWith('http')) {
-        songUrl = 'https://suno.com' + link.getAttribute('href');
-      }
-
-      var prompt = extractPrompt(container);
-      var style = extractStyle();
-
-      selectedSongs.set(songId, {
-        id: songId,
-        title: title,
-        url: songUrl,
-        prompt: prompt,
-        style: style,
-        savedAt: new Date().toISOString()
-      });
-    } else {
-      selectedSongs.delete(songId);
-    }
-
-    updateCount();
-  }
-
-  function extractPrompt(container) {
-    // Try lyrics/prompt from nearby elements
-    var selectors = ['[class*="lyric"]', '[class*="Lyric"]', '[class*="prompt"]', '[class*="description"]'];
-    for (var i = 0; i < selectors.length; i++) {
-      try {
-        var el = container.querySelector(selectors[i]);
-        if (el) {
-          var text = (el.textContent || '').trim();
-          if (text.length > 2) return text;
-        }
-      } catch (e) {}
-    }
-
-    // Try main textarea on the page
-    var textareas = document.querySelectorAll('textarea');
-    for (var j = 0; j < textareas.length; j++) {
-      var val = (textareas[j].value || '').trim();
-      if (val.length > 2) return val;
-    }
-
-    // Try text blocks inside container
-    var spans = container.querySelectorAll('span, p, div');
-    for (var k = 0; k < spans.length; k++) {
-      var txt = (spans[k].textContent || '').trim();
-      if (txt.length > 20 && txt.indexOf('http') === -1 && spans[k].children.length === 0) {
-        return txt;
-      }
-    }
-
-    return '(prompt not found)';
-  }
-
-  function extractStyle() {
-    // Look for "Style of Music" input (NOT exclude)
-    var inputs = document.querySelectorAll('input[type="text"], input:not([type])');
-    for (var i = 0; i < inputs.length; i++) {
-      var ph = (inputs[i].placeholder || '').toLowerCase();
-      var val = (inputs[i].value || '').trim();
-      // Skip exclude fields
-      if (ph.includes('exclude') || ph.includes('negative')) continue;
-      if (ph.includes('style') || ph.includes('genre')) {
-        if (val.length > 1) return val;
-      }
-    }
-    return '(style not found)';
+    var m = href.match(/\/song\/([a-f0-9-]+)/);
+    return m ? m[1] : null;
   }
 
   function updateCount() {
@@ -239,6 +311,7 @@
   // ═══════════════════════════════════════
   //  AUTO-FILL from suhbway.kr
   // ═══════════════════════════════════════
+
   async function checkAndFill() {
     var data = await new Promise(function(r) {
       chrome.storage.local.get(['suno_pending_fill'], r);
@@ -262,112 +335,54 @@
   }
 
   function doFill(fill) {
+    var fields = findAllPageFields();
     var filledAny = false;
 
-    // Collect ALL inputs and textareas on the page
-    var allTextareas = document.querySelectorAll('textarea');
-    var allInputs = document.querySelectorAll('input[type="text"], input:not([type])');
+    // LYRICS → lyrics textarea
+    if (fill.lyrics && fields.lyrics) {
+      setReactValue(fields.lyrics, fill.lyrics);
+      filledAny = true;
+    }
 
-    // ──────────────────────────────────
-    // 1) LYRICS → largest textarea
-    // ──────────────────────────────────
-    if (fill.lyrics) {
-      for (var i = 0; i < allTextareas.length; i++) {
-        var ph = (allTextareas[i].placeholder || '').toLowerCase();
-        if (ph.includes('lyric') || ph.includes('write') || ph.includes('enter') || allTextareas.length === 1) {
-          setReactValue(allTextareas[i], fill.lyrics);
-          filledAny = true;
-          break;
-        }
-      }
-      // Fallback: just use the first textarea
-      if (!filledAny && allTextareas.length > 0) {
-        setReactValue(allTextareas[0], fill.lyrics);
+    // PROMPT (from suhbway = Suno Prompt) → Style of Music input
+    if (fill.prompt && fields.style) {
+      setReactValue(fields.style, fill.prompt);
+      filledAny = true;
+    }
+
+    // EXCLUDE STYLES → Exclude Styles input
+    if (fill.excludeStyles && fields.exclude) {
+      setReactValue(fields.exclude, fill.excludeStyles);
+      filledAny = true;
+    }
+
+    // TITLE → Title input
+    if (fill.title && fields.title) {
+      setReactValue(fields.title, fill.title);
+      filledAny = true;
+    }
+
+    // PARAMETERS → sliders
+    if (fill.params) {
+      if (fill.params.weirdness != null && fields.sliders.weirdness) {
+        setReactValue(fields.sliders.weirdness, String(fill.params.weirdness));
         filledAny = true;
       }
-    }
-
-    // ──────────────────────────────────
-    // 2) PROMPT → "Style of Music" input
-    //    (NOT textarea, NOT exclude)
-    // ──────────────────────────────────
-    if (fill.prompt) {
-      for (var j = 0; j < allInputs.length; j++) {
-        var ph2 = (allInputs[j].placeholder || '').toLowerCase();
-        var label = findLabelFor(allInputs[j]);
-
-        // Skip exclude/negative fields
-        if (ph2.includes('exclude') || ph2.includes('negative')) continue;
-        if (label.includes('exclude') || label.includes('negative')) continue;
-
-        // Match style/genre fields
-        if (ph2.includes('style') || ph2.includes('genre') ||
-            label.includes('style') || label.includes('genre')) {
-          setReactValue(allInputs[j], fill.prompt);
-          filledAny = true;
-          break;
-        }
+      if (fill.params.styleInfluence != null && fields.sliders.styleInfluence) {
+        setReactValue(fields.sliders.styleInfluence, String(fill.params.styleInfluence));
+        filledAny = true;
       }
-    }
-
-    // ──────────────────────────────────
-    // 3) EXCLUDE → "Exclude Styles" input
-    //    (must contain "exclude" in placeholder/label)
-    // ──────────────────────────────────
-    if (fill.excludeStyles) {
-      for (var k = 0; k < allInputs.length; k++) {
-        var ph3 = (allInputs[k].placeholder || '').toLowerCase();
-        var label3 = findLabelFor(allInputs[k]);
-
-        if (ph3.includes('exclude') || ph3.includes('negative') ||
-            label3.includes('exclude') || label3.includes('negative')) {
-          setReactValue(allInputs[k], fill.excludeStyles);
-          filledAny = true;
-          break;
-        }
+      if (fill.params.audioInfluence != null && fields.sliders.audioInfluence) {
+        setReactValue(fields.sliders.audioInfluence, String(fill.params.audioInfluence));
+        filledAny = true;
       }
-    }
-
-    // ──────────────────────────────────
-    // 4) PARAMETERS → sliders
-    // ──────────────────────────────────
-    if (fill.params) {
-      var sliders = document.querySelectorAll('input[type="range"]');
-      sliders.forEach(function(slider) {
-        var sliderLabel = findLabelFor(slider);
-        if (sliderLabel.includes('weird') && fill.params.weirdness != null) {
-          setReactValue(slider, String(fill.params.weirdness));
-        } else if (sliderLabel.includes('style') && fill.params.styleInfluence != null) {
-          setReactValue(slider, String(fill.params.styleInfluence));
-        } else if (sliderLabel.includes('audio') && fill.params.audioInfluence != null) {
-          setReactValue(slider, String(fill.params.audioInfluence));
-        }
-      });
     }
 
     return filledAny;
   }
 
-  function findLabelFor(el) {
-    // Check aria-label
-    var ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
-    if (ariaLabel) return ariaLabel;
-
-    // Check parent for label/span text
-    var parent = el.parentElement;
-    for (var i = 0; i < 3 && parent; i++) {
-      var labelEl = parent.querySelector('label, span');
-      if (labelEl) {
-        var text = (labelEl.textContent || '').toLowerCase();
-        if (text.length < 50) return text;
-      }
-      parent = parent.parentElement;
-    }
-    return '';
-  }
-
   function setReactValue(el, value) {
-    // React controlled inputs need native setter
+    // React uses internal value tracker - must bypass it
     var proto = (el.tagName === 'TEXTAREA') ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     var nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value');
 
@@ -377,15 +392,13 @@
       el.value = value;
     }
 
+    // Reset React's value tracker so it sees the change
+    var tracker = el._valueTracker;
+    if (tracker) tracker.setValue('');
+
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
-
-    // Also try React's synthetic event
-    var tracker = el._valueTracker;
-    if (tracker) {
-      tracker.setValue('');
-    }
-    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
   }
 
   function showFillNotification(fill) {
@@ -413,7 +426,9 @@
 
   // ═══════════════════════════════════════
   //  SAVE TO GITHUB
+  //  Reads ALL current field values at save time
   // ═══════════════════════════════════════
+
   async function handleSave() {
     var saveBtn = document.getElementById('suno-git-save');
     var statusEl = document.getElementById('suno-git-status');
@@ -435,71 +450,103 @@
       var scoreEl = document.getElementById('suno-git-score');
       var score = scoreEl ? scoreEl.value.trim() : '-';
 
+      // READ all current page field values NOW (at save time)
+      var pageData = readCurrentPageData();
+
       var saved = 0;
       var total = selectedSongs.size;
 
       for (var entry of selectedSongs) {
-        var songId = entry[0];
         var songData = entry[1];
+        // Merge page data into song data
         songData.score = score || '-';
+        songData.lyrics = pageData.lyrics;
+        songData.style = pageData.style;
+        songData.exclude = pageData.exclude;
+        songData.weirdness = pageData.weirdness;
+        songData.styleInfluence = pageData.styleInfluence;
+        songData.audioInfluence = pageData.audioInfluence;
+        songData.savedAt = new Date().toISOString();
+
         saved++;
         statusEl.textContent = 'Saving ' + saved + '/' + total + '...';
         var markdown = buildMarkdown(songData);
         await saveToGitHub(settings, songData, markdown);
       }
 
-      // Show success but keep buttons/checkboxes visible
-      statusEl.className = 'suno-git-status success';
-      statusEl.textContent = total + ' song(s) saved!';
-
-      // Clear selection state but keep checkboxes
+      // Clear selection state (buttons stay)
       selectedSongs.clear();
       var cbs = document.querySelectorAll('.suno-git-checkbox.selected');
       for (var i = 0; i < cbs.length; i++) {
         cbs[i].classList.remove('selected');
-        var parent = cbs[i].closest('[data-suno-git]');
-        if (parent) parent.classList.remove('suno-git-selected');
+        var p = cbs[i].closest('[data-suno-git]');
+        if (p) p.classList.remove('suno-git-selected');
       }
       updateCount();
 
-      setTimeout(function() {
-        statusEl.textContent = '';
-        statusEl.className = '';
-      }, 3000);
+      statusEl.className = 'suno-git-status success';
+      statusEl.textContent = total + ' song(s) saved!';
+      setTimeout(function() { statusEl.textContent = ''; statusEl.className = ''; }, 3000);
     } catch (err) {
       statusEl.className = 'suno-git-status error';
       statusEl.textContent = err.message;
-      setTimeout(function() {
-        statusEl.textContent = '';
-        statusEl.className = '';
-      }, 4000);
+      setTimeout(function() { statusEl.textContent = ''; statusEl.className = ''; }, 4000);
     } finally {
-      // ALWAYS restore button text and state
       saveBtn.textContent = 'Save to Git';
       saveBtn.disabled = selectedSongs.size === 0;
     }
   }
 
   function buildMarkdown(data) {
-    return [
+    var lines = [
       '# ' + data.title,
       '',
       '- **Date**: ' + data.savedAt,
       '- **URL**: [' + data.url + '](' + data.url + ')',
       '- **Song ID**: `' + data.id + '`',
       '- **Score**: ' + (data.score || '-') + ' / 100',
-      '',
-      '## Prompt / Lyrics',
-      '',
-      '```',
-      data.prompt,
-      '```',
-      '',
-      '## Style',
-      '',
-      data.style,
       ''
-    ].join('\n');
+    ];
+
+    // Lyrics
+    lines.push('## Lyrics');
+    lines.push('');
+    if (data.lyrics) {
+      lines.push('```');
+      lines.push(data.lyrics);
+      lines.push('```');
+    } else {
+      lines.push('(no lyrics)');
+    }
+    lines.push('');
+
+    // Style of Music (Prompt)
+    lines.push('## Style of Music (Prompt)');
+    lines.push('');
+    lines.push(data.style || '(no style)');
+    lines.push('');
+
+    // Exclude Styles
+    if (data.exclude) {
+      lines.push('## Exclude Styles');
+      lines.push('');
+      lines.push(data.exclude);
+      lines.push('');
+    }
+
+    // Parameters
+    if (data.weirdness || data.styleInfluence || data.audioInfluence) {
+      lines.push('## Parameters');
+      lines.push('');
+      lines.push('| Parameter | Value |');
+      lines.push('|-----------|-------|');
+      if (data.weirdness) lines.push('| Weirdness | ' + data.weirdness + '% |');
+      if (data.styleInfluence) lines.push('| Style Influence | ' + data.styleInfluence + '% |');
+      if (data.audioInfluence) lines.push('| Audio Influence | ' + data.audioInfluence + '% |');
+      lines.push('');
+    }
+
+    return lines.join('\n');
   }
 
   async function saveToGitHub(settings, songData, markdown) {
