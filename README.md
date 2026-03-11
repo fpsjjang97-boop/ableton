@@ -12,6 +12,10 @@
   - Lyrics → 가사 필드에 자동 입력
   - Exclude Styles → Exclude 필드에 자동 입력
   - Parameters (Weirdness, Style Influence, Audio Influence) → 슬라이더에 자동 세팅
+  - Custom 모드 자동 전환 후 필드 렌더링 대기 (최대 8초)
+  - 필드별 독립 재시도 (이미 입력된 필드는 건너뜀)
+  - React 18+ 호환 입력 방식 적용
+  - 콘솔 로그 (`[SunoHelper]`)로 디버깅 지원
 
   ### 기능 B: Suno → GitHub 저장
   - suno.com에서 생성된 곡을 체크박스로 선택
@@ -63,8 +67,8 @@
   |------|------|
   | manifest.json | 확장 프로그램 설정 |
   | background.js | 탭 간 통신 |
-  | content-suno.js | suno.com 기능 (곡 선택, Git 저장, 자동 세팅 수신) |
-  | content-suhbway.js | suhbway.kr 기능 (데이터 추출, Send 버튼) |
+  | content-suno.js | suno.com 기능 (곡 선택, Git 저장, 자동 세팅 수신 - phased fill) |
+  | content-suhbway.js | suhbway.kr 기능 (데이터 추출, Send 버튼 - span/label 지원) |
   | styles.css | suno.com 스타일 |
   | styles-suhbway.css | suhbway.kr 스타일 |
   | popup.html | 설정 화면 |
@@ -89,3 +93,13 @@
   | 2026-03-10 | 곡제목 | 85 | Listen |
 
   ---
+
+  ## 변경 이력
+
+  ### v2.1.0 (2026-03-11)
+  - **Auto-fill 개선**: Custom 모드 전환 후 최대 8초 대기하여 필드 렌더링 보장
+  - **필드 탐지 강화**: `getFieldContext()`로 7레벨 부모까지 탐색, `aria-describedby`, `name` 속성 지원
+  - **중복 입력 방지**: 이미 채운 필드는 재시도 시 건너뜀
+  - **React 18+ 호환**: Fiber memoizedProps 리셋, `focusin`/`focusout` 이벤트, range 슬라이더 mouse 이벤트
+  - **Exclude Styles 추출 수정**: `<span>`, `<label>` 태그의 라벨도 인식 (기존 `h2~h4`, `strong`만 지원)
+  - **디버깅**: `[SunoHelper]` 콘솔 로그로 각 필드 입력 상태 확인 가능
