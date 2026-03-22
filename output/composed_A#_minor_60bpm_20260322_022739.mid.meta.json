@@ -1,0 +1,69 @@
+{
+  "filename": "composed_A#_minor_60bpm_20260322_022739.mid",
+  "filepath": "/Users/ai/ableton/output/composed_A#_minor_60bpm_20260322_022739.mid",
+  "settings": {
+    "bpm": 60,
+    "key": "A#",
+    "scale": "minor",
+    "time_signature": "4/4",
+    "style": "ambient",
+    "octave_range": [
+      2,
+      6
+    ],
+    "velocity_range": [
+      1,
+      68
+    ],
+    "measures": 16,
+    "tracks": [
+      {
+        "name": "Melody",
+        "channel": 0,
+        "type": "melody"
+      },
+      {
+        "name": "Chords",
+        "channel": 1,
+        "type": "chords"
+      },
+      {
+        "name": "Bass",
+        "channel": 2,
+        "type": "bass"
+      }
+    ]
+  },
+  "created_at": "20260322_022739",
+  "tracks": [
+    "Meta",
+    "Melody",
+    "Chords",
+    "Bass"
+  ],
+  "total_notes": 148,
+  "duration_sec": 64.0,
+  "status": "needs_revision",
+  "review": {
+    "file": "composed_A#_minor_60bpm_20260322_022739.mid",
+    "reviewed_at": "2026-03-22T02:27:46.505302",
+    "scores": {
+      "track_1_scale": 100.0,
+      "track_1_velocity": 100.0,
+      "track_1_rhythm": 31.4,
+      "track_2_scale": 66.66666666666666,
+      "track_2_velocity": 100.0,
+      "track_2_rhythm": 68.1,
+      "track_3_scale": 100.0,
+      "track_3_velocity": 100.0,
+      "track_3_rhythm": 100.0,
+      "note_diversity": 92.0
+    },
+    "avg_score": 85.8,
+    "issues": [
+      "트랙 2 스케일 일관성 낮음 (67%)"
+    ],
+    "total_notes": 148,
+    "duration": 64.0
+  }
+}

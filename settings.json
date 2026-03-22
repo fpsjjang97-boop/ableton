@@ -1,0 +1,33 @@
+{
+  "bpm": 60,
+  "key": "A#",
+  "scale": "minor",
+  "time_signature": "4/4",
+  "style": "ambient",
+  "octave_range": [
+    2,
+    6
+  ],
+  "velocity_range": [
+    1,
+    68
+  ],
+  "measures": 16,
+  "tracks": [
+    {
+      "name": "Melody",
+      "channel": 0,
+      "type": "melody"
+    },
+    {
+      "name": "Chords",
+      "channel": 1,
+      "type": "chords"
+    },
+    {
+      "name": "Bass",
+      "channel": 2,
+      "type": "bass"
+    }
+  ]
+}
