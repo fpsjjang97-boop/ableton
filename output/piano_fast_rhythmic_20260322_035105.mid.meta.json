@@ -1,0 +1,35 @@
+{
+  "filename": "piano_fast_rhythmic_20260322_035105.mid",
+  "source": "11.mid",
+  "prompt": "기존곡에서 더 빠르고, 리듬감 있게. 피아노 한곡으로",
+  "changes": {
+    "instrument": "Omnisphere → Acoustic Grand Piano (GM #0)",
+    "bpm": "60 → 110",
+    "tracks": "단일 피아노 (RH 멜로디 + LH 리듬베이스)",
+    "velocity": "1~68 → 50~110 (다이나믹 강화)",
+    "rhythm": "긴 노트 → 8분음표 서브디비전, 싱코페이션 추가",
+    "bass_pattern": "Root-Chord-Octave 리듬 패턴 추가",
+    "key": "Bb minor (유지)"
+  },
+  "created_at": "20260322_035105",
+  "status": "needs_revision",
+  "review": {
+    "file": "piano_fast_rhythmic_20260322_035105.mid",
+    "reviewed_at": "2026-03-22T03:51:10.496751",
+    "scores": {
+      "track_1_scale": 82.71844660194175,
+      "track_1_velocity": 16.1,
+      "track_1_rhythm": 55.3,
+      "track_2_scale": 81.61764705882352,
+      "track_2_velocity": 81.1,
+      "track_2_rhythm": 47.1,
+      "note_diversity": 90.0
+    },
+    "avg_score": 64.8,
+    "issues": [
+      "트랙 1 벨로시티 범위 이탈 (16%)"
+    ],
+    "total_notes": 1059,
+    "duration": 69.81255817708282
+  }
+}
