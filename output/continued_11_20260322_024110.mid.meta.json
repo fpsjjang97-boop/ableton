@@ -1,0 +1,26 @@
+{
+  "filename": "continued_11_20260322_024110.mid",
+  "filepath": "/Users/ai/ableton/output/continued_11_20260322_024110.mid",
+  "source": "11.mid",
+  "method": "markov_continuation",
+  "additional_measures": 8,
+  "created_at": "20260322_024110",
+  "status": "approved",
+  "review": {
+    "file": "continued_11_20260322_024110.mid",
+    "reviewed_at": "2026-03-22T02:41:17.738809",
+    "scores": {
+      "track_1_scale": 82.17054263565892,
+      "track_1_velocity": 100.0,
+      "track_1_rhythm": 46.4,
+      "track_2_scale": 84.31372549019608,
+      "track_2_velocity": 100.0,
+      "track_2_rhythm": 12.0,
+      "note_diversity": 92.0
+    },
+    "avg_score": 73.8,
+    "issues": [],
+    "total_notes": 438,
+    "duration": 131.19699344999992
+  }
+}
