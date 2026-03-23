@@ -1,0 +1,2339 @@
+{
+  "total_files": 93,
+  "processed": 93,
+  "failed": 0,
+  "failed_files": [],
+  "total_notes": 873158,
+  "embedding_shape": [
+    93,
+    128
+  ],
+  "embedding_dim": 128,
+  "stats": [
+    {
+      "filename": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.midi",
+      "total_notes": 4991,
+      "total_duration_sec": 582.25,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        31,
+        89
+      ],
+      "pitch_mean": 69.3,
+      "pitch_std": 11.1,
+      "velocity_range": [
+        6,
+        100
+      ],
+      "velocity_mean": 61.7,
+      "velocity_std": 14.8,
+      "duration_mean": 0.1696,
+      "duration_std": 0.309,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.midi",
+      "total_notes": 4197,
+      "total_duration_sec": 703.98,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        27,
+        102
+      ],
+      "pitch_mean": 65.1,
+      "pitch_std": 13.0,
+      "velocity_range": [
+        2,
+        111
+      ],
+      "velocity_mean": 64.9,
+      "velocity_std": 19.1,
+      "duration_mean": 0.3975,
+      "duration_std": 0.6463,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.midi",
+      "total_notes": 7592,
+      "total_duration_sec": 834.64,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        104
+      ],
+      "pitch_mean": 61.8,
+      "pitch_std": 13.9,
+      "velocity_range": [
+        1,
+        110
+      ],
+      "velocity_mean": 63.0,
+      "velocity_std": 18.1,
+      "duration_mean": 0.2411,
+      "duration_std": 0.5734,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.midi",
+      "total_notes": 8038,
+      "total_duration_sec": 1091.66,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        31,
+        84
+      ],
+      "pitch_mean": 65.0,
+      "pitch_std": 10.7,
+      "velocity_range": [
+        3,
+        100
+      ],
+      "velocity_mean": 68.2,
+      "velocity_std": 11.3,
+      "duration_mean": 0.2886,
+      "duration_std": 0.4722,
+      "estimated_key": "E",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.midi",
+      "total_notes": 12968,
+      "total_duration_sec": 1608.76,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        101
+      ],
+      "pitch_mean": 61.8,
+      "pitch_std": 13.3,
+      "velocity_range": [
+        3,
+        108
+      ],
+      "velocity_mean": 65.0,
+      "velocity_std": 17.0,
+      "duration_mean": 0.3059,
+      "duration_std": 0.5134,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi",
+      "total_notes": 4152,
+      "total_duration_sec": 528.64,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        89
+      ],
+      "pitch_mean": 61.7,
+      "pitch_std": 14.2,
+      "velocity_range": [
+        5,
+        100
+      ],
+      "velocity_mean": 57.1,
+      "velocity_std": 16.3,
+      "duration_mean": 0.3082,
+      "duration_std": 0.4545,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.midi",
+      "total_notes": 9727,
+      "total_duration_sec": 1118.78,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        95
+      ],
+      "pitch_mean": 61.2,
+      "pitch_std": 12.9,
+      "velocity_range": [
+        2,
+        121
+      ],
+      "velocity_mean": 65.5,
+      "velocity_std": 20.8,
+      "duration_mean": 0.2688,
+      "duration_std": 0.425,
+      "estimated_key": "C#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.midi",
+      "total_notes": 3012,
+      "total_duration_sec": 330.37,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        31,
+        84
+      ],
+      "pitch_mean": 63.2,
+      "pitch_std": 10.5,
+      "velocity_range": [
+        3,
+        92
+      ],
+      "velocity_mean": 60.9,
+      "velocity_std": 12.9,
+      "duration_mean": 0.2359,
+      "duration_std": 0.3148,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.midi",
+      "total_notes": 4203,
+      "total_duration_sec": 633.86,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        21,
+        100
+      ],
+      "pitch_mean": 60.0,
+      "pitch_std": 14.3,
+      "velocity_range": [
+        3,
+        98
+      ],
+      "velocity_mean": 54.3,
+      "velocity_std": 17.1,
+      "duration_mean": 0.3388,
+      "duration_std": 0.4689,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.midi",
+      "total_notes": 18867,
+      "total_duration_sec": 1611.83,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        27,
+        105
+      ],
+      "pitch_mean": 68.6,
+      "pitch_std": 15.6,
+      "velocity_range": [
+        1,
+        122
+      ],
+      "velocity_mean": 63.6,
+      "velocity_std": 17.5,
+      "duration_mean": 0.1131,
+      "duration_std": 0.215,
+      "estimated_key": "E",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.midi",
+      "total_notes": 6196,
+      "total_duration_sec": 703.75,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        100
+      ],
+      "pitch_mean": 61.3,
+      "pitch_std": 13.8,
+      "velocity_range": [
+        2,
+        106
+      ],
+      "velocity_mean": 57.5,
+      "velocity_std": 18.7,
+      "duration_mean": 0.1929,
+      "duration_std": 0.2762,
+      "estimated_key": "G#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.midi",
+      "total_notes": 23469,
+      "total_duration_sec": 2457.94,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        101
+      ],
+      "pitch_mean": 65.0,
+      "pitch_std": 15.1,
+      "velocity_range": [
+        1,
+        118
+      ],
+      "velocity_mean": 63.9,
+      "velocity_std": 20.0,
+      "duration_mean": 0.223,
+      "duration_std": 0.3779,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.midi",
+      "total_notes": 12138,
+      "total_duration_sec": 795.12,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        105
+      ],
+      "pitch_mean": 70.1,
+      "pitch_std": 16.4,
+      "velocity_range": [
+        1,
+        126
+      ],
+      "velocity_mean": 67.4,
+      "velocity_std": 20.1,
+      "duration_mean": 0.1145,
+      "duration_std": 0.1895,
+      "estimated_key": "A",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi",
+      "total_notes": 3044,
+      "total_duration_sec": 443.1,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        21,
+        108
+      ],
+      "pitch_mean": 69.7,
+      "pitch_std": 15.1,
+      "velocity_range": [
+        2,
+        114
+      ],
+      "velocity_mean": 53.3,
+      "velocity_std": 19.5,
+      "duration_mean": 0.2642,
+      "duration_std": 0.4497,
+      "estimated_key": "D#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.midi",
+      "total_notes": 4740,
+      "total_duration_sec": 349.69,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        21,
+        105
+      ],
+      "pitch_mean": 67.6,
+      "pitch_std": 12.9,
+      "velocity_range": [
+        1,
+        126
+      ],
+      "velocity_mean": 64.8,
+      "velocity_std": 19.5,
+      "duration_mean": 0.1448,
+      "duration_std": 0.1993,
+      "estimated_key": "C#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.midi",
+      "total_notes": 9152,
+      "total_duration_sec": 1254.07,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        26,
+        90
+      ],
+      "pitch_mean": 62.5,
+      "pitch_std": 12.8,
+      "velocity_range": [
+        3,
+        104
+      ],
+      "velocity_mean": 58.2,
+      "velocity_std": 16.1,
+      "duration_mean": 0.3039,
+      "duration_std": 0.5308,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.midi",
+      "total_notes": 13863,
+      "total_duration_sec": 2033.25,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        103
+      ],
+      "pitch_mean": 61.7,
+      "pitch_std": 12.0,
+      "velocity_range": [
+        2,
+        108
+      ],
+      "velocity_mean": 56.4,
+      "velocity_std": 19.9,
+      "duration_mean": 0.3524,
+      "duration_std": 0.6212,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi",
+      "total_notes": 1122,
+      "total_duration_sec": 256.5,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        23,
+        85
+      ],
+      "pitch_mean": 55.4,
+      "pitch_std": 13.0,
+      "velocity_range": [
+        6,
+        106
+      ],
+      "velocity_mean": 54.4,
+      "velocity_std": 19.8,
+      "duration_mean": 0.706,
+      "duration_std": 0.9956,
+      "estimated_key": "B",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.midi",
+      "total_notes": 2731,
+      "total_duration_sec": 165.67,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        98
+      ],
+      "pitch_mean": 61.5,
+      "pitch_std": 12.6,
+      "velocity_range": [
+        2,
+        111
+      ],
+      "velocity_mean": 67.2,
+      "velocity_std": 17.1,
+      "duration_mean": 0.112,
+      "duration_std": 0.1378,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.midi",
+      "total_notes": 5919,
+      "total_duration_sec": 803.47,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        33,
+        89
+      ],
+      "pitch_mean": 68.9,
+      "pitch_std": 9.9,
+      "velocity_range": [
+        3,
+        101
+      ],
+      "velocity_mean": 60.6,
+      "velocity_std": 13.8,
+      "duration_mean": 0.2393,
+      "duration_std": 0.4018,
+      "estimated_key": "A",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.midi",
+      "total_notes": 7629,
+      "total_duration_sec": 701.5,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        21,
+        104
+      ],
+      "pitch_mean": 64.6,
+      "pitch_std": 14.6,
+      "velocity_range": [
+        2,
+        111
+      ],
+      "velocity_mean": 65.5,
+      "velocity_std": 20.0,
+      "duration_mean": 0.1722,
+      "duration_std": 0.3512,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.midi",
+      "total_notes": 5722,
+      "total_duration_sec": 645.12,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        101
+      ],
+      "pitch_mean": 61.7,
+      "pitch_std": 12.2,
+      "velocity_range": [
+        3,
+        102
+      ],
+      "velocity_mean": 54.1,
+      "velocity_std": 16.0,
+      "duration_mean": 0.2721,
+      "duration_std": 0.4013,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.midi",
+      "total_notes": 6412,
+      "total_duration_sec": 1071.46,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        89
+      ],
+      "pitch_mean": 63.9,
+      "pitch_std": 11.5,
+      "velocity_range": [
+        3,
+        104
+      ],
+      "velocity_mean": 62.1,
+      "velocity_std": 17.1,
+      "duration_mean": 0.2961,
+      "duration_std": 0.4194,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.midi",
+      "total_notes": 18541,
+      "total_duration_sec": 1528.2,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        99
+      ],
+      "pitch_mean": 62.0,
+      "pitch_std": 12.6,
+      "velocity_range": [
+        2,
+        116
+      ],
+      "velocity_mean": 67.9,
+      "velocity_std": 17.4,
+      "duration_mean": 0.1626,
+      "duration_std": 0.3112,
+      "estimated_key": "G#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.midi",
+      "total_notes": 13062,
+      "total_duration_sec": 1641.12,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        101
+      ],
+      "pitch_mean": 61.8,
+      "pitch_std": 13.3,
+      "velocity_range": [
+        2,
+        109
+      ],
+      "velocity_mean": 66.0,
+      "velocity_std": 16.0,
+      "duration_mean": 0.2948,
+      "duration_std": 0.5254,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.midi",
+      "total_notes": 6393,
+      "total_duration_sec": 733.61,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        33,
+        84
+      ],
+      "pitch_mean": 64.4,
+      "pitch_std": 10.8,
+      "velocity_range": [
+        3,
+        98
+      ],
+      "velocity_mean": 62.3,
+      "velocity_std": 14.4,
+      "duration_mean": 0.2343,
+      "duration_std": 0.3311,
+      "estimated_key": "F",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.midi",
+      "total_notes": 8723,
+      "total_duration_sec": 1179.22,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        27,
+        97
+      ],
+      "pitch_mean": 62.9,
+      "pitch_std": 14.8,
+      "velocity_range": [
+        3,
+        104
+      ],
+      "velocity_mean": 58.5,
+      "velocity_std": 18.1,
+      "duration_mean": 0.335,
+      "duration_std": 0.4642,
+      "estimated_key": "B",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.midi",
+      "total_notes": 5662,
+      "total_duration_sec": 360.42,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        89
+      ],
+      "pitch_mean": 62.6,
+      "pitch_std": 12.9,
+      "velocity_range": [
+        2,
+        104
+      ],
+      "velocity_mean": 65.9,
+      "velocity_std": 15.2,
+      "duration_mean": 0.1054,
+      "duration_std": 0.1301,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.midi",
+      "total_notes": 4472,
+      "total_duration_sec": 840.18,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        26,
+        95
+      ],
+      "pitch_mean": 60.6,
+      "pitch_std": 13.5,
+      "velocity_range": [
+        2,
+        109
+      ],
+      "velocity_mean": 61.6,
+      "velocity_std": 20.5,
+      "duration_mean": 0.418,
+      "duration_std": 0.6653,
+      "estimated_key": "C#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.midi",
+      "total_notes": 3633,
+      "total_duration_sec": 520.89,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        92
+      ],
+      "pitch_mean": 61.7,
+      "pitch_std": 13.5,
+      "velocity_range": [
+        3,
+        108
+      ],
+      "velocity_mean": 59.5,
+      "velocity_std": 18.7,
+      "duration_mean": 0.3195,
+      "duration_std": 0.6434,
+      "estimated_key": "B",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi",
+      "total_notes": 1094,
+      "total_duration_sec": 249.33,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        38,
+        81
+      ],
+      "pitch_mean": 59.7,
+      "pitch_std": 8.9,
+      "velocity_range": [
+        3,
+        92
+      ],
+      "velocity_mean": 55.6,
+      "velocity_std": 15.2,
+      "duration_mean": 0.7366,
+      "duration_std": 0.987,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.midi",
+      "total_notes": 12957,
+      "total_duration_sec": 1593.32,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        99
+      ],
+      "pitch_mean": 64.2,
+      "pitch_std": 16.1,
+      "velocity_range": [
+        2,
+        107
+      ],
+      "velocity_mean": 56.9,
+      "velocity_std": 19.3,
+      "duration_mean": 0.267,
+      "duration_std": 0.3773,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.midi",
+      "total_notes": 15330,
+      "total_duration_sec": 1522.02,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        25,
+        103
+      ],
+      "pitch_mean": 64.0,
+      "pitch_std": 12.7,
+      "velocity_range": [
+        2,
+        106
+      ],
+      "velocity_mean": 62.6,
+      "velocity_std": 19.4,
+      "duration_mean": 0.1831,
+      "duration_std": 0.3281,
+      "estimated_key": "D#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.midi",
+      "total_notes": 7149,
+      "total_duration_sec": 727.8,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        21,
+        104
+      ],
+      "pitch_mean": 60.0,
+      "pitch_std": 13.7,
+      "velocity_range": [
+        3,
+        110
+      ],
+      "velocity_mean": 62.5,
+      "velocity_std": 16.1,
+      "duration_mean": 0.1889,
+      "duration_std": 0.3702,
+      "estimated_key": "E",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi",
+      "total_notes": 366,
+      "total_duration_sec": 251.66,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        26,
+        89
+      ],
+      "pitch_mean": 61.9,
+      "pitch_std": 11.6,
+      "velocity_range": [
+        3,
+        81
+      ],
+      "velocity_mean": 40.7,
+      "velocity_std": 13.3,
+      "duration_mean": 1.5463,
+      "duration_std": 1.475,
+      "estimated_key": "E",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.midi",
+      "total_notes": 2404,
+      "total_duration_sec": 313.23,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        37,
+        83
+      ],
+      "pitch_mean": 61.1,
+      "pitch_std": 9.9,
+      "velocity_range": [
+        4,
+        93
+      ],
+      "velocity_mean": 61.1,
+      "velocity_std": 11.6,
+      "duration_mean": 0.3515,
+      "duration_std": 0.4665,
+      "estimated_key": "A",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.midi",
+      "total_notes": 3821,
+      "total_duration_sec": 295.72,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        102
+      ],
+      "pitch_mean": 61.7,
+      "pitch_std": 13.5,
+      "velocity_range": [
+        3,
+        115
+      ],
+      "velocity_mean": 59.8,
+      "velocity_std": 18.9,
+      "duration_mean": 0.175,
+      "duration_std": 0.316,
+      "estimated_key": "A#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.midi",
+      "total_notes": 7533,
+      "total_duration_sec": 1069.02,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        89
+      ],
+      "pitch_mean": 66.9,
+      "pitch_std": 11.4,
+      "velocity_range": [
+        3,
+        102
+      ],
+      "velocity_mean": 59.5,
+      "velocity_std": 15.1,
+      "duration_mean": 0.321,
+      "duration_std": 0.4484,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.midi",
+      "total_notes": 13850,
+      "total_duration_sec": 1897.2,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        103
+      ],
+      "pitch_mean": 61.7,
+      "pitch_std": 12.0,
+      "velocity_range": [
+        3,
+        113
+      ],
+      "velocity_mean": 58.4,
+      "velocity_std": 18.8,
+      "duration_mean": 0.3322,
+      "duration_std": 0.5164,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.midi",
+      "total_notes": 14347,
+      "total_duration_sec": 1307.89,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        93
+      ],
+      "pitch_mean": 62.8,
+      "pitch_std": 14.8,
+      "velocity_range": [
+        3,
+        118
+      ],
+      "velocity_mean": 64.1,
+      "velocity_std": 18.2,
+      "duration_mean": 0.1718,
+      "duration_std": 0.3102,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.midi",
+      "total_notes": 6220,
+      "total_duration_sec": 685.55,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        100
+      ],
+      "pitch_mean": 61.2,
+      "pitch_std": 13.7,
+      "velocity_range": [
+        3,
+        116
+      ],
+      "velocity_mean": 63.4,
+      "velocity_std": 18.0,
+      "duration_mean": 0.2236,
+      "duration_std": 0.3247,
+      "estimated_key": "G#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.midi",
+      "total_notes": 1732,
+      "total_duration_sec": 141.41,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        33,
+        86
+      ],
+      "pitch_mean": 67.2,
+      "pitch_std": 10.6,
+      "velocity_range": [
+        9,
+        102
+      ],
+      "velocity_mean": 70.6,
+      "velocity_std": 13.5,
+      "duration_mean": 0.1164,
+      "duration_std": 0.1848,
+      "estimated_key": "A",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.midi",
+      "total_notes": 5099,
+      "total_duration_sec": 637.16,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        26,
+        86
+      ],
+      "pitch_mean": 63.8,
+      "pitch_std": 10.2,
+      "velocity_range": [
+        3,
+        112
+      ],
+      "velocity_mean": 63.6,
+      "velocity_std": 14.6,
+      "duration_mean": 0.3188,
+      "duration_std": 0.6119,
+      "estimated_key": "A",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.midi",
+      "total_notes": 8081,
+      "total_duration_sec": 1023.82,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        96
+      ],
+      "pitch_mean": 61.0,
+      "pitch_std": 13.8,
+      "velocity_range": [
+        3,
+        111
+      ],
+      "velocity_mean": 56.4,
+      "velocity_std": 19.1,
+      "duration_mean": 0.3126,
+      "duration_std": 0.5253,
+      "estimated_key": "D#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.midi",
+      "total_notes": 4169,
+      "total_duration_sec": 235.5,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        104
+      ],
+      "pitch_mean": 65.6,
+      "pitch_std": 16.3,
+      "velocity_range": [
+        2,
+        121
+      ],
+      "velocity_mean": 71.3,
+      "velocity_std": 17.8,
+      "duration_mean": 0.0919,
+      "duration_std": 0.1132,
+      "estimated_key": "F",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.midi",
+      "total_notes": 12307,
+      "total_duration_sec": 991.34,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        26,
+        104
+      ],
+      "pitch_mean": 66.9,
+      "pitch_std": 16.1,
+      "velocity_range": [
+        2,
+        116
+      ],
+      "velocity_mean": 58.8,
+      "velocity_std": 19.7,
+      "duration_mean": 0.1334,
+      "duration_std": 0.2404,
+      "estimated_key": "A#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.midi",
+      "total_notes": 1787,
+      "total_duration_sec": 244.13,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        25,
+        95
+      ],
+      "pitch_mean": 63.1,
+      "pitch_std": 13.2,
+      "velocity_range": [
+        3,
+        121
+      ],
+      "velocity_mean": 67.8,
+      "velocity_std": 24.6,
+      "duration_mean": 0.2764,
+      "duration_std": 0.3884,
+      "estimated_key": "C#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.midi",
+      "total_notes": 8327,
+      "total_duration_sec": 700.57,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        103
+      ],
+      "pitch_mean": 63.0,
+      "pitch_std": 13.9,
+      "velocity_range": [
+        2,
+        120
+      ],
+      "velocity_mean": 67.1,
+      "velocity_std": 19.6,
+      "duration_mean": 0.1477,
+      "duration_std": 0.3162,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.midi",
+      "total_notes": 5733,
+      "total_duration_sec": 848.26,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        103
+      ],
+      "pitch_mean": 66.2,
+      "pitch_std": 12.9,
+      "velocity_range": [
+        3,
+        122
+      ],
+      "velocity_mean": 49.9,
+      "velocity_std": 19.1,
+      "duration_mean": 0.3091,
+      "duration_std": 0.598,
+      "estimated_key": "C#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.midi",
+      "total_notes": 23835,
+      "total_duration_sec": 2098.05,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        101
+      ],
+      "pitch_mean": 62.7,
+      "pitch_std": 12.9,
+      "velocity_range": [
+        2,
+        126
+      ],
+      "velocity_mean": 68.1,
+      "velocity_std": 20.1,
+      "duration_mean": 0.1787,
+      "duration_std": 0.32,
+      "estimated_key": "G#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi",
+      "total_notes": 1991,
+      "total_duration_sec": 456.18,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        36,
+        84
+      ],
+      "pitch_mean": 62.7,
+      "pitch_std": 10.3,
+      "velocity_range": [
+        15,
+        99
+      ],
+      "velocity_mean": 65.2,
+      "velocity_std": 12.8,
+      "duration_mean": 0.8853,
+      "duration_std": 0.9551,
+      "estimated_key": "C#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.midi",
+      "total_notes": 6636,
+      "total_duration_sec": 760.27,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        96
+      ],
+      "pitch_mean": 64.0,
+      "pitch_std": 12.4,
+      "velocity_range": [
+        2,
+        106
+      ],
+      "velocity_mean": 61.1,
+      "velocity_std": 17.3,
+      "duration_mean": 0.3035,
+      "duration_std": 0.3467,
+      "estimated_key": "B",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.midi",
+      "total_notes": 11094,
+      "total_duration_sec": 976.89,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        99
+      ],
+      "pitch_mean": 63.3,
+      "pitch_std": 11.5,
+      "velocity_range": [
+        1,
+        113
+      ],
+      "velocity_mean": 67.0,
+      "velocity_std": 19.3,
+      "duration_mean": 0.2254,
+      "duration_std": 0.4546,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.midi",
+      "total_notes": 17080,
+      "total_duration_sec": 1700.62,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        21,
+        103
+      ],
+      "pitch_mean": 63.3,
+      "pitch_std": 16.4,
+      "velocity_range": [
+        2,
+        120
+      ],
+      "velocity_mean": 69.4,
+      "velocity_std": 20.6,
+      "duration_mean": 0.247,
+      "duration_std": 0.5102,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.midi",
+      "total_notes": 8552,
+      "total_duration_sec": 1119.84,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        27,
+        97
+      ],
+      "pitch_mean": 63.2,
+      "pitch_std": 14.6,
+      "velocity_range": [
+        3,
+        109
+      ],
+      "velocity_mean": 60.8,
+      "velocity_std": 18.5,
+      "duration_mean": 0.2905,
+      "duration_std": 0.4413,
+      "estimated_key": "B",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.midi",
+      "total_notes": 17624,
+      "total_duration_sec": 1557.23,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        101
+      ],
+      "pitch_mean": 64.1,
+      "pitch_std": 13.4,
+      "velocity_range": [
+        2,
+        113
+      ],
+      "velocity_mean": 66.7,
+      "velocity_std": 19.2,
+      "duration_mean": 0.1635,
+      "duration_std": 0.2182,
+      "estimated_key": "F",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.midi",
+      "total_notes": 11581,
+      "total_duration_sec": 1358.57,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        106
+      ],
+      "pitch_mean": 62.9,
+      "pitch_std": 14.4,
+      "velocity_range": [
+        2,
+        117
+      ],
+      "velocity_mean": 65.0,
+      "velocity_std": 20.6,
+      "duration_mean": 0.1888,
+      "duration_std": 0.4149,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.midi",
+      "total_notes": 11532,
+      "total_duration_sec": 1324.91,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        36,
+        84
+      ],
+      "pitch_mean": 63.7,
+      "pitch_std": 10.3,
+      "velocity_range": [
+        3,
+        104
+      ],
+      "velocity_mean": 67.1,
+      "velocity_std": 12.4,
+      "duration_mean": 0.1992,
+      "duration_std": 0.3695,
+      "estimated_key": "E",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.midi",
+      "total_notes": 10111,
+      "total_duration_sec": 1451.4,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        89
+      ],
+      "pitch_mean": 62.6,
+      "pitch_std": 12.5,
+      "velocity_range": [
+        2,
+        108
+      ],
+      "velocity_mean": 63.0,
+      "velocity_std": 15.8,
+      "duration_mean": 0.2982,
+      "duration_std": 1.0081,
+      "estimated_key": "A",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi",
+      "total_notes": 14160,
+      "total_duration_sec": 1461.29,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        100
+      ],
+      "pitch_mean": 59.9,
+      "pitch_std": 13.0,
+      "velocity_range": [
+        2,
+        106
+      ],
+      "velocity_mean": 59.7,
+      "velocity_std": 18.8,
+      "duration_mean": 0.2205,
+      "duration_std": 0.3881,
+      "estimated_key": "C#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.midi",
+      "total_notes": 6615,
+      "total_duration_sec": 945.39,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        89
+      ],
+      "pitch_mean": 67.0,
+      "pitch_std": 9.1,
+      "velocity_range": [
+        10,
+        100
+      ],
+      "velocity_mean": 63.0,
+      "velocity_std": 13.9,
+      "duration_mean": 0.2147,
+      "duration_std": 0.3854,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.midi",
+      "total_notes": 9486,
+      "total_duration_sec": 1120.84,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        95
+      ],
+      "pitch_mean": 61.0,
+      "pitch_std": 12.8,
+      "velocity_range": [
+        1,
+        114
+      ],
+      "velocity_mean": 68.8,
+      "velocity_std": 16.6,
+      "duration_mean": 0.1909,
+      "duration_std": 0.3474,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi",
+      "total_notes": 1223,
+      "total_duration_sec": 294.08,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        35,
+        83
+      ],
+      "pitch_mean": 65.8,
+      "pitch_std": 8.2,
+      "velocity_range": [
+        7,
+        87
+      ],
+      "velocity_mean": 50.5,
+      "velocity_std": 12.8,
+      "duration_mean": 0.6763,
+      "duration_std": 0.5578,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.midi",
+      "total_notes": 15923,
+      "total_duration_sec": 1823.35,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        21,
+        104
+      ],
+      "pitch_mean": 63.1,
+      "pitch_std": 15.5,
+      "velocity_range": [
+        2,
+        120
+      ],
+      "velocity_mean": 68.6,
+      "velocity_std": 19.2,
+      "duration_mean": 0.178,
+      "duration_std": 0.3948,
+      "estimated_key": "D#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.midi",
+      "total_notes": 6700,
+      "total_duration_sec": 809.98,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        93
+      ],
+      "pitch_mean": 66.6,
+      "pitch_std": 11.5,
+      "velocity_range": [
+        3,
+        98
+      ],
+      "velocity_mean": 60.1,
+      "velocity_std": 15.3,
+      "duration_mean": 0.2075,
+      "duration_std": 0.4009,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.midi",
+      "total_notes": 8200,
+      "total_duration_sec": 1054.61,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        23,
+        100
+      ],
+      "pitch_mean": 61.3,
+      "pitch_std": 12.8,
+      "velocity_range": [
+        1,
+        117
+      ],
+      "velocity_mean": 65.2,
+      "velocity_std": 19.1,
+      "duration_mean": 0.2677,
+      "duration_std": 0.3747,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.midi",
+      "total_notes": 4719,
+      "total_duration_sec": 623.06,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        36,
+        84
+      ],
+      "pitch_mean": 62.8,
+      "pitch_std": 9.9,
+      "velocity_range": [
+        11,
+        92
+      ],
+      "velocity_mean": 66.7,
+      "velocity_std": 11.8,
+      "duration_mean": 0.2472,
+      "duration_std": 0.5604,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.midi",
+      "total_notes": 16221,
+      "total_duration_sec": 1906.32,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        104
+      ],
+      "pitch_mean": 63.1,
+      "pitch_std": 15.5,
+      "velocity_range": [
+        2,
+        117
+      ],
+      "velocity_mean": 67.2,
+      "velocity_std": 22.6,
+      "duration_mean": 0.2354,
+      "duration_std": 0.5013,
+      "estimated_key": "D#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.midi",
+      "total_notes": 9786,
+      "total_duration_sec": 1371.9,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        26,
+        101
+      ],
+      "pitch_mean": 62.3,
+      "pitch_std": 14.0,
+      "velocity_range": [
+        2,
+        108
+      ],
+      "velocity_mean": 63.0,
+      "velocity_std": 20.6,
+      "duration_mean": 0.2334,
+      "duration_std": 0.406,
+      "estimated_key": "E",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.midi",
+      "total_notes": 2644,
+      "total_duration_sec": 206.4,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        31,
+        93
+      ],
+      "pitch_mean": 62.9,
+      "pitch_std": 10.0,
+      "velocity_range": [
+        2,
+        104
+      ],
+      "velocity_mean": 62.2,
+      "velocity_std": 17.8,
+      "duration_mean": 0.1314,
+      "duration_std": 0.2418,
+      "estimated_key": "A",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi",
+      "total_notes": 1901,
+      "total_duration_sec": 305.87,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        31,
+        91
+      ],
+      "pitch_mean": 61.6,
+      "pitch_std": 10.7,
+      "velocity_range": [
+        3,
+        97
+      ],
+      "velocity_mean": 50.2,
+      "velocity_std": 16.7,
+      "duration_mean": 0.2578,
+      "duration_std": 0.5152,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.midi",
+      "total_notes": 4687,
+      "total_duration_sec": 270.71,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        27,
+        102
+      ],
+      "pitch_mean": 61.8,
+      "pitch_std": 12.9,
+      "velocity_range": [
+        2,
+        118
+      ],
+      "velocity_mean": 64.5,
+      "velocity_std": 19.5,
+      "duration_mean": 0.0848,
+      "duration_std": 0.2567,
+      "estimated_key": "C#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi",
+      "total_notes": 1095,
+      "total_duration_sec": 216.59,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        38,
+        86
+      ],
+      "pitch_mean": 68.3,
+      "pitch_std": 10.1,
+      "velocity_range": [
+        7,
+        90
+      ],
+      "velocity_mean": 53.1,
+      "velocity_std": 15.1,
+      "duration_mean": 0.376,
+      "duration_std": 0.3734,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.midi",
+      "total_notes": 3085,
+      "total_duration_sec": 194.77,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        33,
+        86
+      ],
+      "pitch_mean": 64.7,
+      "pitch_std": 11.2,
+      "velocity_range": [
+        4,
+        99
+      ],
+      "velocity_mean": 68.9,
+      "velocity_std": 11.9,
+      "duration_mean": 0.0589,
+      "duration_std": 0.0979,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.midi",
+      "total_notes": 4480,
+      "total_duration_sec": 855.71,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        27,
+        104
+      ],
+      "pitch_mean": 62.8,
+      "pitch_std": 11.4,
+      "velocity_range": [
+        1,
+        105
+      ],
+      "velocity_mean": 62.5,
+      "velocity_std": 19.1,
+      "duration_mean": 0.3371,
+      "duration_std": 0.6219,
+      "estimated_key": "C#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.midi",
+      "total_notes": 8059,
+      "total_duration_sec": 1060.91,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        96
+      ],
+      "pitch_mean": 61.0,
+      "pitch_std": 13.8,
+      "velocity_range": [
+        2,
+        109
+      ],
+      "velocity_mean": 56.5,
+      "velocity_std": 17.8,
+      "duration_mean": 0.2894,
+      "duration_std": 0.5181,
+      "estimated_key": "D#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi",
+      "total_notes": 1429,
+      "total_duration_sec": 297.49,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        99
+      ],
+      "pitch_mean": 68.1,
+      "pitch_std": 15.1,
+      "velocity_range": [
+        3,
+        96
+      ],
+      "velocity_mean": 48.9,
+      "velocity_std": 15.0,
+      "duration_mean": 0.4272,
+      "duration_std": 0.6837,
+      "estimated_key": "F",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.midi",
+      "total_notes": 8209,
+      "total_duration_sec": 1022.12,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        23,
+        100
+      ],
+      "pitch_mean": 61.1,
+      "pitch_std": 12.8,
+      "velocity_range": [
+        2,
+        107
+      ],
+      "velocity_mean": 61.1,
+      "velocity_std": 17.2,
+      "duration_mean": 0.2605,
+      "duration_std": 0.3385,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi",
+      "total_notes": 4867,
+      "total_duration_sec": 569.93,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        92
+      ],
+      "pitch_mean": 59.3,
+      "pitch_std": 11.3,
+      "velocity_range": [
+        3,
+        103
+      ],
+      "velocity_mean": 55.9,
+      "velocity_std": 18.8,
+      "duration_mean": 0.2559,
+      "duration_std": 0.428,
+      "estimated_key": "G",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.midi",
+      "total_notes": 9525,
+      "total_duration_sec": 1195.24,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        95
+      ],
+      "pitch_mean": 60.9,
+      "pitch_std": 12.8,
+      "velocity_range": [
+        2,
+        120
+      ],
+      "velocity_mean": 68.1,
+      "velocity_std": 19.9,
+      "duration_mean": 0.2944,
+      "duration_std": 0.4447,
+      "estimated_key": "F#",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.midi",
+      "total_notes": 13920,
+      "total_duration_sec": 1887.8,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        22,
+        103
+      ],
+      "pitch_mean": 61.7,
+      "pitch_std": 12.1,
+      "velocity_range": [
+        2,
+        113
+      ],
+      "velocity_mean": 63.7,
+      "velocity_std": 20.2,
+      "duration_mean": 0.3176,
+      "duration_std": 0.5603,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.midi",
+      "total_notes": 18352,
+      "total_duration_sec": 1846.8,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        24,
+        100
+      ],
+      "pitch_mean": 64.0,
+      "pitch_std": 12.5,
+      "velocity_range": [
+        2,
+        108
+      ],
+      "velocity_mean": 62.2,
+      "velocity_std": 18.8,
+      "duration_mean": 0.193,
+      "duration_std": 0.2426,
+      "estimated_key": "E",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.midi",
+      "total_notes": 16617,
+      "total_duration_sec": 1743.53,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        26,
+        101
+      ],
+      "pitch_mean": 60.5,
+      "pitch_std": 13.3,
+      "velocity_range": [
+        1,
+        118
+      ],
+      "velocity_mean": 62.0,
+      "velocity_std": 18.5,
+      "duration_mean": 0.1986,
+      "duration_std": 0.3492,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.midi",
+      "total_notes": 18262,
+      "total_duration_sec": 2244.51,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        100
+      ],
+      "pitch_mean": 65.4,
+      "pitch_std": 13.1,
+      "velocity_range": [
+        1,
+        118
+      ],
+      "velocity_mean": 62.1,
+      "velocity_std": 16.4,
+      "duration_mean": 0.2016,
+      "duration_std": 0.3384,
+      "estimated_key": "E",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.midi",
+      "total_notes": 17591,
+      "total_duration_sec": 1898.99,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        100
+      ],
+      "pitch_mean": 64.7,
+      "pitch_std": 13.0,
+      "velocity_range": [
+        2,
+        103
+      ],
+      "velocity_mean": 56.5,
+      "velocity_std": 16.8,
+      "duration_mean": 0.2315,
+      "duration_std": 0.3449,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.midi",
+      "total_notes": 18040,
+      "total_duration_sec": 1991.28,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        100
+      ],
+      "pitch_mean": 64.5,
+      "pitch_std": 13.0,
+      "velocity_range": [
+        2,
+        107
+      ],
+      "velocity_mean": 60.2,
+      "velocity_std": 18.1,
+      "duration_mean": 0.2436,
+      "duration_std": 0.3624,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.midi",
+      "total_notes": 25076,
+      "total_duration_sec": 2348.59,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        100
+      ],
+      "pitch_mean": 63.4,
+      "pitch_std": 12.8,
+      "velocity_range": [
+        1,
+        112
+      ],
+      "velocity_mean": 62.8,
+      "velocity_std": 19.8,
+      "duration_mean": 0.1791,
+      "duration_std": 0.2699,
+      "estimated_key": "A",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.midi",
+      "total_notes": 16514,
+      "total_duration_sec": 1749.04,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        29,
+        101
+      ],
+      "pitch_mean": 60.5,
+      "pitch_std": 13.3,
+      "velocity_range": [
+        2,
+        110
+      ],
+      "velocity_mean": 59.2,
+      "velocity_std": 18.1,
+      "duration_mean": 0.195,
+      "duration_std": 0.3823,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.midi",
+      "total_notes": 21435,
+      "total_duration_sec": 2562.28,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        101
+      ],
+      "pitch_mean": 63.3,
+      "pitch_std": 12.9,
+      "velocity_range": [
+        1,
+        119
+      ],
+      "velocity_mean": 57.8,
+      "velocity_std": 17.7,
+      "duration_mean": 0.2105,
+      "duration_std": 0.4566,
+      "estimated_key": "F",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.midi",
+      "total_notes": 21420,
+      "total_duration_sec": 2423.5,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        101
+      ],
+      "pitch_mean": 63.3,
+      "pitch_std": 12.8,
+      "velocity_range": [
+        2,
+        108
+      ],
+      "velocity_mean": 55.1,
+      "velocity_std": 16.6,
+      "duration_mean": 0.2338,
+      "duration_std": 0.4863,
+      "estimated_key": "F",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi",
+      "total_notes": 16662,
+      "total_duration_sec": 1631.46,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        26,
+        101
+      ],
+      "pitch_mean": 60.3,
+      "pitch_std": 13.2,
+      "velocity_range": [
+        1,
+        119
+      ],
+      "velocity_mean": 62.1,
+      "velocity_std": 17.9,
+      "duration_mean": 0.1979,
+      "duration_std": 0.3499,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi",
+      "total_notes": 16853,
+      "total_duration_sec": 2081.37,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        28,
+        100
+      ],
+      "pitch_mean": 64.6,
+      "pitch_std": 13.1,
+      "velocity_range": [
+        1,
+        104
+      ],
+      "velocity_mean": 57.5,
+      "velocity_std": 18.6,
+      "duration_mean": 0.2507,
+      "duration_std": 0.3469,
+      "estimated_key": "D",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    },
+    {
+      "filename": "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi",
+      "total_notes": 16690,
+      "total_duration_sec": 1759.13,
+      "avg_tempo": 120.0,
+      "pitch_range": [
+        26,
+        101
+      ],
+      "pitch_mean": 60.4,
+      "pitch_std": 13.3,
+      "velocity_range": [
+        2,
+        110
+      ],
+      "velocity_mean": 60.3,
+      "velocity_std": 17.8,
+      "duration_mean": 0.1976,
+      "duration_std": 0.338,
+      "estimated_key": "C",
+      "num_instruments": 1,
+      "time_signatures": [
+        "4/4"
+      ]
+    }
+  ]
+}
