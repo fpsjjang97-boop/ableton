@@ -1,0 +1,170 @@
+{
+  "id": "pair_2026-03-23_001",
+  "created_by": "pipeline_variation.py (auto)",
+  "created_date": "2026-03-23",
+  "pipeline_version": "v2",
+  "original": {
+    "midi_file": "originals/11_full.mid",
+    "source": "11.mid (Omnisphere, ambient/cinematic)",
+    "key": "A#",
+    "tempo": 50.6,
+    "time_signature": "4/4",
+    "total_notes": 387,
+    "duration_sec": 131.2,
+    "pitch_range": [
+      32,
+      94
+    ],
+    "velocity_range": [
+      1,
+      68
+    ],
+    "style_tags": [
+      "앰비언트",
+      "시네마틱",
+      "서정적",
+      "pp~mp",
+      "레가토"
+    ],
+    "quality_score": null,
+    "notes": "11.mid - Bb minor, Omnisphere synth, 앰비언트/시네마틱 스타일"
+  },
+  "variation": {
+    "midi_file": "variations/11_var_v2_2026-03-23.mid",
+    "variation_type": "mixed",
+    "variation_types_used": [
+      "rhythm",
+      "harmony",
+      "dynamics",
+      "structure"
+    ],
+    "description": "11.mid를 베이스로 MAESTRO DB Top-10 유사곡에서 202개 프레이즈 패턴 추출 후 적용. 5섹션 구조 (Theme→Rhythm Var→Harmonic Var→Climax→Coda).",
+    "sections": [
+      {
+        "name": "Theme",
+        "start": 0,
+        "end": 30,
+        "notes": 54
+      },
+      {
+        "name": "Rhythm Variation",
+        "start": 30,
+        "end": 65,
+        "notes": 105
+      },
+      {
+        "name": "Harmonic Variation",
+        "start": 65,
+        "end": 100,
+        "notes": 184
+      },
+      {
+        "name": "Climax",
+        "start": 100,
+        "end": 130,
+        "notes": 120
+      },
+      {
+        "name": "Coda",
+        "start": 130,
+        "end": 170,
+        "notes": 30
+      }
+    ],
+    "total_notes": 493,
+    "duration_sec": 169.7,
+    "key": "A#",
+    "top_pitch_classes": [
+      "A#",
+      "D#",
+      "F#"
+    ],
+    "tempo": 66,
+    "pitch_range": [
+      30,
+      96
+    ],
+    "velocity_range": [
+      10,
+      119
+    ],
+    "style_tags": [
+      "클래식",
+      "피아노솔로",
+      "변주곡",
+      "pp~ff"
+    ],
+    "quality_score": null,
+    "reviewer": null,
+    "review_date": null
+  },
+  "reference_songs": [
+    {
+      "filename": "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi",
+      "similarity": 0.8729,
+      "patterns_extracted": 14,
+      "total_notes": 366
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi",
+      "similarity": 0.8273,
+      "patterns_extracted": 18,
+      "total_notes": 1223
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi",
+      "similarity": 0.8091,
+      "patterns_extracted": 18,
+      "total_notes": 1429
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi",
+      "similarity": 0.7922,
+      "patterns_extracted": 15,
+      "total_notes": 1094
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi",
+      "similarity": 0.7865,
+      "patterns_extracted": 14,
+      "total_notes": 1095
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi",
+      "similarity": 0.7782,
+      "patterns_extracted": 16,
+      "total_notes": 1122
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi",
+      "similarity": 0.7399,
+      "patterns_extracted": 27,
+      "total_notes": 3044
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi",
+      "similarity": 0.7335,
+      "patterns_extracted": 19,
+      "total_notes": 1901
+    },
+    {
+      "filename": "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi",
+      "similarity": 0.7236,
+      "patterns_extracted": 28,
+      "total_notes": 1991
+    },
+    {
+      "filename": "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi",
+      "similarity": 0.7002,
+      "patterns_extracted": 33,
+      "total_notes": 4152
+    }
+  ],
+  "pipeline_log": {
+    "step1_embedding_dim": 128,
+    "step2_similar_songs": 10,
+    "step3_total_patterns": 202,
+    "step4_sections": 5,
+    "step5_output_notes": 493
+  }
+}
