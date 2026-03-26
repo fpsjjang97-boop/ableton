@@ -1,0 +1,1078 @@
+{
+  "maw_version": 1,
+  "name": "Midnight Reverie",
+  "bpm": 75.0,
+  "time_signature": [
+    4,
+    4
+  ],
+  "key": "A",
+  "scale": "minor",
+  "ticks_per_beat": 480,
+  "loop_start": 0,
+  "loop_end": 7680,
+  "loop_enabled": false,
+  "tracks": [
+    {
+      "name": "Melody",
+      "channel": 1,
+      "notes": [
+        {
+          "pitch": 79,
+          "velocity": 62,
+          "start_tick": 443,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 90,
+          "start_tick": 2471,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 78,
+          "start_tick": 3816,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 93,
+          "start_tick": 4759,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 51,
+          "start_tick": 7639,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 68,
+          "start_tick": 9103,
+          "duration_ticks": 1440,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 97,
+          "start_tick": 10627,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 79,
+          "velocity": 87,
+          "start_tick": 12910,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 79,
+          "velocity": 63,
+          "start_tick": 15879,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 81,
+          "start_tick": 17816,
+          "duration_ticks": 1440,
+          "channel": 0
+        },
+        {
+          "pitch": 84,
+          "velocity": 89,
+          "start_tick": 19202,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 86,
+          "velocity": 59,
+          "start_tick": 22966,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 86,
+          "velocity": 80,
+          "start_tick": 24438,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 94,
+          "start_tick": 26404,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 87,
+          "start_tick": 27850,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 77,
+          "start_tick": 29243,
+          "duration_ticks": 1440,
+          "channel": 0
+        }
+      ],
+      "muted": false,
+      "solo": false,
+      "volume": 100,
+      "pan": 64,
+      "color": "#8C8C8C",
+      "instrument": 0
+    },
+    {
+      "name": "Chords",
+      "channel": 0,
+      "notes": [
+        {
+          "pitch": 57,
+          "velocity": 52,
+          "start_tick": 0,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 64,
+          "velocity": 64,
+          "start_tick": 0,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 48,
+          "velocity": 55,
+          "start_tick": 12,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 62,
+          "velocity": 55,
+          "start_tick": 1870,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 53,
+          "velocity": 58,
+          "start_tick": 1875,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 69,
+          "velocity": 46,
+          "start_tick": 1891,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 74,
+          "velocity": 58,
+          "start_tick": 3784,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 59,
+          "velocity": 55,
+          "start_tick": 3813,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 67,
+          "velocity": 46,
+          "start_tick": 3890,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 52,
+          "velocity": 54,
+          "start_tick": 5705,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 60,
+          "velocity": 58,
+          "start_tick": 5810,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 67,
+          "velocity": 54,
+          "start_tick": 5812,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 64,
+          "velocity": 50,
+          "start_tick": 7644,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 57,
+          "velocity": 55,
+          "start_tick": 7671,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 48,
+          "velocity": 57,
+          "start_tick": 7694,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 69,
+          "velocity": 54,
+          "start_tick": 9578,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 62,
+          "velocity": 60,
+          "start_tick": 9605,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 53,
+          "velocity": 53,
+          "start_tick": 9615,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 67,
+          "velocity": 56,
+          "start_tick": 11471,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 74,
+          "velocity": 57,
+          "start_tick": 11486,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 59,
+          "velocity": 47,
+          "start_tick": 11509,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 52,
+          "velocity": 62,
+          "start_tick": 13393,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 60,
+          "velocity": 51,
+          "start_tick": 13473,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 67,
+          "velocity": 59,
+          "start_tick": 13497,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 64,
+          "velocity": 61,
+          "start_tick": 15392,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 57,
+          "velocity": 61,
+          "start_tick": 15407,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 48,
+          "velocity": 53,
+          "start_tick": 15412,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 69,
+          "velocity": 52,
+          "start_tick": 17223,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 53,
+          "velocity": 56,
+          "start_tick": 17279,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 62,
+          "velocity": 55,
+          "start_tick": 17319,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 74,
+          "velocity": 52,
+          "start_tick": 19156,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 59,
+          "velocity": 63,
+          "start_tick": 19218,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 67,
+          "velocity": 59,
+          "start_tick": 19223,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 52,
+          "velocity": 52,
+          "start_tick": 21116,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 67,
+          "velocity": 57,
+          "start_tick": 21116,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 60,
+          "velocity": 62,
+          "start_tick": 21170,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 48,
+          "velocity": 56,
+          "start_tick": 23007,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 57,
+          "velocity": 56,
+          "start_tick": 23062,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 64,
+          "velocity": 62,
+          "start_tick": 23097,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 62,
+          "velocity": 55,
+          "start_tick": 24975,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 69,
+          "velocity": 49,
+          "start_tick": 24990,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 53,
+          "velocity": 56,
+          "start_tick": 25002,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 59,
+          "velocity": 47,
+          "start_tick": 26846,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 74,
+          "velocity": 52,
+          "start_tick": 26865,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 67,
+          "velocity": 60,
+          "start_tick": 26936,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 52,
+          "velocity": 48,
+          "start_tick": 28788,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 60,
+          "velocity": 57,
+          "start_tick": 28791,
+          "duration_ticks": 1800,
+          "channel": 0
+        },
+        {
+          "pitch": 67,
+          "velocity": 48,
+          "start_tick": 28808,
+          "duration_ticks": 1800,
+          "channel": 0
+        }
+      ],
+      "muted": false,
+      "solo": false,
+      "volume": 85,
+      "pan": 64,
+      "color": "#B0B0B0",
+      "instrument": 0
+    },
+    {
+      "name": "Counter Melody",
+      "channel": 2,
+      "notes": [
+        {
+          "pitch": 79,
+          "velocity": 58,
+          "start_tick": 387,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 88,
+          "start_tick": 2357,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 87,
+          "start_tick": 3760,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 79,
+          "velocity": 95,
+          "start_tick": 4887,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 50,
+          "start_tick": 7694,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 68,
+          "start_tick": 9055,
+          "duration_ticks": 1440,
+          "channel": 0
+        },
+        {
+          "pitch": 88,
+          "velocity": 92,
+          "start_tick": 10539,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 79,
+          "velocity": 89,
+          "start_tick": 12899,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 84,
+          "velocity": 69,
+          "start_tick": 15746,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 80,
+          "start_tick": 17667,
+          "duration_ticks": 1440,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 99,
+          "start_tick": 19228,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 86,
+          "velocity": 58,
+          "start_tick": 23076,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 91,
+          "velocity": 87,
+          "start_tick": 24528,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 96,
+          "velocity": 92,
+          "start_tick": 26455,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 95,
+          "start_tick": 27833,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 74,
+          "start_tick": 29292,
+          "duration_ticks": 1440,
+          "channel": 0
+        }
+      ],
+      "muted": false,
+      "solo": false,
+      "volume": 65,
+      "pan": 64,
+      "color": "#C8C8C8",
+      "instrument": 0
+    },
+    {
+      "name": "Bass",
+      "channel": 3,
+      "notes": [
+        {
+          "pitch": 35,
+          "velocity": 85,
+          "start_tick": 0,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 58,
+          "start_tick": 692,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 74,
+          "start_tick": 934,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 85,
+          "start_tick": 1926,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 52,
+          "start_tick": 2613,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 77,
+          "start_tick": 2853,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 84,
+          "start_tick": 3831,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 53,
+          "start_tick": 4563,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 77,
+          "start_tick": 4836,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 85,
+          "start_tick": 5728,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 57,
+          "start_tick": 6465,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 75,
+          "start_tick": 6699,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 85,
+          "start_tick": 7679,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 54,
+          "start_tick": 8391,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 76,
+          "start_tick": 8616,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 87,
+          "start_tick": 9591,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 74,
+          "start_tick": 10596,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 86,
+          "start_tick": 11517,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 76,
+          "start_tick": 12473,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 87,
+          "start_tick": 13416,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 72,
+          "start_tick": 14372,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 85,
+          "start_tick": 15346,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 55,
+          "start_tick": 16106,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 76,
+          "start_tick": 16320,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 82,
+          "start_tick": 17280,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 56,
+          "start_tick": 17996,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 75,
+          "start_tick": 18228,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 88,
+          "start_tick": 19180,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 55,
+          "start_tick": 19938,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 78,
+          "start_tick": 20175,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 84,
+          "start_tick": 21145,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 54,
+          "start_tick": 21803,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 73,
+          "start_tick": 22090,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 87,
+          "start_tick": 23053,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 75,
+          "start_tick": 23988,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 83,
+          "start_tick": 24936,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 52,
+          "start_tick": 25689,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 72,
+          "start_tick": 25925,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 86,
+          "start_tick": 26881,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 73,
+          "start_tick": 27848,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 82,
+          "start_tick": 28802,
+          "duration_ticks": 480,
+          "channel": 0
+        },
+        {
+          "pitch": 35,
+          "velocity": 55,
+          "start_tick": 29518,
+          "duration_ticks": 240,
+          "channel": 0
+        },
+        {
+          "pitch": 41,
+          "velocity": 78,
+          "start_tick": 29736,
+          "duration_ticks": 480,
+          "channel": 0
+        }
+      ],
+      "muted": false,
+      "solo": false,
+      "volume": 90,
+      "pan": 64,
+      "color": "#9A9A9A",
+      "instrument": 0
+    },
+    {
+      "name": "Harmony",
+      "channel": 4,
+      "notes": [
+        {
+          "pitch": 79,
+          "velocity": 67,
+          "start_tick": 445,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 85,
+          "start_tick": 2397,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 95,
+          "velocity": 73,
+          "start_tick": 2415,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 80,
+          "start_tick": 3826,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 91,
+          "start_tick": 4840,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 53,
+          "start_tick": 7676,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 67,
+          "start_tick": 9173,
+          "duration_ticks": 1440,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 91,
+          "start_tick": 10611,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 79,
+          "velocity": 92,
+          "start_tick": 12979,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 79,
+          "velocity": 64,
+          "start_tick": 15841,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 83,
+          "velocity": 50,
+          "start_tick": 15897,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 81,
+          "velocity": 78,
+          "start_tick": 17704,
+          "duration_ticks": 1440,
+          "channel": 0
+        },
+        {
+          "pitch": 84,
+          "velocity": 89,
+          "start_tick": 19188,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 86,
+          "velocity": 60,
+          "start_tick": 23070,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 46,
+          "start_tick": 23074,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 98,
+          "velocity": 78,
+          "start_tick": 24500,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 86,
+          "velocity": 84,
+          "start_tick": 24508,
+          "duration_ticks": 1920,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 98,
+          "start_tick": 26346,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 91,
+          "start_tick": 27907,
+          "duration_ticks": 960,
+          "channel": 0
+        },
+        {
+          "pitch": 89,
+          "velocity": 74,
+          "start_tick": 29270,
+          "duration_ticks": 1440,
+          "channel": 0
+        }
+      ],
+      "muted": false,
+      "solo": false,
+      "volume": 55,
+      "pan": 64,
+      "color": "#707070",
+      "instrument": 0
+    }
+  ]
+}

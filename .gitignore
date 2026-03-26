@@ -1,0 +1,16 @@
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# JUCE build
+juce_app/build/
+*.obj
+*.exe
+*.pdb
+*.ilk
+
+# Temp
+*.tmp
+build_log.txt
