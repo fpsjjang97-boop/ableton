@@ -333,4 +333,6 @@ intro / verse / pre-chorus / chorus / bridge / ending
 
 ---
 
-원하면 내가 다음 답변에서 이걸 바로 **기획서/회의 문서에 넣기 좋게 더 딱딱한 문체로 다시 정리**해줄게.
+https://github.com/music-x-lab/POP909-Dataset
+실제 유명한 팝송을 피아노로 변주한뒤 midi파일로 뽑아놓은 dataset 아직 db가 구축되지 않은 지금 상황에서 db로 활용할수 있을것같다 다만 피아노에 한해서
+
