@@ -5,7 +5,8 @@
     "by_category": {
       "chamber": 7,
       "recital": 74,
-      "schubert": 12
+      "schubert": 12,
+      "pop909": 0
     },
     "by_key": {
       "C": 11,
@@ -37,6 +38,29 @@
     "by_register": {
       "alto": 89,
       "tenor": 4
+    },
+    "by_rhythm_type": {
+      "virtuosic": 56,
+      "dense": 36,
+      "sparse": 1
+    },
+    "by_harmony_type": {
+      "dyadic": 22,
+      "triadic": 69,
+      "dense_voicing": 2
+    },
+    "by_accompaniment": {
+      "mixed": 16,
+      "block_chord": 72,
+      "arpeggio": 4,
+      "pad": 1
+    },
+    "by_voicing_type": {
+      "semi_open": 10,
+      "open": 83
+    },
+    "by_dynamic_profile": {
+      "expressive": 93
     }
   },
   "index": {
@@ -139,7 +163,8 @@
         "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi",
         "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi",
         "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi"
-      ]
+      ],
+      "pop909": []
     },
     "by_key": {
       "C": [
@@ -657,6 +682,507 @@
         "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi",
         "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi"
       ]
+    },
+    "by_rhythm_type": {
+      "virtuosic": [
+        "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi"
+      ],
+      "dense": [
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.midi"
+      ],
+      "sparse": [
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi"
+      ]
+    },
+    "by_harmony_type": {
+      "dyadic": [
+        "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi"
+      ],
+      "triadic": [
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi"
+      ],
+      "dense_voicing": [
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi"
+      ]
+    },
+    "by_accompaniment": {
+      "mixed": [
+        "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.midi"
+      ],
+      "block_chord": [
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi"
+      ],
+      "arpeggio": [
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.midi"
+      ],
+      "pad": [
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi"
+      ]
+    },
+    "by_voicing_type": {
+      "semi_open": [
+        "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi"
+      ],
+      "open": [
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi"
+      ]
+    },
+    "by_dynamic_profile": {
+      "expressive": [
+        "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi",
+        "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.midi",
+        "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi",
+        "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi"
+      ]
     }
   },
   "catalog": [
@@ -690,7 +1216,29 @@
         "4/4"
       ],
       "embedding_file": "individual/chamber/MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.58,
+        "avg_ioi": 0.1185,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.599,
+        "harmony_ratio": 0.538,
+        "avg_polyphony": 2.45,
+        "max_polyphony": 6,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.118,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 13.5,
+        "pitch_range": 58,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 94,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.midi",
@@ -722,7 +1270,29 @@
         "4/4"
       ],
       "embedding_file": "individual/chamber/MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 6.1,
+        "avg_ioi": 0.1674,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.747,
+        "harmony_ratio": 0.729,
+        "avg_polyphony": 3.0,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.046,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.3,
+        "pitch_range": 75,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 109,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.midi",
@@ -754,7 +1324,29 @@
         "4/4"
       ],
       "embedding_file": "individual/chamber/MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.13,
+        "avg_ioi": 0.1147,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.419,
+        "harmony_ratio": 0.851,
+        "avg_polyphony": 3.24,
+        "max_polyphony": 11,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.059,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.5,
+        "pitch_range": 82,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 109,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.midi",
@@ -786,7 +1378,29 @@
         "4/4"
       ],
       "embedding_file": "individual/chamber/MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.36,
+        "avg_ioi": 0.1375,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.438,
+        "harmony_ratio": 0.503,
+        "avg_polyphony": 2.16,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.115,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.8,
+        "pitch_range": 53,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 97,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.midi",
@@ -818,7 +1432,29 @@
         "4/4"
       ],
       "embedding_file": "individual/chamber/MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.08,
+        "avg_ioi": 0.1262,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.459,
+        "harmony_ratio": 0.616,
+        "avg_polyphony": 2.63,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.091,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.3,
+        "pitch_range": 77,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 105,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi",
@@ -850,7 +1486,29 @@
         "4/4"
       ],
       "embedding_file": "individual/chamber/MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.92,
+        "avg_ioi": 0.1298,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.436,
+        "harmony_ratio": 0.789,
+        "avg_polyphony": 2.67,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.056,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.6,
+        "pitch_range": 60,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 95,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.midi",
@@ -882,7 +1540,29 @@
         "4/4"
       ],
       "embedding_file": "individual/chamber/MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/chamber/MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.7,
+        "avg_ioi": 0.1184,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.563,
+        "harmony_ratio": 0.775,
+        "avg_polyphony": 2.79,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.061,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.8,
+        "pitch_range": 73,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 119,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.midi",
@@ -914,7 +1594,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.16,
+        "avg_ioi": 0.1096,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.419,
+        "harmony_ratio": 0.566,
+        "avg_polyphony": 2.6,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.085,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.5,
+        "pitch_range": 53,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 89,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.midi",
@@ -946,7 +1648,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 6.66,
+        "avg_ioi": 0.1513,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.33,
+        "harmony_ratio": 0.791,
+        "avg_polyphony": 2.5,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.035,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.9,
+        "pitch_range": 79,
+        "register": "tenor",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 95,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.midi",
@@ -978,7 +1702,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 11.71,
+        "avg_ioi": 0.0879,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.383,
+        "harmony_ratio": 0.717,
+        "avg_polyphony": 2.75,
+        "max_polyphony": 11,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.108,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.6,
+        "pitch_range": 78,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 121,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.midi",
@@ -1010,7 +1756,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_01_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.84,
+        "avg_ioi": 0.115,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.569,
+        "harmony_ratio": 0.582,
+        "avg_polyphony": 2.58,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.085,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.6,
+        "pitch_range": 78,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 104,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.midi",
@@ -1042,7 +1810,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.56,
+        "avg_ioi": 0.1077,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.371,
+        "harmony_ratio": 0.769,
+        "avg_polyphony": 2.7,
+        "max_polyphony": 11,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.073,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.7,
+        "pitch_range": 79,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 117,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.midi",
@@ -1074,7 +1864,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 15.27,
+        "avg_ioi": 0.0688,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.348,
+        "harmony_ratio": 0.839,
+        "avg_polyphony": 3.25,
+        "max_polyphony": 11,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.089,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.6,
+        "pitch_range": 81,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 125,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi",
@@ -1106,7 +1918,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 6.9,
+        "avg_ioi": 0.1455,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.472,
+        "harmony_ratio": 0.637,
+        "avg_polyphony": 3.05,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "arpeggio",
+        "arpeggio_ratio": 0.192,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.2,
+        "pitch_range": 87,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 112,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.midi",
@@ -1138,7 +1972,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_02_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 13.56,
+        "avg_ioi": 0.0758,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.522,
+        "harmony_ratio": 0.626,
+        "avg_polyphony": 2.91,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.087,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.8,
+        "pitch_range": 84,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 125,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.midi",
@@ -1170,7 +2026,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.3,
+        "avg_ioi": 0.1413,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.385,
+        "harmony_ratio": 0.692,
+        "avg_polyphony": 2.7,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.081,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.2,
+        "pitch_range": 64,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 101,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.midi",
@@ -1202,7 +2080,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 6.83,
+        "avg_ioi": 0.1514,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.412,
+        "harmony_ratio": 0.756,
+        "avg_polyphony": 2.75,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.06,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.1,
+        "pitch_range": 81,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 106,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi",
@@ -1234,7 +2134,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 4.37,
+        "avg_ioi": 0.2355,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.31,
+        "harmony_ratio": 0.928,
+        "avg_polyphony": 2.64,
+        "max_polyphony": 6,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.046,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 11.0,
+        "pitch_range": 62,
+        "register": "tenor",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 100,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.midi",
@@ -1266,7 +2188,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital1-3_MID--AUDIO_03_R1_2018_wav--5.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.024,
+        "note_density_per_sec": 16.62,
+        "avg_ioi": 0.0618,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.258,
+        "harmony_ratio": 0.716,
+        "avg_polyphony": 2.49,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.05,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.1,
+        "pitch_range": 70,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 109,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.midi",
@@ -1298,7 +2242,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.37,
+        "avg_ioi": 0.1376,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.42,
+        "harmony_ratio": 0.557,
+        "avg_polyphony": 2.39,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.121,
+        "voicing_type": "open",
+        "avg_voicing_spread": 14.7,
+        "pitch_range": 56,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 98,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.midi",
@@ -1330,7 +2296,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 10.88,
+        "avg_ioi": 0.0967,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.604,
+        "harmony_ratio": 0.796,
+        "avg_polyphony": 3.37,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.08,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.6,
+        "pitch_range": 83,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 109,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.midi",
@@ -1362,7 +2350,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital12_MID--AUDIO_12_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.88,
+        "avg_ioi": 0.1134,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.467,
+        "harmony_ratio": 0.425,
+        "avg_polyphony": 2.47,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.137,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.9,
+        "pitch_range": 72,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 99,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.midi",
@@ -1394,7 +2404,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 5.99,
+        "avg_ioi": 0.1693,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.376,
+        "harmony_ratio": 0.53,
+        "avg_polyphony": 2.4,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.072,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.8,
+        "pitch_range": 60,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 101,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.midi",
@@ -1426,7 +2458,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 12.15,
+        "avg_ioi": 0.0869,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.438,
+        "harmony_ratio": 0.805,
+        "avg_polyphony": 3.58,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.063,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.1,
+        "pitch_range": 75,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 114,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.midi",
@@ -1458,7 +2512,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_13_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.97,
+        "avg_ioi": 0.1277,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.464,
+        "harmony_ratio": 0.595,
+        "avg_polyphony": 2.59,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.096,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.2,
+        "pitch_range": 77,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 107,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.midi",
@@ -1490,7 +2566,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.72,
+        "avg_ioi": 0.1161,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.375,
+        "harmony_ratio": 0.65,
+        "avg_polyphony": 2.23,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.055,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.4,
+        "pitch_range": 51,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 95,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.midi",
@@ -1522,7 +2620,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.42,
+        "avg_ioi": 0.1378,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.318,
+        "harmony_ratio": 0.707,
+        "avg_polyphony": 2.51,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.068,
+        "voicing_type": "open",
+        "avg_voicing_spread": 22.0,
+        "pitch_range": 70,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 101,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.midi",
@@ -1554,7 +2674,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 15.74,
+        "avg_ioi": 0.0662,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.457,
+        "harmony_ratio": 0.72,
+        "avg_polyphony": 3.04,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.103,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.9,
+        "pitch_range": 60,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 102,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.midi",
@@ -1586,7 +2728,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_14_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 5.34,
+        "avg_ioi": 0.1932,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.514,
+        "harmony_ratio": 0.748,
+        "avg_polyphony": 2.71,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.058,
+        "voicing_type": "open",
+        "avg_voicing_spread": 21.0,
+        "pitch_range": 69,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 107,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.midi",
@@ -1618,7 +2782,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.04,
+        "avg_ioi": 0.1436,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.89,
+        "harmony_ratio": 0.585,
+        "avg_polyphony": 2.44,
+        "max_polyphony": 6,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.077,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 13.9,
+        "pitch_range": 68,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 105,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi",
@@ -1650,7 +2836,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 4.48,
+        "avg_ioi": 0.2223,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.58,
+        "harmony_ratio": 0.436,
+        "avg_polyphony": 2.48,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.116,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 13.7,
+        "pitch_range": 43,
+        "register": "tenor",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 89,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.midi",
@@ -1682,7 +2890,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.15,
+        "avg_ioi": 0.1251,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.339,
+        "harmony_ratio": 0.674,
+        "avg_polyphony": 2.54,
+        "max_polyphony": 6,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.057,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.6,
+        "pitch_range": 75,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 105,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.midi",
@@ -1714,7 +2944,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital13-15_MID--AUDIO_15_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 10.07,
+        "avg_ioi": 0.1036,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.391,
+        "harmony_ratio": 0.837,
+        "avg_polyphony": 3.02,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.049,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.7,
+        "pitch_range": 78,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 104,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.midi",
@@ -1746,7 +2998,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.82,
+        "avg_ioi": 0.1049,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.539,
+        "harmony_ratio": 0.702,
+        "avg_polyphony": 2.82,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.076,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.0,
+        "pitch_range": 83,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 107,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi",
@@ -1778,7 +3052,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital16_MID--AUDIO_16_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "sparse",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 1.48,
+        "avg_ioi": 0.6671,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.4,
+        "harmony_ratio": 0.538,
+        "avg_polyphony": 2.98,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "pad",
+        "arpeggio_ratio": 0.017,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 12.6,
+        "pitch_range": 63,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "piano",
+        "velocity_range": 78,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.midi",
@@ -1810,7 +3106,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.67,
+        "avg_ioi": 0.1305,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.426,
+        "harmony_ratio": 0.721,
+        "avg_polyphony": 2.27,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.067,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.8,
+        "pitch_range": 46,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 89,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.midi",
@@ -1842,7 +3160,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 13.09,
+        "avg_ioi": 0.0781,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.341,
+        "harmony_ratio": 0.797,
+        "avg_polyphony": 3.33,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.055,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.7,
+        "pitch_range": 80,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 112,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.midi",
@@ -1874,7 +3214,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.05,
+        "avg_ioi": 0.1435,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.362,
+        "harmony_ratio": 0.515,
+        "avg_polyphony": 2.37,
+        "max_polyphony": 6,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.112,
+        "voicing_type": "open",
+        "avg_voicing_spread": 14.5,
+        "pitch_range": 60,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 99,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.midi",
@@ -1906,7 +3268,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_17_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.31,
+        "avg_ioi": 0.1398,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.43,
+        "harmony_ratio": 0.73,
+        "avg_polyphony": 2.67,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.065,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.1,
+        "pitch_range": 81,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 110,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.midi",
@@ -1938,7 +3322,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 10.98,
+        "avg_ioi": 0.0935,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.425,
+        "harmony_ratio": 0.7,
+        "avg_polyphony": 2.54,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.09,
+        "voicing_type": "open",
+        "avg_voicing_spread": 21.9,
+        "pitch_range": 64,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 115,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.midi",
@@ -1970,7 +3376,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.08,
+        "avg_ioi": 0.1113,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.606,
+        "harmony_ratio": 0.577,
+        "avg_polyphony": 2.6,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.091,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.5,
+        "pitch_range": 78,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 113,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.midi",
@@ -2002,7 +3430,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_18_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 12.37,
+        "avg_ioi": 0.082,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.429,
+        "harmony_ratio": 0.773,
+        "avg_polyphony": 2.57,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.049,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.7,
+        "pitch_range": 53,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 93,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.midi",
@@ -2034,7 +3484,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.02,
+        "avg_ioi": 0.1247,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.372,
+        "harmony_ratio": 0.415,
+        "avg_polyphony": 2.24,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "arpeggio",
+        "arpeggio_ratio": 0.205,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.7,
+        "pitch_range": 60,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 109,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.midi",
@@ -2066,7 +3538,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.9,
+        "avg_ioi": 0.1308,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.4,
+        "harmony_ratio": 0.731,
+        "avg_polyphony": 3.04,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.043,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.6,
+        "pitch_range": 72,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 108,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.midi",
@@ -2098,7 +3592,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 17.9,
+        "avg_ioi": 0.0575,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.27,
+        "harmony_ratio": 0.775,
+        "avg_polyphony": 2.9,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.096,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.9,
+        "pitch_range": 76,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 119,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.midi",
@@ -2130,7 +3646,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 12.42,
+        "avg_ioi": 0.083,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.397,
+        "harmony_ratio": 0.696,
+        "avg_polyphony": 2.81,
+        "max_polyphony": 11,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.089,
+        "voicing_type": "open",
+        "avg_voicing_spread": 14.8,
+        "pitch_range": 78,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 114,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.midi",
@@ -2162,7 +3700,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--5.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.64,
+        "avg_ioi": 0.1435,
+        "harmony_type": "dense_voicing",
+        "harmonic_brightness": 0.377,
+        "harmony_ratio": 0.877,
+        "avg_polyphony": 4.06,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.027,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.6,
+        "pitch_range": 70,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 118,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.midi",
@@ -2194,7 +3754,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital17-19_MID--AUDIO_19_R1_2018_wav--6.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 11.89,
+        "avg_ioi": 0.0894,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.489,
+        "harmony_ratio": 0.805,
+        "avg_polyphony": 3.52,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.087,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.4,
+        "pitch_range": 81,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 118,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.midi",
@@ -2226,7 +3808,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 6.81,
+        "avg_ioi": 0.1495,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.489,
+        "harmony_ratio": 0.635,
+        "avg_polyphony": 2.67,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.1,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 12.0,
+        "pitch_range": 81,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "piano",
+        "velocity_range": 119,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.midi",
@@ -2258,7 +3862,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital20_MID--AUDIO_20_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 11.38,
+        "avg_ioi": 0.093,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.427,
+        "harmony_ratio": 0.757,
+        "avg_polyphony": 3.44,
+        "max_polyphony": 11,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.077,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.5,
+        "pitch_range": 77,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 124,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi",
@@ -2290,7 +3916,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 4.38,
+        "avg_ioi": 0.2322,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.382,
+        "harmony_ratio": 0.698,
+        "avg_polyphony": 2.43,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.009,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.0,
+        "pitch_range": 48,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 84,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.midi",
@@ -2322,7 +3970,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.73,
+        "avg_ioi": 0.1186,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.324,
+        "harmony_ratio": 0.708,
+        "avg_polyphony": 2.92,
+        "max_polyphony": 10,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.074,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.6,
+        "pitch_range": 68,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 104,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.midi",
@@ -2354,7 +4024,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 11.36,
+        "avg_ioi": 0.0906,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.424,
+        "harmony_ratio": 0.754,
+        "avg_polyphony": 2.62,
+        "max_polyphony": 10,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.05,
+        "voicing_type": "open",
+        "avg_voicing_spread": 14.8,
+        "pitch_range": 75,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 112,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.midi",
@@ -2386,7 +4078,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital4_MID--AUDIO_04_R1_2018_wav--5.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 10.05,
+        "avg_ioi": 0.1051,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.418,
+        "harmony_ratio": 0.77,
+        "avg_polyphony": 3.34,
+        "max_polyphony": 10,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.09,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.4,
+        "pitch_range": 82,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 118,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.midi",
@@ -2418,7 +4132,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.67,
+        "avg_ioi": 0.1329,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.324,
+        "harmony_ratio": 0.715,
+        "avg_polyphony": 2.58,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.074,
+        "voicing_type": "open",
+        "avg_voicing_spread": 22.2,
+        "pitch_range": 70,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 106,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.midi",
@@ -2450,7 +4186,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 11.32,
+        "avg_ioi": 0.0922,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.428,
+        "harmony_ratio": 0.823,
+        "avg_polyphony": 2.92,
+        "max_polyphony": 11,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.078,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.9,
+        "pitch_range": 79,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 111,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.midi",
@@ -2482,7 +4240,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_05_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.54,
+        "avg_ioi": 0.122,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.443,
+        "harmony_ratio": 0.752,
+        "avg_polyphony": 2.94,
+        "max_polyphony": 10,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.081,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.3,
+        "pitch_range": 84,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 115,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.midi",
@@ -2514,7 +4294,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.71,
+        "avg_ioi": 0.1167,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.405,
+        "harmony_ratio": 0.734,
+        "avg_polyphony": 2.11,
+        "max_polyphony": 4,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.045,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.4,
+        "pitch_range": 48,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 101,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.midi",
@@ -2546,7 +4348,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 6.97,
+        "avg_ioi": 0.1464,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.277,
+        "harmony_ratio": 0.597,
+        "avg_polyphony": 2.49,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.091,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.7,
+        "pitch_range": 61,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 106,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi",
@@ -2578,7 +4402,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_06_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.69,
+        "avg_ioi": 0.1075,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.446,
+        "harmony_ratio": 0.835,
+        "avg_polyphony": 3.08,
+        "max_polyphony": 10,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.045,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.4,
+        "pitch_range": 78,
+        "register": "tenor",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 104,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.midi",
@@ -2610,7 +4456,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.0,
+        "avg_ioi": 0.1444,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.391,
+        "harmony_ratio": 0.493,
+        "avg_polyphony": 2.28,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.083,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 12.6,
+        "pitch_range": 60,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 90,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.midi",
@@ -2642,7 +4510,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.47,
+        "avg_ioi": 0.1225,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.556,
+        "harmony_ratio": 0.786,
+        "avg_polyphony": 2.85,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.061,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.5,
+        "pitch_range": 73,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 113,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi",
@@ -2674,7 +4564,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 4.16,
+        "avg_ioi": 0.2392,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.376,
+        "harmony_ratio": 0.697,
+        "avg_polyphony": 2.22,
+        "max_polyphony": 4,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.019,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 9.7,
+        "pitch_range": 48,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 80,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.midi",
@@ -2706,7 +4618,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital5-7_MID--AUDIO_07_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.76,
+        "avg_ioi": 0.1209,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.451,
+        "harmony_ratio": 0.807,
+        "avg_polyphony": 3.26,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.043,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.1,
+        "pitch_range": 83,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 118,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.midi",
@@ -2738,7 +4672,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.28,
+        "avg_ioi": 0.1238,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.426,
+        "harmony_ratio": 0.64,
+        "avg_polyphony": 2.72,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.094,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.7,
+        "pitch_range": 64,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 95,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.midi",
@@ -2770,7 +4726,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.78,
+        "avg_ioi": 0.1316,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.404,
+        "harmony_ratio": 0.581,
+        "avg_polyphony": 2.84,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "arpeggio",
+        "arpeggio_ratio": 0.155,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.9,
+        "pitch_range": 77,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 116,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.midi",
@@ -2802,7 +4780,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.6,
+        "avg_ioi": 0.134,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.445,
+        "harmony_ratio": 0.668,
+        "avg_polyphony": 2.22,
+        "max_polyphony": 5,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.063,
+        "voicing_type": "open",
+        "avg_voicing_spread": 15.7,
+        "pitch_range": 48,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 81,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.midi",
@@ -2834,7 +4834,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital8_MID--AUDIO_08_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.51,
+        "avg_ioi": 0.1247,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.463,
+        "harmony_ratio": 0.794,
+        "avg_polyphony": 3.34,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.041,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.6,
+        "pitch_range": 80,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 115,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.midi",
@@ -2866,7 +4888,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.14,
+        "avg_ioi": 0.1479,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.44,
+        "harmony_ratio": 0.815,
+        "avg_polyphony": 3.07,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.053,
+        "voicing_type": "open",
+        "avg_voicing_spread": 21.2,
+        "pitch_range": 75,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 106,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.midi",
@@ -2898,7 +4942,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 13.3,
+        "avg_ioi": 0.0765,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.383,
+        "harmony_ratio": 0.694,
+        "avg_polyphony": 2.52,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.108,
+        "voicing_type": "open",
+        "avg_voicing_spread": 14.4,
+        "pitch_range": 62,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 102,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi",
@@ -2930,7 +4996,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 6.34,
+        "avg_ioi": 0.1559,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.41,
+        "harmony_ratio": 0.655,
+        "avg_polyphony": 2.25,
+        "max_polyphony": 4,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.043,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 13.7,
+        "pitch_range": 60,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 94,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.midi",
@@ -2962,7 +5050,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--4.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 17.41,
+        "avg_ioi": 0.0576,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.392,
+        "harmony_ratio": 0.785,
+        "avg_polyphony": 2.46,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.084,
+        "voicing_type": "open",
+        "avg_voicing_spread": 14.2,
+        "pitch_range": 75,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 116,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi",
@@ -2994,7 +5104,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--5.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 5.1,
+        "avg_ioi": 0.1964,
+        "harmony_type": "dyadic",
+        "harmonic_brightness": 0.279,
+        "harmony_ratio": 0.511,
+        "avg_polyphony": 2.3,
+        "max_polyphony": 4,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.037,
+        "voicing_type": "semi_open",
+        "avg_voicing_spread": 12.4,
+        "pitch_range": 48,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 83,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.midi",
@@ -3026,7 +5158,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_09_R1_2018_wav--6.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 15.84,
+        "avg_ioi": 0.0643,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.364,
+        "harmony_ratio": 0.651,
+        "avg_polyphony": 2.57,
+        "max_polyphony": 6,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.06,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.0,
+        "pitch_range": 53,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 95,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.midi",
@@ -3058,7 +5212,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 5.28,
+        "avg_ioi": 0.1931,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.443,
+        "harmony_ratio": 0.573,
+        "avg_polyphony": 2.78,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "mixed",
+        "arpeggio_ratio": 0.079,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.6,
+        "pitch_range": 77,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 104,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.midi",
@@ -3090,7 +5266,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.6,
+        "avg_ioi": 0.1358,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.408,
+        "harmony_ratio": 0.73,
+        "avg_polyphony": 3.05,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.042,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.6,
+        "pitch_range": 72,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 107,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi",
@@ -3122,7 +5320,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--3.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 4.93,
+        "avg_ioi": 0.2155,
+        "harmony_type": "dense_voicing",
+        "harmonic_brightness": 0.444,
+        "harmony_ratio": 0.875,
+        "avg_polyphony": 4.1,
+        "max_polyphony": 10,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.035,
+        "voicing_type": "open",
+        "avg_voicing_spread": 21.4,
+        "pitch_range": 77,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "piano",
+        "velocity_range": 93,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.midi",
@@ -3154,7 +5374,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_10_R1_2018_wav--5.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.03,
+        "avg_ioi": 0.1266,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.405,
+        "harmony_ratio": 0.611,
+        "avg_polyphony": 2.77,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "arpeggio",
+        "arpeggio_ratio": 0.15,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.0,
+        "pitch_range": 77,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 105,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi",
@@ -3186,7 +5428,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--1.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.6,
+        "avg_ioi": 0.1205,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.54,
+        "harmony_ratio": 0.783,
+        "avg_polyphony": 3.04,
+        "max_polyphony": 7,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.041,
+        "voicing_type": "open",
+        "avg_voicing_spread": 17.1,
+        "pitch_range": 63,
+        "register": "tenor",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 100,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.midi",
@@ -3218,7 +5482,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--2.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.97,
+        "avg_ioi": 0.1308,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.558,
+        "harmony_ratio": 0.781,
+        "avg_polyphony": 2.82,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.056,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.2,
+        "pitch_range": 73,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 118,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.midi",
@@ -3250,7 +5536,29 @@
         "4/4"
       ],
       "embedding_file": "individual/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.json",
-      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.midi"
+      "midi_file": "Ableton/midi_raw/recital/MIDI-Unprocessed_Recital9-11_MID--AUDIO_11_R1_2018_wav--5.midi",
+      "composer_tags": {
+        "rhythm_type": "dense",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 7.38,
+        "avg_ioi": 0.1396,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.419,
+        "harmony_ratio": 0.756,
+        "avg_polyphony": 2.73,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.064,
+        "voicing_type": "open",
+        "avg_voicing_spread": 16.0,
+        "pitch_range": 81,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 111,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.midi",
@@ -3282,7 +5590,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert1-3_MID--AUDIO_02_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.94,
+        "avg_ioi": 0.1046,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.414,
+        "harmony_ratio": 0.806,
+        "avg_polyphony": 3.01,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.047,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.5,
+        "pitch_range": 76,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 106,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.midi",
@@ -3314,7 +5644,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert1-3_MID--AUDIO_05_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.53,
+        "avg_ioi": 0.1087,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.457,
+        "harmony_ratio": 0.782,
+        "avg_polyphony": 2.81,
+        "max_polyphony": 15,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.068,
+        "voicing_type": "open",
+        "avg_voicing_spread": 21.3,
+        "pitch_range": 75,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 117,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.midi",
@@ -3346,7 +5698,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert1-3_MID--AUDIO_07_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.14,
+        "avg_ioi": 0.1266,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.437,
+        "harmony_ratio": 0.667,
+        "avg_polyphony": 2.93,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.115,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.7,
+        "pitch_range": 71,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 117,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.midi",
@@ -3378,7 +5752,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert10-12_MID--AUDIO_17_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.27,
+        "avg_ioi": 0.1125,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.408,
+        "harmony_ratio": 0.808,
+        "avg_polyphony": 3.2,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.059,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.6,
+        "pitch_range": 72,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 101,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.midi",
@@ -3410,7 +5806,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert10-12_MID--AUDIO_18_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.07,
+        "avg_ioi": 0.1149,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.407,
+        "harmony_ratio": 0.814,
+        "avg_polyphony": 3.21,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.059,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.6,
+        "pitch_range": 72,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 105,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.midi",
@@ -3442,7 +5860,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert10-12_MID--AUDIO_20_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 10.69,
+        "avg_ioi": 0.0984,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.478,
+        "harmony_ratio": 0.845,
+        "avg_polyphony": 3.14,
+        "max_polyphony": 10,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.053,
+        "voicing_type": "open",
+        "avg_voicing_spread": 18.8,
+        "pitch_range": 72,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 111,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.midi",
@@ -3474,7 +5914,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert4-6_MID--AUDIO_08_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.44,
+        "avg_ioi": 0.1089,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.466,
+        "harmony_ratio": 0.77,
+        "avg_polyphony": 2.77,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.074,
+        "voicing_type": "open",
+        "avg_voicing_spread": 21.4,
+        "pitch_range": 72,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 108,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.midi",
@@ -3506,7 +5968,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert4-6_MID--AUDIO_09_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.37,
+        "avg_ioi": 0.1233,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.518,
+        "harmony_ratio": 0.716,
+        "avg_polyphony": 2.85,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.059,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.6,
+        "pitch_range": 73,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 118,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.midi",
@@ -3538,7 +6022,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert4-6_MID--AUDIO_10_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.84,
+        "avg_ioi": 0.1163,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.512,
+        "harmony_ratio": 0.725,
+        "avg_polyphony": 2.87,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.06,
+        "voicing_type": "open",
+        "avg_voicing_spread": 19.9,
+        "pitch_range": 73,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 106,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi",
@@ -3570,7 +6076,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert7-9_MID--AUDIO_11_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 10.22,
+        "avg_ioi": 0.1024,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.462,
+        "harmony_ratio": 0.787,
+        "avg_polyphony": 2.83,
+        "max_polyphony": 9,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.07,
+        "voicing_type": "open",
+        "avg_voicing_spread": 21.2,
+        "pitch_range": 75,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 118,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi",
@@ -3602,7 +6130,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert7-9_MID--AUDIO_15_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 8.12,
+        "avg_ioi": 0.128,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.406,
+        "harmony_ratio": 0.798,
+        "avg_polyphony": 3.14,
+        "max_polyphony": 8,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.056,
+        "voicing_type": "open",
+        "avg_voicing_spread": 20.8,
+        "pitch_range": 72,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 103,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     },
     {
       "filename": "MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi",
@@ -3634,7 +6184,29 @@
         "4/4"
       ],
       "embedding_file": "individual/schubert/MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.json",
-      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi"
+      "midi_file": "Ableton/midi_raw/schubert/MIDI-Unprocessed_Schubert7-9_MID--AUDIO_16_R2_2018_wav.midi",
+      "composer_tags": {
+        "rhythm_type": "virtuosic",
+        "rhythm_regularity": 0.0,
+        "note_density_per_sec": 9.49,
+        "avg_ioi": 0.1092,
+        "harmony_type": "triadic",
+        "harmonic_brightness": 0.463,
+        "harmony_ratio": 0.786,
+        "avg_polyphony": 2.82,
+        "max_polyphony": 10,
+        "accompaniment_pattern": "block_chord",
+        "arpeggio_ratio": 0.073,
+        "voicing_type": "open",
+        "avg_voicing_spread": 21.2,
+        "pitch_range": 75,
+        "register": "alto",
+        "dynamic_profile": "expressive",
+        "dynamic_level": "mezzo-forte",
+        "velocity_range": 108,
+        "tempo_bpm": 120.0,
+        "tempo_category": "allegro"
+      }
     }
   ]
 }

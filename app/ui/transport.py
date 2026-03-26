@@ -36,19 +36,125 @@ def _sep() -> QFrame:
     return s
 
 
+class _IconButton(QPushButton):
+    """Transport button that paints a vector icon instead of text."""
+
+    def __init__(self, icon_name: str, tip: str, size: int = 28,
+                 checkable: bool = False, parent=None):
+        super().__init__(parent)
+        self._icon_name = icon_name
+        self.setToolTip(tip)
+        self.setCheckable(checkable)
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet(
+            "QPushButton{background:#2A2A2A;border:1px solid #444;border-radius:4px;}"
+            "QPushButton:hover{background:#444;border:1px solid #666;}"
+            "QPushButton:checked{background:#C0C0C0;border:1px solid #888;}"
+        )
+
+    def paintEvent(self, ev):
+        super().paintEvent(ev)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        cx, cy = w // 2, h // 2
+
+        if self.isChecked():
+            color = QColor("#FFF")
+        elif self.underMouse():
+            color = QColor("#EEE")
+        else:
+            color = QColor("#CCC")
+
+        if self._icon_name == "play":
+            # 삼각형
+            if self.isChecked():
+                color = QColor("#FFF")
+            else:
+                color = QColor("#4CAF50")
+            p.setBrush(color)
+            p.setPen(Qt.PenStyle.NoPen)
+            from PyQt6.QtCore import QPointF
+            from PyQt6.QtGui import QPolygonF
+            s = min(w, h) * 0.3
+            poly = QPolygonF([
+                QPointF(cx - s * 0.5, cy - s),
+                QPointF(cx - s * 0.5, cy + s),
+                QPointF(cx + s * 0.8, cy),
+            ])
+            p.drawPolygon(poly)
+
+        elif self._icon_name == "pause":
+            p.setBrush(QColor("#FFF"))
+            p.setPen(Qt.PenStyle.NoPen)
+            bw = 3
+            gap = 3
+            bh = min(w, h) * 0.4
+            p.drawRect(int(cx - gap - bw), int(cy - bh / 2), bw, int(bh))
+            p.drawRect(int(cx + gap), int(cy - bh / 2), bw, int(bh))
+
+        elif self._icon_name == "stop":
+            p.setBrush(color)
+            p.setPen(Qt.PenStyle.NoPen)
+            s = min(w, h) * 0.28
+            p.drawRect(int(cx - s), int(cy - s), int(s * 2), int(s * 2))
+
+        elif self._icon_name == "record":
+            if self.isChecked():
+                color = QColor("#FF4444")
+            else:
+                color = QColor("#CC6666")
+            p.setBrush(color)
+            p.setPen(Qt.PenStyle.NoPen)
+            r = min(w, h) * 0.28
+            from PyQt6.QtCore import QPointF
+            p.drawEllipse(QPointF(cx, cy), r, r)
+
+        elif self._icon_name == "rewind":
+            p.setBrush(color)
+            p.setPen(Qt.PenStyle.NoPen)
+            from PyQt6.QtCore import QPointF
+            from PyQt6.QtGui import QPolygonF
+            s = min(w, h) * 0.22
+            # 왼쪽 삼각형
+            poly1 = QPolygonF([
+                QPointF(cx - s * 0.2, cy - s),
+                QPointF(cx - s * 0.2, cy + s),
+                QPointF(cx - s * 1.5, cy),
+            ])
+            p.drawPolygon(poly1)
+            # 오른쪽 삼각형
+            poly2 = QPolygonF([
+                QPointF(cx + s * 1.2, cy - s),
+                QPointF(cx + s * 1.2, cy + s),
+                QPointF(cx - s * 0.1, cy),
+            ])
+            p.drawPolygon(poly2)
+            # 왼쪽 바
+            p.drawRect(int(cx - s * 1.7), int(cy - s), 2, int(s * 2))
+
+        p.end()
+
+
+def _icon_btn(icon_name: str, tip: str, size: int = _BTN_SIZE,
+              checkable: bool = False) -> _IconButton:
+    return _IconButton(icon_name, tip, size, checkable)
+
+
 def _flat_btn(text: str, tip: str, size: int = _BTN_SIZE,
               checkable: bool = False) -> QPushButton:
     btn = QPushButton(text)
     btn.setToolTip(tip)
     btn.setCheckable(checkable)
     btn.setFixedSize(size, size)
-    btn.setFont(QFont("Segoe UI Symbol", 10))
+    btn.setFont(QFont("Segoe UI Symbol", 12))
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     btn.setStyleSheet(
-        f"QPushButton{{background:transparent;border:none;color:{COLORS['text_secondary']};}}"
-        f"QPushButton:hover{{color:{COLORS['text_primary']};background:{COLORS['bg_hover']};"
-        f"border-radius:3px;}}"
-        f"QPushButton:checked{{color:#FFF;background:{COLORS['accent']};border-radius:3px;}}"
+        f"QPushButton{{background:#2A2A2A;border:1px solid #444;color:#E0E0E0;"
+        f"border-radius:4px;font-size:13px;}}"
+        f"QPushButton:hover{{color:#FFF;background:#444;border:1px solid #666;}}"
+        f"QPushButton:checked{{color:#FFF;background:#C0C0C0;border:1px solid #888;}}"
     )
     return btn
 
@@ -173,9 +279,9 @@ class TransportWidget(QWidget):
         self._project: ProjectState | None = None
         self._tap_times: list[float] = []
 
-        self.setFixedHeight(36)
+        self.setFixedHeight(44)
         self.setStyleSheet(
-            f"TransportWidget{{background:{COLORS['bg_transport']};}}"
+            f"TransportWidget{{background:#1A1A1A;border-bottom:1px solid #333;}}"
         )
 
         root = QHBoxLayout(self)
@@ -232,13 +338,19 @@ class TransportWidget(QWidget):
                                        QSizePolicy.Policy.Minimum))
 
         # ── CENTER: Transport controls ────────────────────────────────────
-        self.btn_rewind = _flat_btn("\u23EE", "Rewind")
-        self.btn_play = _flat_btn("\u25B6", "Play / Pause", size=28, checkable=True)
-        self.btn_stop = _flat_btn("\u23F9", "Stop")
-        self.btn_record = _flat_btn("\u23FA", "Record", checkable=True)
+        self.btn_rewind = _icon_btn("rewind", "Rewind", 30)
+        self.btn_play = _icon_btn("play", "Play / Pause", 34, checkable=True)
+        self.btn_play.setStyleSheet(
+            "QPushButton{background:#2A3A2A;border:2px solid #4CAF50;border-radius:5px;}"
+            "QPushButton:hover{background:#3A4A3A;border:2px solid #66FF66;}"
+            "QPushButton:checked{background:#4CAF50;border:2px solid #66FF66;}"
+        )
+        self.btn_stop = _icon_btn("stop", "Stop", 30)
+        self.btn_record = _icon_btn("record", "Record", 30, checkable=True)
         self.btn_record.setStyleSheet(
-            self.btn_record.styleSheet() +
-            f"QPushButton:checked{{color:#FFF;background:#C44;border-radius:3px;}}"
+            "QPushButton{background:#2A2A2A;border:1px solid #444;border-radius:4px;}"
+            "QPushButton:hover{background:#3A3A3A;border:1px solid #666;}"
+            "QPushButton:checked{background:#C44;border:1px solid #F66;}"
         )
 
         root.addWidget(self.btn_rewind)
@@ -266,7 +378,9 @@ class TransportWidget(QWidget):
                                        QSizePolicy.Policy.Minimum))
 
         # ── RIGHT: Loop / Key / Scale / Snap ──────────────────────────────
-        self.btn_loop = _flat_btn("\U0001F501", "Loop On/Off", checkable=True)
+        self.btn_loop = _flat_btn("LOOP", "Loop On/Off", checkable=True)
+        self.btn_loop.setFixedSize(40, 24)
+        self.btn_loop.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
         root.addWidget(self.btn_loop)
 
         self.combo_key = _compact_combo(NOTE_NAMES, width=48)
@@ -376,7 +490,8 @@ class TransportWidget(QWidget):
         self._playing = playing
         self.btn_play.blockSignals(True)
         self.btn_play.setChecked(playing)
-        self.btn_play.setText("\u23F8" if playing else "\u25B6")
+        self.btn_play._icon_name = "pause" if playing else "play"
+        self.btn_play.update()
         self.btn_play.blockSignals(False)
 
     def set_recording(self, recording: bool) -> None:

@@ -28,6 +28,11 @@
       "name": "Bass",
       "channel": 2,
       "type": "bass"
+    },
+    {
+      "name": "Drums",
+      "channel": 9,
+      "type": "drums"
     }
   ]
 }

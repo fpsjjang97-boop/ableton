@@ -47,6 +47,7 @@ class PlaybackThread(QThread):
         # State that the engine sets before calling start()
         self._project: Optional[ProjectState] = None
         self._output_port: Optional[mido.ports.BaseOutput] = None
+        self._audio_engine = None  # FluidSynth AudioEngine
 
         # Transport controls (guarded by _lock)
         self._playing = False
@@ -63,10 +64,12 @@ class PlaybackThread(QThread):
         project: ProjectState,
         output_port: Optional[mido.ports.BaseOutput],
         start_tick: int = 0,
+        audio_engine=None,
     ) -> None:
         """Set up state before starting the thread."""
         self._project = project
         self._output_port = output_port
+        self._audio_engine = audio_engine
         self._current_tick = start_tick
 
     def request_stop(self) -> None:
@@ -194,33 +197,55 @@ class PlaybackThread(QThread):
     # -- MIDI output helpers ------------------------------------------------
 
     def _send_note_on(self, note: Note) -> None:
-        if self._output_port is None or self._output_port.closed:
+        # FluidSynth AudioEngine (우선)
+        if self._audio_engine is not None and self._audio_engine.available:
+            try:
+                self._audio_engine.note_on(note.channel, note.pitch, note.velocity)
+            except Exception:
+                logger.debug("AudioEngine note_on failed pitch=%d", note.pitch)
             return
-        try:
-            msg = mido.Message("note_on", note=note.pitch, velocity=note.velocity, channel=note.channel)
-            self._output_port.send(msg)
-        except Exception:
-            logger.debug("Failed to send note_on pitch=%d", note.pitch)
+        # mido output port (폴백)
+        if self._output_port is not None and not self._output_port.closed:
+            try:
+                msg = mido.Message("note_on", note=note.pitch, velocity=note.velocity, channel=note.channel)
+                self._output_port.send(msg)
+            except Exception:
+                logger.debug("Failed to send note_on pitch=%d", note.pitch)
 
     def _send_note_off(self, note: Note) -> None:
-        if self._output_port is None or self._output_port.closed:
+        # FluidSynth AudioEngine (우선)
+        if self._audio_engine is not None and self._audio_engine.available:
+            try:
+                self._audio_engine.note_off(note.channel, note.pitch)
+            except Exception:
+                logger.debug("AudioEngine note_off failed pitch=%d", note.pitch)
             return
-        try:
-            msg = mido.Message("note_off", note=note.pitch, velocity=0, channel=note.channel)
-            self._output_port.send(msg)
-        except Exception:
-            logger.debug("Failed to send note_off pitch=%d", note.pitch)
+        # mido output port (폴백)
+        if self._output_port is not None and not self._output_port.closed:
+            try:
+                msg = mido.Message("note_off", note=note.pitch, velocity=0, channel=note.channel)
+                self._output_port.send(msg)
+            except Exception:
+                logger.debug("Failed to send note_off pitch=%d", note.pitch)
 
     def _all_notes_off(self, active: set[tuple[int, int]]) -> None:
         """Silence every currently-sounding note."""
-        if self._output_port is None or self._output_port.closed:
-            return
-        for pitch, channel in list(active):
+        # FluidSynth
+        if self._audio_engine is not None and self._audio_engine.available:
             try:
-                msg = mido.Message("note_off", note=pitch, velocity=0, channel=channel)
-                self._output_port.send(msg)
+                self._audio_engine.all_notes_off()
             except Exception:
                 pass
+            active.clear()
+            return
+        # mido
+        if self._output_port is not None and not self._output_port.closed:
+            for pitch, channel in list(active):
+                try:
+                    msg = mido.Message("note_off", note=pitch, velocity=0, channel=channel)
+                    self._output_port.send(msg)
+                except Exception:
+                    pass
         active.clear()
 
 
@@ -249,6 +274,7 @@ class MidiEngine(QObject):
         self._project = ProjectState()
         self._playback_thread: Optional[PlaybackThread] = None
         self._output_port: Optional[mido.ports.BaseOutput] = None
+        self._audio_engine = None  # FluidSynth AudioEngine 연동
         self._clipboard: list[Note] = []
         self._state: str = "stopped"  # playing | paused | stopped
 
@@ -285,6 +311,11 @@ class MidiEngine(QObject):
         except Exception:
             logger.warning("Could not enumerate MIDI output ports")
             return []
+
+    def set_audio_engine(self, audio_engine) -> None:
+        """FluidSynth AudioEngine 연결 — Play 시 가상악기로 소리 출력."""
+        self._audio_engine = audio_engine
+        logger.info("AudioEngine connected to MidiEngine")
 
     def open_output_port(self, port_name: str | None = None) -> bool:
         """Open *port_name* (or the default port) for MIDI output."""
@@ -475,8 +506,15 @@ class MidiEngine(QObject):
 
         self.stop()
 
+        # AudioEngine에 각 트랙의 악기/볼륨/팬 설정
+        if self._audio_engine is not None and self._audio_engine.available:
+            for trk in self._project.tracks:
+                self._audio_engine.program_change(trk.channel, trk.instrument)
+                self._audio_engine.set_channel_volume(trk.channel, trk.volume)
+                self._audio_engine.set_channel_pan(trk.channel, trk.pan)
+
         thread = PlaybackThread(self)
-        thread.configure(self._project, self._output_port, start_tick)
+        thread.configure(self._project, self._output_port, start_tick, self._audio_engine)
         thread.position_changed.connect(self.position_changed)
         thread.playback_finished.connect(self._on_playback_finished)
         self._playback_thread = thread

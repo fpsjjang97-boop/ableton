@@ -97,6 +97,13 @@ def main() -> int:
     # --- Engines ---
     midi_engine = MidiEngine(w)
     audio_engine = AudioEngine()
+    midi_engine.set_audio_engine(audio_engine)  # FluidSynth 연동
+    # FluidSynth 오디오 드라이버 시작
+    if audio_engine.available and hasattr(audio_engine, '_synth') and audio_engine._synth:
+        try:
+            audio_engine._synth.start(driver='dsound')
+        except Exception:
+            pass
     project_mgr = ProjectManager(w)
     ai_engine = AIEngine()
     undo_mgr = UndoManager()
@@ -104,7 +111,7 @@ def main() -> int:
 
     # --- Widgets ---
     transport = TransportWidget()
-    transport.setFixedHeight(36)
+    transport.setFixedHeight(44)
 
     session_view = SessionView()
     detail_view = DetailView()
@@ -586,7 +593,24 @@ def main() -> int:
     meter_timer.timeout.connect(simulate_meters)
     meter_timer.start(80)
 
-    # --- Load default project ---
+    # --- Auto-load latest MIDI or CLI argument ---
+    _auto_midi = None
+    if len(sys.argv) > 1 and os.path.isfile(sys.argv[1]):
+        _auto_midi = sys.argv[1]
+    else:
+        _out_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output")
+        if os.path.isdir(_out_dir):
+            _mids = sorted(
+                [f for f in os.listdir(_out_dir) if f.endswith(".mid")],
+                key=lambda f: os.path.getmtime(os.path.join(_out_dir, f)),
+                reverse=True,
+            )
+            if _mids:
+                _auto_midi = os.path.join(_out_dir, _mids[0])
+
+    if _auto_midi:
+        project_mgr.import_midi(_auto_midi)
+
     apply_project(project_mgr.state)
 
     # --- Restore window state ---

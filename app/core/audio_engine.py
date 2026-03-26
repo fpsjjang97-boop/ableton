@@ -20,6 +20,18 @@ from config import DEFAULT_SOUNDFONT, SOUNDFONT_SEARCH_PATHS
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# FluidSynth DLL path setup (Windows)
+# ---------------------------------------------------------------------------
+try:
+    from config import FLUIDSYNTH_DLL_PATH
+    if FLUIDSYNTH_DLL_PATH and os.path.isdir(FLUIDSYNTH_DLL_PATH):
+        os.environ["PATH"] = FLUIDSYNTH_DLL_PATH + os.pathsep + os.environ.get("PATH", "")
+        if hasattr(os, "add_dll_directory"):
+            os.add_dll_directory(FLUIDSYNTH_DLL_PATH)
+except (ImportError, OSError):
+    pass
+
+# ---------------------------------------------------------------------------
 # FluidSynth availability probe
 # ---------------------------------------------------------------------------
 try:

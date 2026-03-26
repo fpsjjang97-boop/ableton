@@ -34,8 +34,211 @@ PIANOROLL_RES = 100  # 피아노롤 해상도 (100 steps/beat)
 EMBED_DIM = 128      # 임베딩 차원
 
 
+def analyze_composer_tags(all_notes, midi):
+    """작곡가 관점 파라미터 자동 추출 — Troubleshooter 이슈 #1 대응"""
+    if not all_notes:
+        return {}
+
+    pitches = [n['pitch'] for n in all_notes]
+    velocities = [n['velocity'] for n in all_notes]
+    durations = [n['duration'] for n in all_notes]
+    starts = [n['start'] for n in all_notes]
+    total_dur = all_notes[-1]['end'] if all_notes else 1.0
+
+    # ── 1. 리듬 유형 분석 ──
+    # IOI (Inter-Onset Interval) 기반
+    ioi_list = [starts[i+1] - starts[i] for i in range(len(starts)-1) if starts[i+1] - starts[i] > 0]
+    avg_ioi = float(np.mean(ioi_list)) if ioi_list else 1.0
+    ioi_std = float(np.std(ioi_list)) if ioi_list else 0.0
+
+    # 리듬 규칙성: std/mean 비율 — 낮을수록 규칙적
+    rhythm_regularity = 1.0 - min(1.0, ioi_std / avg_ioi) if avg_ioi > 0 else 0.0
+
+    # 리듬 밀도: 초당 노트 수
+    note_density = len(all_notes) / max(total_dur, 0.1)
+
+    # 리듬 유형 분류
+    if note_density < 1.5:
+        rhythm_type = "sparse"       # 희박 (앰비언트, 패드)
+    elif note_density < 4.0:
+        rhythm_type = "moderate"     # 보통 (발라드, 반주)
+    elif note_density < 8.0:
+        rhythm_type = "dense"        # 밀집 (아르페지오, 컴핑)
+    else:
+        rhythm_type = "virtuosic"    # 고밀도 (빠른 패시지, 트레몰로)
+
+    # ── 2. 화성 성향 분석 ──
+    # 동시 발음 그룹 탐지 (50ms 이내 = 동시)
+    chord_groups = []
+    current_group = [all_notes[0]]
+    for i in range(1, len(all_notes)):
+        if all_notes[i]['start'] - current_group[0]['start'] < 0.05:
+            current_group.append(all_notes[i])
+        else:
+            if len(current_group) >= 2:
+                chord_groups.append(current_group)
+            current_group = [all_notes[i]]
+    if len(current_group) >= 2:
+        chord_groups.append(current_group)
+
+    # 동시 발음 수 통계
+    polyphony_values = [len(g) for g in chord_groups]
+    avg_polyphony = float(np.mean(polyphony_values)) if polyphony_values else 1.0
+    max_polyphony = max(polyphony_values) if polyphony_values else 1
+
+    # 화성 비율 (전체 노트 중 화음에 속하는 비율)
+    chordal_notes = sum(len(g) for g in chord_groups)
+    harmony_ratio = chordal_notes / max(len(all_notes), 1)
+
+    # 인터벌 분석 — 화음 내 인터벌
+    chord_intervals = []
+    for g in chord_groups:
+        g_pitches = sorted(set(n['pitch'] for n in g))
+        for i in range(len(g_pitches) - 1):
+            chord_intervals.append(g_pitches[i+1] - g_pitches[i])
+
+    # 장/단 성향: 장3도(4) vs 단3도(3) 비율
+    major_thirds = sum(1 for iv in chord_intervals if iv == 4)
+    minor_thirds = sum(1 for iv in chord_intervals if iv == 3)
+    if major_thirds + minor_thirds > 0:
+        harmonic_brightness = major_thirds / (major_thirds + minor_thirds)
+    else:
+        harmonic_brightness = 0.5
+
+    # 화성 유형 분류
+    if harmony_ratio < 0.2:
+        harmony_type = "monophonic"   # 단선율
+    elif avg_polyphony < 2.5:
+        harmony_type = "dyadic"       # 2음 위주
+    elif avg_polyphony < 4.0:
+        harmony_type = "triadic"      # 3화음 위주
+    else:
+        harmony_type = "dense_voicing" # 밀집 보이싱
+
+    # ── 3. 반주 구조 분석 ──
+    # 아르페지오 감지: 순차적으로 가까운 음이 빠르게 나오는 패턴
+    arpeggio_count = 0
+    for i in range(len(all_notes) - 3):
+        window = all_notes[i:i+4]
+        time_span = window[-1]['start'] - window[0]['start']
+        if 0.05 < time_span < 0.5:  # 빠른 순차 진행
+            pitches_w = [n['pitch'] for n in window]
+            intervals_w = [pitches_w[j+1] - pitches_w[j] for j in range(len(pitches_w)-1)]
+            # 같은 방향으로 움직이면 아르페지오
+            if all(iv > 0 for iv in intervals_w) or all(iv < 0 for iv in intervals_w):
+                arpeggio_count += 1
+
+    arpeggio_ratio = arpeggio_count / max(len(all_notes) - 3, 1)
+
+    if arpeggio_ratio > 0.15:
+        accompaniment_pattern = "arpeggio"
+    elif harmony_ratio > 0.6:
+        accompaniment_pattern = "block_chord"
+    elif rhythm_regularity > 0.7 and note_density > 3.0:
+        accompaniment_pattern = "comping"
+    elif note_density < 2.0 and harmony_ratio > 0.3:
+        accompaniment_pattern = "pad"
+    else:
+        accompaniment_pattern = "mixed"
+
+    # ── 4. 보이싱 밀도 & 음역 분석 ──
+    pitch_range = max(pitches) - min(pitches)
+    register_center = float(np.mean(pitches))
+
+    if register_center < 48:
+        register = "bass"
+    elif register_center < 60:
+        register = "tenor"
+    elif register_center < 72:
+        register = "alto"
+    else:
+        register = "soprano"
+
+    # 보이싱 스프레드 (화음 내 음역 폭)
+    voicing_spreads = []
+    for g in chord_groups:
+        g_pitches = [n['pitch'] for n in g]
+        voicing_spreads.append(max(g_pitches) - min(g_pitches))
+    avg_voicing_spread = float(np.mean(voicing_spreads)) if voicing_spreads else 0.0
+
+    if avg_voicing_spread < 7:
+        voicing_type = "close"        # 밀집 보이싱
+    elif avg_voicing_spread < 14:
+        voicing_type = "semi_open"    # 반개방
+    else:
+        voicing_type = "open"         # 개방 보이싱
+
+    # ── 5. 다이나믹 프로파일 ──
+    vel_range = max(velocities) - min(velocities)
+    vel_mean = float(np.mean(velocities))
+
+    if vel_range < 30:
+        dynamic_profile = "flat"       # 일정한 다이나믹
+    elif vel_range < 60:
+        dynamic_profile = "moderate"   # 보통 변화
+    else:
+        dynamic_profile = "expressive" # 극적인 다이나믹
+
+    if vel_mean < 50:
+        dynamic_level = "piano"
+    elif vel_mean < 80:
+        dynamic_level = "mezzo-forte"
+    elif vel_mean < 105:
+        dynamic_level = "forte"
+    else:
+        dynamic_level = "fortissimo"
+
+    # ── 6. 템포 & BPM ──
+    tempos = midi.get_tempo_changes()
+    avg_tempo = float(np.mean(tempos[1])) if len(tempos[1]) > 0 else 120.0
+
+    if avg_tempo < 60:
+        tempo_category = "largo"
+    elif avg_tempo < 80:
+        tempo_category = "adagio"
+    elif avg_tempo < 100:
+        tempo_category = "andante"
+    elif avg_tempo < 120:
+        tempo_category = "moderato"
+    elif avg_tempo < 140:
+        tempo_category = "allegro"
+    elif avg_tempo < 170:
+        tempo_category = "vivace"
+    else:
+        tempo_category = "presto"
+
+    return {
+        # 리듬
+        'rhythm_type': rhythm_type,
+        'rhythm_regularity': round(rhythm_regularity, 3),
+        'note_density_per_sec': round(note_density, 2),
+        'avg_ioi': round(avg_ioi, 4),
+        # 화성
+        'harmony_type': harmony_type,
+        'harmonic_brightness': round(harmonic_brightness, 3),
+        'harmony_ratio': round(harmony_ratio, 3),
+        'avg_polyphony': round(avg_polyphony, 2),
+        'max_polyphony': max_polyphony,
+        # 반주 구조
+        'accompaniment_pattern': accompaniment_pattern,
+        'arpeggio_ratio': round(arpeggio_ratio, 3),
+        # 보이싱
+        'voicing_type': voicing_type,
+        'avg_voicing_spread': round(avg_voicing_spread, 1),
+        'pitch_range': pitch_range,
+        'register': register,
+        # 다이나믹
+        'dynamic_profile': dynamic_profile,
+        'dynamic_level': dynamic_level,
+        'velocity_range': vel_range,
+        # 템포
+        'tempo_bpm': round(avg_tempo, 1),
+        'tempo_category': tempo_category,
+    }
+
+
 def analyze_midi(filepath):
-    """단일 MIDI 파일 분석 — 모든 노트 데이터 보존"""
+    """단일 MIDI 파일 분석 — 모든 노트 데이터 보존 + 작곡가 태그"""
     midi = pretty_midi.PrettyMIDI(filepath)
     filename = os.path.basename(filepath)
 
@@ -163,8 +366,12 @@ def analyze_midi(filepath):
         for i, p in enumerate(sorted_pitches):
             embedding[63 + i] = pitch_hist[p]
 
+    # 작곡가 관점 태그 추출
+    composer_tags = analyze_composer_tags(all_notes, midi)
+
     return {
         'stats': stats,
+        'composer_tags': composer_tags,
         'notes': all_notes,
         'embedding': embedding.tolist(),
         'pitch_histogram': pitch_hist.tolist(),
@@ -178,8 +385,8 @@ def analyze_midi(filepath):
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    midi_files = sorted(glob.glob(os.path.join(MIDI_DIR, '*.midi')) +
-                        glob.glob(os.path.join(MIDI_DIR, '*.mid')))
+    midi_files = sorted(glob.glob(os.path.join(MIDI_DIR, '**', '*.midi'), recursive=True) +
+                        glob.glob(os.path.join(MIDI_DIR, '**', '*.mid'), recursive=True))
 
     print(f"Found {len(midi_files)} MIDI files")
 
@@ -194,19 +401,24 @@ def main():
             result = analyze_midi(filepath)
 
             # 개별 파일 저장 (노트 데이터 포함 — 누락 없음)
+            # 카테고리 폴더 구조 유지 (e.g. individual/recital/xxx.json)
+            rel_path = os.path.relpath(filepath, MIDI_DIR)
             individual_path = os.path.join(OUTPUT_DIR, 'individual',
-                                           filename.replace('.midi', '.json').replace('.mid', '.json'))
+                                           rel_path.replace('.midi', '.json').replace('.mid', '.json'))
             os.makedirs(os.path.dirname(individual_path), exist_ok=True)
             with open(individual_path, 'w', encoding='utf-8') as f:
                 json.dump(result, f, ensure_ascii=False, cls=NumpyEncoder)
 
-            all_stats.append(result['stats'])
+            all_stats.append({**result['stats'], 'composer_tags': result['composer_tags']})
             all_embeddings.append(result['embedding'])
             total_notes += result['stats']['total_notes']
 
+            tags = result['composer_tags']
             print(f"  [{i+1:3d}/{len(midi_files)}] {filename} — "
                   f"{result['stats']['total_notes']} notes, "
-                  f"{result['stats']['total_duration_sec']}s")
+                  f"{result['stats']['total_duration_sec']}s | "
+                  f"{tags.get('rhythm_type','?')} / {tags.get('harmony_type','?')} / "
+                  f"{tags.get('accompaniment_pattern','?')} / {tags.get('tempo_category','?')}")
 
         except Exception as e:
             failed.append({'file': filename, 'error': str(e)})

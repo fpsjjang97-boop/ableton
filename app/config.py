@@ -103,14 +103,18 @@ COLORS = {
 }
 
 # FluidSynth
-DEFAULT_SOUNDFONT = "GeneralUser_GS.sf2"
+DEFAULT_SOUNDFONT = "FluidR3_GM.sf2"
 SOUNDFONT_SEARCH_PATHS = [
     ".",
     "./resources",
     "C:/soundfonts",
+    "E:/Ableton/repo/resources",
     "/usr/share/sounds/sf2",
     "/usr/share/soundfonts",
 ]
+
+# FluidSynth DLL 경로 (Windows)
+FLUIDSYNTH_DLL_PATH = "E:/Ableton/repo/fluidsynth/bin"
 
 # AI
 AI_VARIATION_TYPES = [

@@ -815,33 +815,64 @@ class MixerStrip(QFrame):
         sep.setStyleSheet(f"background:{COLORS['separator']};")
         layout.addWidget(sep)
 
-        # -- Sends --
+        # -- Sends (horizontal sliders) --
         lbl_sends = QLabel("Sends")
         lbl_sends.setFont(label_font)
         lbl_sends.setStyleSheet(dim_style)
         lbl_sends.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(lbl_sends)
 
-        sends_row = QHBoxLayout()
-        sends_row.setSpacing(4)
-        sends_row.setContentsMargins(0, 0, 0, 0)
-        sends_row.addStretch()
-        self._send_a = KnobIndicator(0, 0, 127, "Send A")
-        self._send_b = KnobIndicator(0, 0, 127, "Send B")
-        sends_row.addWidget(self._send_a)
-        sends_row.addWidget(self._send_b)
-        sends_row.addStretch()
-        layout.addLayout(sends_row)
+        from PyQt6.QtWidgets import QSlider
+        _slider_style = (
+            "QSlider{background:transparent;}"
+            "QSlider::groove:horizontal{height:4px;background:#1A1A1A;"
+            "border:1px solid #333;border-radius:2px;}"
+            "QSlider::handle:horizontal{width:10px;height:10px;"
+            "background:#888;border:1px solid #555;border-radius:5px;"
+            "margin:-3px 0;}"
+            "QSlider::handle:horizontal:hover{background:#AAA;}"
+        )
 
-        # -- Volume fader --
-        fader_row = QHBoxLayout()
-        fader_row.setContentsMargins(0, 0, 0, 0)
-        fader_row.addStretch()
-        self._fader = VerticalFader(track.volume, 0, 127)
-        self._fader.value_changed.connect(self._on_volume)
-        fader_row.addWidget(self._fader)
-        fader_row.addStretch()
-        layout.addLayout(fader_row)
+        self._send_a = QSlider(Qt.Orientation.Horizontal)
+        self._send_a.setRange(0, 127)
+        self._send_a.setValue(0)
+        self._send_a.setFixedHeight(16)
+        self._send_a.setToolTip("Send A")
+        self._send_a.setStyleSheet(_slider_style)
+        layout.addWidget(self._send_a)
+
+        self._send_b = QSlider(Qt.Orientation.Horizontal)
+        self._send_b.setRange(0, 127)
+        self._send_b.setValue(0)
+        self._send_b.setFixedHeight(16)
+        self._send_b.setToolTip("Send B")
+        self._send_b.setStyleSheet(_slider_style)
+        layout.addWidget(self._send_b)
+
+        # -- Volume (horizontal slider) --
+        vol_label = QLabel("Vol")
+        vol_label.setFont(label_font)
+        vol_label.setStyleSheet(dim_style)
+        vol_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(vol_label)
+
+        self._fader = QSlider(Qt.Orientation.Horizontal)
+        self._fader.setRange(0, 127)
+        self._fader.setValue(track.volume)
+        self._fader.setFixedHeight(22)
+        self._fader.setToolTip(f"Volume: {track.volume}")
+        self._fader.setStyleSheet(
+            "QSlider{background:transparent;}"
+            "QSlider::groove:horizontal{height:6px;background:#1A1A1A;"
+            "border:1px solid #333;border-radius:3px;}"
+            "QSlider::handle:horizontal{width:14px;height:14px;"
+            "background:#CCC;border:1px solid #666;border-radius:7px;"
+            "margin:-4px 0;}"
+            "QSlider::handle:horizontal:hover{background:#FFF;}"
+            "QSlider::sub-page:horizontal{background:#888;border-radius:3px;}"
+        )
+        self._fader.valueChanged.connect(self._on_volume)
+        layout.addWidget(self._fader)
 
         # -- dB readout --
         self._db_label = QLabel(_vol_to_db(track.volume))
@@ -850,15 +881,21 @@ class MixerStrip(QFrame):
         self._db_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._db_label)
 
-        # -- Pan knob --
-        pan_row = QHBoxLayout()
-        pan_row.setContentsMargins(0, 0, 0, 0)
-        pan_row.addStretch()
-        self._pan_knob = KnobIndicator(track.pan, 0, 127, "Pan")
-        self._pan_knob.value_changed.connect(self._on_pan)
-        pan_row.addWidget(self._pan_knob)
-        pan_row.addStretch()
-        layout.addLayout(pan_row)
+        # -- Pan (horizontal slider) --
+        pan_label = QLabel("Pan")
+        pan_label.setFont(label_font)
+        pan_label.setStyleSheet(dim_style)
+        pan_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(pan_label)
+
+        self._pan_knob = QSlider(Qt.Orientation.Horizontal)
+        self._pan_knob.setRange(0, 127)
+        self._pan_knob.setValue(track.pan)
+        self._pan_knob.setFixedHeight(22)
+        self._pan_knob.setToolTip(f"Pan: {track.pan}")
+        self._pan_knob.setStyleSheet(_slider_style)
+        self._pan_knob.valueChanged.connect(self._on_pan)
+        layout.addWidget(self._pan_knob)
 
         # -- Track number in colored circle --
         self._track_num = QLabel(str(track_idx + 1))

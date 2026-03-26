@@ -8,7 +8,7 @@ import os, sys, json, glob
 sys.stdout.reconfigure(encoding='utf-8')
 
 EMBED_DIR = os.path.join(os.path.dirname(__file__), '..', 'embeddings')
-CATEGORIES = ['chamber', 'recital', 'schubert']
+CATEGORIES = ['chamber', 'recital', 'schubert', 'pop909']
 
 KEY_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
@@ -59,6 +59,12 @@ def main():
     by_complexity = {}
     by_dynamics = {}
     by_register = {}
+    # 작곡가 관점 태그 인덱스
+    by_rhythm_type = {}
+    by_harmony_type = {}
+    by_accompaniment = {}
+    by_voicing_type = {}
+    by_dynamic_profile = {}
 
     for cat in CATEGORIES:
         cat_dir = os.path.join(EMBED_DIR, 'individual', cat)
@@ -75,6 +81,9 @@ def main():
             complexity = classify_complexity(stats['total_notes'], stats['total_duration_sec'])
             dynamics = classify_dynamics(stats.get('velocity_mean', 64), stats.get('velocity_std', 20))
             register = classify_register(stats.get('pitch_mean', 60))
+
+            # 작곡가 관점 태그 (있으면 사용)
+            ctags = data.get('composer_tags', {})
 
             entry = {
                 'filename': fname,
@@ -99,10 +108,20 @@ def main():
                 'time_signatures': stats.get('time_signatures', []),
                 'embedding_file': f'individual/{cat}/{fname.replace(".midi", ".json").replace(".mid", ".json")}',
                 'midi_file': f'Ableton/midi_raw/{cat}/{fname}',
+                # 작곡가 관점 태그
+                'composer_tags': ctags,
             }
 
             catalog.append(entry)
             by_category[cat].append(fname)
+
+            # 작곡가 태그별 인덱스 구축
+            if ctags:
+                by_rhythm_type.setdefault(ctags.get('rhythm_type', 'unknown'), []).append(fname)
+                by_harmony_type.setdefault(ctags.get('harmony_type', 'unknown'), []).append(fname)
+                by_accompaniment.setdefault(ctags.get('accompaniment_pattern', 'unknown'), []).append(fname)
+                by_voicing_type.setdefault(ctags.get('voicing_type', 'unknown'), []).append(fname)
+                by_dynamic_profile.setdefault(ctags.get('dynamic_profile', 'unknown'), []).append(fname)
 
             key = stats.get('estimated_key', '?')
             if key in by_key:
@@ -124,6 +143,12 @@ def main():
             'by_complexity': {k: len(v) for k, v in by_complexity.items()},
             'by_dynamics': {k: len(v) for k, v in by_dynamics.items()},
             'by_register': {k: len(v) for k, v in by_register.items()},
+            # 작곡가 관점 분류
+            'by_rhythm_type': {k: len(v) for k, v in by_rhythm_type.items()},
+            'by_harmony_type': {k: len(v) for k, v in by_harmony_type.items()},
+            'by_accompaniment': {k: len(v) for k, v in by_accompaniment.items()},
+            'by_voicing_type': {k: len(v) for k, v in by_voicing_type.items()},
+            'by_dynamic_profile': {k: len(v) for k, v in by_dynamic_profile.items()},
         },
         'index': {
             'by_category': by_category,
@@ -132,6 +157,12 @@ def main():
             'by_complexity': by_complexity,
             'by_dynamics': by_dynamics,
             'by_register': by_register,
+            # 작곡가 관점 인덱스
+            'by_rhythm_type': by_rhythm_type,
+            'by_harmony_type': by_harmony_type,
+            'by_accompaniment': by_accompaniment,
+            'by_voicing_type': by_voicing_type,
+            'by_dynamic_profile': by_dynamic_profile,
         },
         'catalog': catalog,
     }
