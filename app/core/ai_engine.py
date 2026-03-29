@@ -494,7 +494,7 @@ class AIEngine:
             ))
             cursor += max(style_cfg["grid"], dur)
 
-        track = Track(name="AI Melody", notes=notes, color="#B0B0B0")
+        track = Track(name="AI Melody", notes=notes, color="#B0B0B0", instrument=0, channel=0)
         return track
 
     def _melody_style(self, style: str, density: float) -> dict:
@@ -604,7 +604,7 @@ class AIEngine:
                         ))
                         strum_offset += int(self.rng.integers(0, _BEAT // 16 + 1))
 
-        track = Track(name="AI Chords", notes=notes, color="#51CF66")
+        track = Track(name="AI Chords", notes=notes, color="#51CF66", instrument=0, channel=1)  # Piano
         return track
 
     def _generate_chords_with_rules(
@@ -768,7 +768,7 @@ class AIEngine:
 
             prev_pitches = voicing
 
-        track = Track(name="AI Chords (Rule DB)", notes=notes, color="#51CF66")
+        track = Track(name="AI Chords (Rule DB)", notes=notes, color="#51CF66", instrument=0, channel=1)  # Piano
         return track
 
     # ------------------------------------------------------------------
@@ -813,7 +813,7 @@ class AIEngine:
                 # Pop default: root-fifth pattern
                 notes.extend(self._bass_pop(br, bar_start, sp_bass))
 
-        track = Track(name="AI Bass", notes=notes, color="#FF922B")
+        track = Track(name="AI Bass", notes=notes, color="#FF922B", instrument=32, channel=2)  # Acoustic Bass
         return track
 
     def _extract_bar_roots(

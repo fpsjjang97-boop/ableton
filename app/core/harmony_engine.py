@@ -1743,4 +1743,4 @@ class HarmonyEngine:
             prev_chord = chord_label
             prev_bass_pc = voicing[0] % 12 if voicing else None
 
-        return Track(name="AI Harmony Voicing", notes=notes, color="#CF9FFF")
+        return Track(name="AI Harmony Voicing", notes=notes, color="#CF9FFF", instrument=0, channel=1)  # Piano

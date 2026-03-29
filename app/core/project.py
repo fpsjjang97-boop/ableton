@@ -190,10 +190,13 @@ class ProjectManager(QObject):
         for idx, midi_track in enumerate(mid.tracks):
             notes: list[Note] = []
             active: dict[int, tuple[int, int]] = {}  # pitch -> (tick, vel)
+            instrument = 0  # Default: Acoustic Grand Piano
             tick = 0
             for msg in midi_track:
                 tick += msg.time
-                if msg.type == "note_on" and msg.velocity > 0:
+                if msg.type == "program_change":
+                    instrument = msg.program
+                elif msg.type == "note_on" and msg.velocity > 0:
                     active[msg.note] = (tick, msg.velocity)
                 elif msg.type in ("note_off", "note_on"):
                     start_info = active.pop(msg.note, None)
@@ -206,9 +209,22 @@ class ProjectManager(QObject):
             if notes:
                 color = TRACK_COLORS[idx % len(TRACK_COLORS)]
                 track_name = midi_track.name or f"Track {idx + 1}"
+                # Auto-detect instrument from track name if no program_change
+                if instrument == 0:
+                    name_lower = track_name.lower()
+                    if "bass" in name_lower:
+                        instrument = 32  # Acoustic Bass
+                    elif "string" in name_lower or "str_" in name_lower:
+                        instrument = 48  # String Ensemble
+                    elif "guitar" in name_lower:
+                        instrument = 24  # Acoustic Guitar
+                    elif "drum" in name_lower:
+                        instrument = 0  # Channel 9 handles drums
+                    elif "pad" in name_lower:
+                        instrument = 88  # Pad
                 self._state.tracks.append(
                     Track(name=track_name, channel=idx, notes=notes,
-                          color=color))
+                          color=color, instrument=instrument))
 
         # Detect tempo from first track
         for msg in mid.tracks[0] if mid.tracks else []:
