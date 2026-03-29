@@ -6,15 +6,26 @@ from __future__ import annotations
 import sys
 import os
 import traceback
-import faulthandler
 
-faulthandler.enable()
+# PyInstaller --windowed sets sys.stderr/stdout to None
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+
+import faulthandler
+try:
+    faulthandler.enable()
+except Exception:
+    pass
 
 if sys.platform == "win32":
     os.environ.setdefault("PYTHONIOENCODING", "utf-8")
     try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
 

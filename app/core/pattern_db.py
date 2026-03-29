@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -18,7 +19,20 @@ _NAME_TO_PC: dict[str, int] = {n: i for i, n in enumerate(NOTE_NAMES)}
 # Also handle flats for robustness
 _FLAT_MAP = {"Db": "C#", "Eb": "D#", "Fb": "E", "Gb": "F#", "Ab": "G#", "Bb": "A#", "Cb": "B"}
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent  # app/core -> app -> repo
+def _get_repo_root() -> Path:
+    """Find repo root, supporting both normal Python and PyInstaller."""
+    if getattr(sys, 'frozen', False):
+        bundle = Path(getattr(sys, '_MEIPASS', ''))
+        if (bundle / "pattern_library").is_dir():
+            return bundle
+        exe_dir = Path(sys.executable).resolve().parent
+        for d in [exe_dir, exe_dir.parent, exe_dir.parent.parent]:
+            if (d / "pattern_library").is_dir():
+                return d
+        return exe_dir
+    return Path(__file__).resolve().parent.parent.parent
+
+_REPO_ROOT = _get_repo_root()
 
 
 def _note_pc(name: str) -> int:

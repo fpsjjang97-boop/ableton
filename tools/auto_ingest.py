@@ -18,9 +18,26 @@ from datetime import datetime
 from pathlib import Path
 
 # ── Path setup ───────────────────────────────────────────────────────────
-REPO_ROOT = Path(__file__).resolve().parent.parent
-APP_DIR = REPO_ROOT / "app"
-sys.path.insert(0, str(APP_DIR))
+# Support both normal Python and PyInstaller frozen exe
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller bundle
+    _BUNDLE_DIR = Path(sys._MEIPASS)
+    # Repo root: look for analyzed_chords/ relative to the exe location
+    _EXE_DIR = Path(sys.executable).resolve().parent
+    # Walk up to find repo root (contains analyzed_chords/ or app/)
+    REPO_ROOT = _EXE_DIR
+    for _candidate in [_EXE_DIR, _EXE_DIR.parent, _EXE_DIR.parent.parent]:
+        if (_candidate / "analyzed_chords").is_dir() or (_candidate / "app").is_dir():
+            REPO_ROOT = _candidate
+            break
+    APP_DIR = REPO_ROOT / "app"
+    # Add bundled path for imports
+    sys.path.insert(0, str(_BUNDLE_DIR))
+    sys.path.insert(0, str(APP_DIR))
+else:
+    REPO_ROOT = Path(__file__).resolve().parent.parent
+    APP_DIR = REPO_ROOT / "app"
+    sys.path.insert(0, str(APP_DIR))
 
 import mido
 from core.models import Note, Track, ProjectState, TICKS_PER_BEAT

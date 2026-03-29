@@ -61,7 +61,22 @@ _RULE_DB_FILENAME = "260327_최종본_v2.07_song_form_added.json"
 
 def _find_rule_db() -> str:
     """Locate the rule database JSON relative to the repo root."""
-    # repo root is two levels up from this file (app/core/harmony_engine.py)
+    import sys as _sys
+
+    # PyInstaller frozen bundle: check _MEIPASS first
+    if getattr(_sys, 'frozen', False):
+        bundle = getattr(_sys, '_MEIPASS', '')
+        candidate = os.path.join(bundle, _RULE_DB_FILENAME)
+        if os.path.isfile(candidate):
+            return candidate
+        # Also check exe directory and parent
+        exe_dir = os.path.dirname(os.path.abspath(_sys.executable))
+        for d in [exe_dir, os.path.dirname(exe_dir), os.path.dirname(os.path.dirname(exe_dir))]:
+            candidate = os.path.join(d, _RULE_DB_FILENAME)
+            if os.path.isfile(candidate):
+                return candidate
+
+    # Normal Python: repo root is two levels up from this file
     repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     candidate = os.path.join(repo, _RULE_DB_FILENAME)
     if os.path.isfile(candidate):
