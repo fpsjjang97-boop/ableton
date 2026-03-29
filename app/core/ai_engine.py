@@ -132,6 +132,17 @@ class AIEngine:
 
     def __init__(self, seed: Optional[int] = None):
         self.rng = np.random.default_rng(seed)
+        # Harmony engine (rule DB v2.07)
+        self._harmony_engine = None
+        try:
+            from core.harmony_engine import HarmonyEngine
+            self._harmony_engine = HarmonyEngine()
+        except Exception:
+            pass
+
+    @property
+    def harmony_engine(self):
+        return self._harmony_engine
 
     # ------------------------------------------------------------------
     # 1. Variation
@@ -452,12 +463,24 @@ class AIEngine:
         length_beats: int = 16,
         style: str = "pop",
         octave: int = 3,
+        melody_track: Optional[Track] = None,
     ) -> Track:
         """Generate a chord progression.
 
-        Uses common progressions stored in ``_PROGRESSIONS`` and applies
-        style-specific voicing and rhythm.
+        When the harmony engine (rule DB v2.07) is available, uses it for
+        melody-aware voicing generation with playability constraints.
+        Otherwise falls back to the built-in progression templates.
         """
+        # --- Try harmony engine for rule-aware voicing ---
+        if self._harmony_engine is not None:
+            try:
+                return self._generate_chords_with_rules(
+                    key, scale, length_beats, style, octave, melody_track
+                )
+            except Exception:
+                pass  # Fall back to basic generation
+
+        # --- Fallback: built-in progression templates ---
         root = key_name_to_root(key)
         family = "minor" if scale in ("minor", "dorian", "minor_penta") else "major"
         progs = _PROGRESSIONS.get(family, _PROGRESSIONS["major"])
@@ -514,6 +537,125 @@ class AIEngine:
                         strum_offset += int(self.rng.integers(0, _BEAT // 16 + 1))
 
         track = Track(name="AI Chords", notes=notes, color="#51CF66")
+        return track
+
+    def _generate_chords_with_rules(
+        self,
+        key: str,
+        scale: str,
+        length_beats: int,
+        style: str,
+        octave: int,
+        melody_track: Optional[Track] = None,
+    ) -> Track:
+        """Generate chords using the harmony engine rule DB for voicing."""
+        he = self._harmony_engine
+        root = key_name_to_root(key)
+        family = "minor" if scale in ("minor", "dorian", "minor_penta") else "major"
+        progs = _PROGRESSIONS.get(family, _PROGRESSIONS["major"])
+        prog = list(progs[int(self.rng.integers(len(progs)))])
+
+        total_ticks = length_beats * _BEAT
+        bars = max(1, total_ticks // _BAR)
+        full_prog: list[int] = []
+        while len(full_prog) < bars:
+            full_prog.extend(prog)
+        full_prog = full_prog[:bars]
+
+        # Convert scale degrees to chord labels
+        intervals = SCALE_INTERVALS.get(scale, SCALE_INTERVALS["minor"])
+        n_int = len(intervals)
+        notes: list[Note] = []
+        prev_pitches: list[int] = []
+
+        for bar_idx, degree in enumerate(full_prog):
+            bar_start = bar_idx * _BAR
+            # Determine root pitch class for this degree
+            deg_idx = (degree - 1) % n_int
+            chord_root_pc = (root + intervals[deg_idx]) % 12
+            chord_root_name = NOTE_NAMES[chord_root_pc]
+
+            # Determine chord quality from scale context
+            third_idx = (degree + 1) % n_int if degree + 1 <= n_int else (degree + 1 - n_int - 1)
+            third_semitones = (intervals[(degree - 1 + 2) % n_int] - intervals[deg_idx]) % 12
+            if third_semitones == 3:
+                quality = "m7" if self.rng.random() > 0.4 else "min"
+            elif third_semitones == 4:
+                quality = "maj7" if self.rng.random() > 0.5 else "maj"
+            else:
+                quality = "maj"
+
+            # Dominant on degree 5
+            if degree == 5:
+                quality = "7"
+
+            chord_label = f"{chord_root_name}{quality}" if quality != "maj" else chord_root_name
+
+            # Melody protection
+            melody_p = None
+            if melody_track:
+                mel_notes = melody_track.get_notes_in_range(bar_start, bar_start + _BAR)
+                if mel_notes:
+                    melody_p = max(mel_notes, key=lambda n: n.duration_ticks).pitch
+
+            voicing = he.generate_voicing(
+                chord_label,
+                bass_octave=octave,
+                rh_octave=octave + 1,
+                melody_pitch=melody_p,
+                style=style,
+            )
+
+            if prev_pitches and voicing:
+                voicing = he._apply_voice_leading(prev_pitches, voicing)
+
+            # Style-aware note creation
+            if style == "ambient":
+                for i, p in enumerate(voicing):
+                    notes.append(Note(
+                        pitch=p,
+                        velocity=_clamp_vel(55 + int(self.rng.integers(-5, 6))),
+                        start_tick=bar_start,
+                        duration_ticks=_BAR - _BEAT // 4,
+                        role="bass" if i == 0 else "third",
+                    ))
+            elif style == "edm":
+                for beat in range(4):
+                    for i, p in enumerate(voicing):
+                        notes.append(Note(
+                            pitch=p,
+                            velocity=_clamp_vel(80 if beat == 0 else 65),
+                            start_tick=bar_start + beat * _BEAT,
+                            duration_ticks=_BEAT // 2,
+                            role="bass" if i == 0 else "third",
+                        ))
+            elif style in ("jazz", "lo-fi"):
+                for i, p in enumerate(voicing):
+                    stagger = i * 10
+                    notes.append(Note(
+                        pitch=p,
+                        velocity=_clamp_vel(65 + int(self.rng.integers(-5, 6))),
+                        start_tick=bar_start + stagger,
+                        duration_ticks=_BAR - _BEAT // 4,
+                        role="bass" if i == 0 else "third",
+                    ))
+            else:
+                for half in range(2):
+                    vel_base = 75 if half == 0 else 65
+                    strum_offset = 0
+                    for i, p in enumerate(voicing):
+                        notes.append(Note(
+                            pitch=p,
+                            velocity=_clamp_vel(vel_base + int(self.rng.integers(-4, 5))),
+                            start_tick=bar_start + half * _BEAT * 2 + strum_offset,
+                            duration_ticks=_BEAT * 2 - _BEAT // 8,
+                            role="bass" if i == 0 else "third",
+                        ))
+                        strum_offset += int(self.rng.integers(0, _BEAT // 16 + 1))
+
+            prev_pitches = voicing
+
+        track = Track(name="AI Chords (Rule DB)", notes=notes, color="#51CF66")
         return track
 
     # ------------------------------------------------------------------
@@ -795,7 +937,7 @@ class AIEngine:
         if len(notes) < 4:
             issues.append("Very few notes — track may be too sparse")
 
-        return {
+        result = {
             "note_count": len(notes),
             "pitch_min": int(pitches.min()),
             "pitch_max": int(pitches.max()),
@@ -817,6 +959,26 @@ class AIEngine:
             "pitch_distribution": pitch_hist,
             "interval_histogram": interval_hist,
         }
+
+        # Enrich with harmony analysis from rule DB v2.07
+        if self._harmony_engine is not None:
+            try:
+                harmony = self._harmony_engine.analyze_track_harmony(track, key, scale)
+                result["harmony_segments"] = harmony.get("harmony_segments", [])
+                result["chord_count"] = harmony.get("chord_count", 0)
+                result["playability_score"] = harmony.get("playability_score", 100)
+                result["harmony_score"] = harmony.get("overall_score", 0)
+                result["rule_db_version"] = harmony.get("rule_db_version", 0)
+                # Merge harmony issues
+                result["issues"] = result["issues"] + harmony.get("issues", [])
+                # Weighted score including harmony
+                result["score"] = int(round(
+                    score * 0.5 + harmony.get("overall_score", score) * 0.5
+                ))
+            except Exception:
+                pass
+
+        return result
 
     # ------------------------------------------------------------------
     # Private utilities

@@ -1,18 +1,31 @@
 {
-  "bpm": 60,
-  "key": "A#",
-  "scale": "minor",
+  "bpm": 120,
+  "key": "D",
+  "scale": "major",
   "time_signature": "4/4",
-  "style": "ambient",
+  "style": "jazz",
   "octave_range": [
     2,
     6
   ],
   "velocity_range": [
-    1,
-    68
+    40,
+    90
   ],
   "measures": 16,
+  "chord_progression": [
+    {"chord": "DMaj7",   "duration": "full"},
+    {"chord": "C#m7b5",  "duration": "half"},
+    {"chord": "F#7",     "duration": "half"},
+    {"chord": "Bm7",     "duration": "full"},
+    {"chord": "Am7",     "duration": "half"},
+    {"chord": "D7",      "duration": "half"},
+    {"chord": "GMaj7",   "duration": "full"},
+    {"chord": "F#m7",    "duration": "half"},
+    {"chord": "Bm7",     "duration": "half"},
+    {"chord": "E7",      "duration": "full"},
+    {"chord": "A7",      "duration": "full"}
+  ],
   "tracks": [
     {
       "name": "Melody",

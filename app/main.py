@@ -261,9 +261,14 @@ def main() -> int:
     act_gen_bass = ai_menu.addAction("Generate &Bass")
     ai_menu.addSeparator()
     act_gen_variation = ai_menu.addAction("Generate &Variation")
+    act_gen_voicing = ai_menu.addAction("Generate &Voicing (Rule DB)")
     ai_menu.addSeparator()
     act_humanize = ai_menu.addAction("&Humanize")
     act_analyze = ai_menu.addAction("&Analyze Track")
+    act_analyze_harmony = ai_menu.addAction("Analyze &Harmony")
+    act_analyze_form = ai_menu.addAction("Analyze Song &Form")
+    ai_menu.addSeparator()
+    act_gen_from_settings = ai_menu.addAction("Generate from &Settings")
 
     # Help menu
     help_menu = menubar.addMenu("&Help")
@@ -391,8 +396,126 @@ def main() -> int:
             if hasattr(rp, 'show_review'):
                 rp.show_review(analysis)
 
+    def generate_voicing():
+        p = project()
+        idx = selected_track[0]
+        if 0 <= idx < len(p.tracks) and ai_engine.harmony_engine:
+            push_undo("Generate Voicing")
+            he = ai_engine.harmony_engine
+            # Find melody track if available
+            melody_t = None
+            for t in p.tracks:
+                if "melody" in t.name.lower():
+                    melody_t = t
+                    break
+            voicing_track = he.generate_voicing_track(
+                p.tracks[idx], p.key, p.scale,
+                melody_track=melody_t, style="pop", octave=4,
+            )
+            voicing_track.color = TRACK_COLORS[len(p.tracks) % len(TRACK_COLORS)]
+            p.tracks.append(voicing_track)
+            mark_modified()
+            session_view.refresh()
+            detail_view.set_track(voicing_track, len(p.tracks) - 1)
+        elif not ai_engine.harmony_engine:
+            MB.warning(w, "Rule DB", "Harmony Rule DB (v2.07) not loaded.")
+
+    def analyze_harmony():
+        p = project()
+        idx = selected_track[0]
+        if 0 <= idx < len(p.tracks) and ai_engine.harmony_engine:
+            he = ai_engine.harmony_engine
+            result = he.analyze_track_harmony(p.tracks[idx], p.key, p.scale)
+            # Show in review panel via the analysis dict
+            analysis = ai_engine.analyze_track(p.tracks[idx], p.key, p.scale)
+            detail_view.show_tab("analysis")
+            rp = detail_view._review_panel
+            if hasattr(rp, 'show_review'):
+                rp.show_review(analysis)
+        elif not ai_engine.harmony_engine:
+            MB.warning(w, "Rule DB", "Harmony Rule DB (v2.07) not loaded.")
+
+    def analyze_song_form():
+        p = project()
+        if ai_engine.harmony_engine:
+            he = ai_engine.harmony_engine
+            form = he.analyze_song_form(p)
+            sections = form.get("sections", [])
+            form_type = form.get("form_type", "unknown")
+            conf = form.get("confidence", 0)
+
+            lines = [f"Form: {form_type} (confidence: {int(conf * 100)}%)", ""]
+            for sec in sections:
+                label = sec.get("label", "?")
+                bars = f"bar {sec.get('start_bar', '?')}-{sec.get('end_bar', '?')}"
+                energy = sec.get("avg_energy", 0)
+                lines.append(f"  [{label.upper():12}] {bars}  energy={energy:.2f}")
+
+            MB.information(w, "Song Form Analysis", "\n".join(lines))
+        else:
+            MB.warning(w, "Rule DB", "Harmony Rule DB (v2.07) not loaded.")
+
+    def generate_from_settings():
+        """Generate voicing track from settings.json chord_progression."""
+        if not ai_engine.harmony_engine:
+            MB.warning(w, "Rule DB", "Harmony Rule DB (v2.07) not loaded.")
+            return
+        settings_path = os.path.join(_repo_root, "settings.json")
+        if not os.path.isfile(settings_path):
+            MB.warning(w, "Settings", "settings.json not found.")
+            return
+        try:
+            import json as _json
+            with open(settings_path, "r", encoding="utf-8") as f:
+                sdata = _json.load(f)
+            chord_prog = sdata.get("chord_progression", [])
+            if not chord_prog:
+                MB.warning(w, "Settings", "No chord_progression in settings.json.")
+                return
+
+            push_undo("Generate from Settings")
+            p = project()
+            p.bpm = sdata.get("bpm", p.bpm)
+            p.key = sdata.get("key", p.key)
+            p.scale = sdata.get("scale", p.scale)
+            transport.set_project(p)
+
+            he = ai_engine.harmony_engine
+            # Find melody track if exists
+            melody_t = None
+            for t in p.tracks:
+                if "melody" in t.name.lower():
+                    melody_t = t
+                    break
+
+            track = he.generate_from_progression(
+                chord_prog,
+                key=p.key, scale=p.scale,
+                style=sdata.get("style", "jazz"),
+                octave=4, melody_track=melody_t,
+            )
+            track.color = TRACK_COLORS[len(p.tracks) % len(TRACK_COLORS)]
+            p.tracks.append(track)
+            mark_modified()
+            session_view.refresh()
+            detail_view.set_track(track, len(p.tracks) - 1)
+            sb.showMessage(
+                f"Generated voicing from settings.json ({len(chord_prog)} chords)", 5000
+            )
+        except Exception as e:
+            MB.critical(w, "Error", f"Failed to generate from settings:\n{e}")
+
     def about():
-        MB.about(w, "About", f"{APP_NAME} v{APP_VERSION}\n\nAI-powered MIDI Workstation")
+        he_status = "loaded" if ai_engine.harmony_engine else "not found"
+        ver = ""
+        if ai_engine.harmony_engine:
+            ver = f" v{ai_engine.harmony_engine.schema_version}"
+        MB.about(
+            w, "About",
+            f"{APP_NAME} v{APP_VERSION}\n\n"
+            f"AI-powered MIDI Workstation\n"
+            f"Harmony Rule DB{ver}: {he_status}"
+        )
 
     # Connect menu actions
     act_new.triggered.connect(new_project)
@@ -413,6 +536,10 @@ def main() -> int:
     act_gen_variation.triggered.connect(generate_variation)
     act_humanize.triggered.connect(humanize_track)
     act_analyze.triggered.connect(analyze_track)
+    act_gen_voicing.triggered.connect(generate_voicing)
+    act_analyze_harmony.triggered.connect(analyze_harmony)
+    act_analyze_form.triggered.connect(analyze_song_form)
+    act_gen_from_settings.triggered.connect(generate_from_settings)
     act_about.triggered.connect(about)
 
     # --- Widget signal connections ---

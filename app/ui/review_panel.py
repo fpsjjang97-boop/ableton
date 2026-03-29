@@ -209,6 +209,57 @@ class ReviewPanel(QWidget):
 
         root.addLayout(right_col, 1)
 
+        # --- Far-right column: Harmony Analysis (Rule DB v2.07) ----------
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.VLine)
+        sep2.setStyleSheet(f"color: {COLORS['border']};")
+        root.addWidget(sep2)
+
+        harmony_col = QVBoxLayout()
+        harmony_col.setSpacing(4)
+
+        harmony_header = QLabel("Harmony Analysis")
+        harmony_header.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        harmony_header.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        harmony_col.addWidget(harmony_header)
+
+        self._harmony_text = QTextEdit()
+        self._harmony_text.setReadOnly(True)
+        self._harmony_text.setPlaceholderText("Run analysis to view chord labels.")
+        self._harmony_text.setMaximumHeight(100)
+        self._harmony_text.setFont(QFont("Consolas", 10))
+        harmony_col.addWidget(self._harmony_text)
+
+        # Playability meter
+        play_row = QHBoxLayout()
+        play_lbl = QLabel("Playability")
+        play_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
+        self._playability_bar = QProgressBar()
+        self._playability_bar.setRange(0, 100)
+        self._playability_bar.setValue(0)
+        self._playability_val = QLabel("--")
+        self._playability_val.setFixedWidth(40)
+        self._playability_val.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        self._playability_val.setStyleSheet(
+            f"color: {COLORS['text_primary']}; font-size: 11px;"
+        )
+        play_row.addWidget(play_lbl)
+        play_row.addWidget(self._playability_bar)
+        play_row.addWidget(self._playability_val)
+        harmony_col.addLayout(play_row)
+
+        # Rule DB version label
+        self._rule_db_label = QLabel("")
+        self._rule_db_label.setStyleSheet(
+            f"color: {COLORS['text_dim']}; font-size: 9px;"
+        )
+        harmony_col.addWidget(self._rule_db_label)
+
+        harmony_col.addStretch()
+        root.addLayout(harmony_col, 1)
+
     # -- Public API ----------------------------------------------------------
 
     def show_review(self, review: dict):
@@ -277,6 +328,39 @@ class ReviewPanel(QWidget):
         else:
             self._pitch_text.setPlainText("")
 
+        # --- Harmony Analysis (Rule DB v2.07) ---
+        segments = review.get("harmony_segments", [])
+        if segments:
+            chord_lines = []
+            for seg in segments:
+                bar = seg.get("bar", "?")
+                chord = seg.get("chord", "N.C.")
+                conf = seg.get("confidence", 0)
+                conf_str = f"{int(conf * 100)}%" if isinstance(conf, float) else str(conf)
+                alts = seg.get("alternatives", [])
+                alt_str = ""
+                if alts:
+                    alt_str = f"  ({', '.join(a['label'] for a in alts[:2])})"
+                chord_lines.append(f"Bar {bar}: {chord} [{conf_str}]{alt_str}")
+            self._harmony_text.setPlainText("\n".join(chord_lines))
+        else:
+            self._harmony_text.setPlainText("")
+
+        play_score = review.get("playability_score")
+        if play_score is not None:
+            play_score = int(play_score)
+            self._playability_bar.setValue(play_score)
+            self._playability_bar.setStyleSheet(
+                f"QProgressBar::chunk {{ background-color: {_bar_color(play_score)}; border-radius: 2px; }}"
+            )
+            self._playability_val.setText(f"{play_score}%")
+
+        db_ver = review.get("rule_db_version")
+        if db_ver:
+            self._rule_db_label.setText(f"Rule DB v{db_ver}")
+        else:
+            self._rule_db_label.setText("")
+
     def clear(self):
         """Reset all fields to their default empty state."""
         self._score_label.setText("--")
@@ -291,3 +375,8 @@ class ReviewPanel(QWidget):
 
         self._issues_text.clear()
         self._pitch_text.clear()
+        self._harmony_text.clear()
+        self._playability_bar.setValue(0)
+        self._playability_bar.setStyleSheet("")
+        self._playability_val.setText("--")
+        self._rule_db_label.setText("")

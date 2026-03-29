@@ -1,0 +1,138 @@
+{
+  "version": "0.1.0",
+  "generated_date": "2026-03-29",
+  "source_corpus": "MAESTRO 2018 (93 files)",
+  "status": "auto-generated",
+  "statistics": {
+    "corpus_size": 93,
+    "total_notes": 0,
+    "total_bars": 0,
+    "avg_notes_per_file": 0.0,
+    "avg_bars_per_file": 0.0,
+    "key_distribution": {
+      "C": 93
+    },
+    "top_chords": [
+      {
+        "chord": "C",
+        "count": 1214
+      },
+      {
+        "chord": "D",
+        "count": 1142
+      },
+      {
+        "chord": "G",
+        "count": 1022
+      },
+      {
+        "chord": "C#",
+        "count": 878
+      },
+      {
+        "chord": "D#",
+        "count": 849
+      },
+      {
+        "chord": "A",
+        "count": 802
+      },
+      {
+        "chord": "E",
+        "count": 784
+      },
+      {
+        "chord": "A#",
+        "count": 768
+      },
+      {
+        "chord": "F",
+        "count": 759
+      },
+      {
+        "chord": "G#",
+        "count": 749
+      },
+      {
+        "chord": "Gsus4",
+        "count": 748
+      },
+      {
+        "chord": "Cmin",
+        "count": 696
+      },
+      {
+        "chord": "G#sus4",
+        "count": 683
+      },
+      {
+        "chord": "Esus4",
+        "count": 678
+      },
+      {
+        "chord": "Dsus4",
+        "count": 674
+      },
+      {
+        "chord": "Asus4",
+        "count": 666
+      },
+      {
+        "chord": "D#sus4",
+        "count": 651
+      },
+      {
+        "chord": "A#sus4",
+        "count": 647
+      },
+      {
+        "chord": "Csus4",
+        "count": 632
+      },
+      {
+        "chord": "Fsus4",
+        "count": 611
+      },
+      {
+        "chord": "C#sus4",
+        "count": 572
+      },
+      {
+        "chord": "C#min",
+        "count": 565
+      },
+      {
+        "chord": "B",
+        "count": 545
+      },
+      {
+        "chord": "Bsus4",
+        "count": 537
+      },
+      {
+        "chord": "F#",
+        "count": 527
+      },
+      {
+        "chord": "F#sus4",
+        "count": 515
+      },
+      {
+        "chord": "Gmin",
+        "count": 475
+      },
+      {
+        "chord": "Dmin",
+        "count": 473
+      },
+      {
+        "chord": "F#min",
+        "count": 432
+      },
+      {
+        "chord": "Bmin",
+        "count": 431
+      }
+    ]
+  }
+}

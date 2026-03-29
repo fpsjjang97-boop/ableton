@@ -1,0 +1,3274 @@
+{
+  "version": "0.1.0",
+  "generated_date": "2026-03-29",
+  "source_corpus": "MAESTRO 2018 (93 files)",
+  "status": "auto-generated",
+  "examples": {
+    "maj": [
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 1
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 2
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 3
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 4
+      },
+      {
+        "chord": "D/A",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 4
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 6
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 6
+      },
+      {
+        "chord": "D/A",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 7
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 9
+      },
+      {
+        "chord": "A",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 11
+      },
+      {
+        "chord": "A",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 11
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 12
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 12
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 13
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 15
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 38
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 40
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 41
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 42
+      },
+      {
+        "chord": "D",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 42
+      }
+    ],
+    "sus4": [
+      {
+        "chord": "Asus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 16
+      },
+      {
+        "chord": "Asus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 27
+      },
+      {
+        "chord": "Asus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 29
+      },
+      {
+        "chord": "Dsus4",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 31
+      },
+      {
+        "chord": "Asus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 34
+      },
+      {
+        "chord": "Asus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 36
+      },
+      {
+        "chord": "Dsus4",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 79
+      },
+      {
+        "chord": "Asus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 83
+      },
+      {
+        "chord": "C#sus4",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 86
+      },
+      {
+        "chord": "Dsus4",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 89
+      },
+      {
+        "chord": "Dsus4",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 95
+      },
+      {
+        "chord": "Asus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 118
+      },
+      {
+        "chord": "Asus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 132
+      },
+      {
+        "chord": "Dsus4",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 168
+      },
+      {
+        "chord": "Dsus4",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 171
+      },
+      {
+        "chord": "Asus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 174
+      },
+      {
+        "chord": "Dsus4",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 197
+      },
+      {
+        "chord": "Dsus4",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 198
+      },
+      {
+        "chord": "G#sus4",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 227
+      },
+      {
+        "chord": "F#sus4/C#",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 1
+      }
+    ],
+    "7": [
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 7
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 116
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 125
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 136
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 164
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 173
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 174
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 190
+      },
+      {
+        "chord": "D7/A",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 195
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 196
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 204
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 214
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 215
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 220
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 221
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 222
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 222
+      },
+      {
+        "chord": "D7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 15
+      },
+      {
+        "chord": "A7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 17
+      },
+      {
+        "chord": "C#7",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 27
+      }
+    ],
+    "min": [
+      {
+        "chord": "F#min/A",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 15
+      },
+      {
+        "chord": "Bmin",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 74
+      },
+      {
+        "chord": "Dmin",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 115
+      },
+      {
+        "chord": "Dmin",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 121
+      },
+      {
+        "chord": "Dmin",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 121
+      },
+      {
+        "chord": "Dmin",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 129
+      },
+      {
+        "chord": "Dmin",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 134
+      },
+      {
+        "chord": "Dmin",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 134
+      },
+      {
+        "chord": "Dmin",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 135
+      },
+      {
+        "chord": "Dmin/A",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 135
+      },
+      {
+        "chord": "Dmin",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 137
+      },
+      {
+        "chord": "Dmin/A",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 140
+      },
+      {
+        "chord": "Dmin/A",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 141
+      },
+      {
+        "chord": "Bmin/F#",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 212
+      },
+      {
+        "chord": "Bmin",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 5
+      },
+      {
+        "chord": "Bmin",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 6
+      },
+      {
+        "chord": "Emin",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 12
+      },
+      {
+        "chord": "Cmin",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 20
+      },
+      {
+        "chord": "Gmin",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 21
+      },
+      {
+        "chord": "Emin",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 36
+      }
+    ],
+    "maj9": [
+      {
+        "chord": "Dmaj9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 24
+      },
+      {
+        "chord": "Dmaj9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 41
+      },
+      {
+        "chord": "Gmaj9/F#",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 48
+      },
+      {
+        "chord": "Dmaj9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 49
+      },
+      {
+        "chord": "Gmaj9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 51
+      },
+      {
+        "chord": "Dmaj9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 53
+      },
+      {
+        "chord": "Gmaj9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 58
+      },
+      {
+        "chord": "Gmaj9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 60
+      },
+      {
+        "chord": "Gmaj9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 62
+      },
+      {
+        "chord": "Gmaj9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 69
+      },
+      {
+        "chord": "Dmaj9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 74
+      },
+      {
+        "chord": "Dmaj9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 75
+      },
+      {
+        "chord": "Gmaj9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 79
+      },
+      {
+        "chord": "Dmaj9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 84
+      },
+      {
+        "chord": "Gmaj9/F#",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 154
+      },
+      {
+        "chord": "Gmaj9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 156
+      },
+      {
+        "chord": "Amaj9",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 28
+      },
+      {
+        "chord": "Bmaj9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 84
+      },
+      {
+        "chord": "Emaj9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 205
+      },
+      {
+        "chord": "Fmaj9",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 154
+      }
+    ],
+    "6": [
+      {
+        "chord": "A6",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 29
+      },
+      {
+        "chord": "D6",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 31
+      },
+      {
+        "chord": "D6",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 67
+      },
+      {
+        "chord": "A6",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 108
+      },
+      {
+        "chord": "F#6",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 35
+      },
+      {
+        "chord": "D6/A",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 216
+      },
+      {
+        "chord": "D6",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 36
+      },
+      {
+        "chord": "E6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 66
+      },
+      {
+        "chord": "E6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 109
+      },
+      {
+        "chord": "D6",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 125
+      },
+      {
+        "chord": "D6/F#",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 136
+      },
+      {
+        "chord": "E6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 143
+      },
+      {
+        "chord": "E6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 146
+      },
+      {
+        "chord": "E6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 176
+      },
+      {
+        "chord": "E6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 177
+      },
+      {
+        "chord": "D6",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 193
+      },
+      {
+        "chord": "C6",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 208
+      },
+      {
+        "chord": "C6/G",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 217
+      },
+      {
+        "chord": "C6",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 221
+      },
+      {
+        "chord": "C6/G",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 255
+      }
+    ],
+    "add9": [
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 37
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 73
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 78
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 85
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 145
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 149
+      },
+      {
+        "chord": "Gadd9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 153
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 156
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 163
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 166
+      },
+      {
+        "chord": "Gadd9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 176
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 200
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 203
+      },
+      {
+        "chord": "F#add9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 88
+      },
+      {
+        "chord": "Eadd9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 99
+      },
+      {
+        "chord": "G#add9",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 142
+      },
+      {
+        "chord": "Gadd9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 143
+      },
+      {
+        "chord": "C#add9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 149
+      },
+      {
+        "chord": "Dadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 159
+      },
+      {
+        "chord": "A#add9",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 223
+      }
+    ],
+    "m7": [
+      {
+        "chord": "Bm7",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 38
+      },
+      {
+        "chord": "Bm7",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 40
+      },
+      {
+        "chord": "Bm7",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 51
+      },
+      {
+        "chord": "Bm7",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 53
+      },
+      {
+        "chord": "Bm7",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 89
+      },
+      {
+        "chord": "F#m7",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 110
+      },
+      {
+        "chord": "F#m7",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 206
+      },
+      {
+        "chord": "Gm7",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 21
+      },
+      {
+        "chord": "Fm7",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 29
+      },
+      {
+        "chord": "F#m7",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 34
+      },
+      {
+        "chord": "Em7",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 48
+      },
+      {
+        "chord": "Cm7",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 66
+      },
+      {
+        "chord": "Em7/D",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 72
+      },
+      {
+        "chord": "Gm7/F",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 85
+      },
+      {
+        "chord": "Fm7",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 93
+      },
+      {
+        "chord": "F#m7",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 97
+      },
+      {
+        "chord": "Em7",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 102
+      },
+      {
+        "chord": "A#m7",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 156
+      },
+      {
+        "chord": "G#m7/F#",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 183
+      },
+      {
+        "chord": "Cm7",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 196
+      }
+    ],
+    "sus2": [
+      {
+        "chord": "Dsus2",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 46
+      },
+      {
+        "chord": "Dsus2",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 103
+      },
+      {
+        "chord": "Dsus2",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 118
+      },
+      {
+        "chord": "Dsus2",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 124
+      },
+      {
+        "chord": "Asus2",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 31
+      },
+      {
+        "chord": "Bsus2",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 81
+      },
+      {
+        "chord": "Asus2",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 94
+      },
+      {
+        "chord": "Bsus2",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 172
+      },
+      {
+        "chord": "Esus2",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 173
+      },
+      {
+        "chord": "Dsus2",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 208
+      },
+      {
+        "chord": "Csus2",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 231
+      },
+      {
+        "chord": "Csus2",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 235
+      },
+      {
+        "chord": "G#sus2",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 239
+      },
+      {
+        "chord": "D#sus2",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 243
+      },
+      {
+        "chord": "Csus2",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 281
+      },
+      {
+        "chord": "Asus2",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 46
+      },
+      {
+        "chord": "F#sus2",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 195
+      },
+      {
+        "chord": "Asus2",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 214
+      },
+      {
+        "chord": "Dsus2",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 226
+      },
+      {
+        "chord": "Csus2",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 260
+      }
+    ],
+    "7sus4": [
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 47
+      },
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 76
+      },
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 81
+      },
+      {
+        "chord": "G#7sus4",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 87
+      },
+      {
+        "chord": "F#7sus4/B",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 90
+      },
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 91
+      },
+      {
+        "chord": "C#7sus4",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 93
+      },
+      {
+        "chord": "C#7sus4",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 98
+      },
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 99
+      },
+      {
+        "chord": "B7sus4",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 106
+      },
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 123
+      },
+      {
+        "chord": "C#7sus4",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 153
+      },
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 157
+      },
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 170
+      },
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 170
+      },
+      {
+        "chord": "B7sus4",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 177
+      },
+      {
+        "chord": "A7sus4",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 214
+      },
+      {
+        "chord": "D7sus4/A",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 13
+      },
+      {
+        "chord": "C#7sus4",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 19
+      },
+      {
+        "chord": "C#7sus4/G#",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 26
+      }
+    ],
+    "aug": [
+      {
+        "chord": "C#aug",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 50
+      },
+      {
+        "chord": "A#aug",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 99
+      },
+      {
+        "chord": "F#aug",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 110
+      },
+      {
+        "chord": "C#aug",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 130
+      },
+      {
+        "chord": "Baug",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 3
+      },
+      {
+        "chord": "C#aug",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 7
+      },
+      {
+        "chord": "C#aug",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 9
+      },
+      {
+        "chord": "Eaug",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 11
+      },
+      {
+        "chord": "Aaug",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 12
+      },
+      {
+        "chord": "Aaug",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 14
+      },
+      {
+        "chord": "Faug",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 29
+      },
+      {
+        "chord": "Daug",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 44
+      },
+      {
+        "chord": "C#aug",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 47
+      },
+      {
+        "chord": "Faug",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 51
+      },
+      {
+        "chord": "Faug",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 53
+      },
+      {
+        "chord": "Faug",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 54
+      },
+      {
+        "chord": "Eaug",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 62
+      },
+      {
+        "chord": "C#aug",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 72
+      },
+      {
+        "chord": "Baug",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 74
+      },
+      {
+        "chord": "Faug",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 74
+      }
+    ],
+    "madd9": [
+      {
+        "chord": "Dmadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 128
+      },
+      {
+        "chord": "D#madd9",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 38
+      },
+      {
+        "chord": "C#madd9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 57
+      },
+      {
+        "chord": "Cmadd9",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 82
+      },
+      {
+        "chord": "D#madd9/F",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 135
+      },
+      {
+        "chord": "C#madd9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 138
+      },
+      {
+        "chord": "D#madd9",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 158
+      },
+      {
+        "chord": "F#madd9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 193
+      },
+      {
+        "chord": "Bmadd9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 11
+      },
+      {
+        "chord": "Dmadd9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 14
+      },
+      {
+        "chord": "Emadd9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 56
+      },
+      {
+        "chord": "Bmadd9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 68
+      },
+      {
+        "chord": "Emadd9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 101
+      },
+      {
+        "chord": "C#madd9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 119
+      },
+      {
+        "chord": "Emadd9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 167
+      },
+      {
+        "chord": "Emadd9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 168
+      },
+      {
+        "chord": "C#madd9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 202
+      },
+      {
+        "chord": "Cmadd9",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 241
+      },
+      {
+        "chord": "A#madd9",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 273
+      },
+      {
+        "chord": "C#madd9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 279
+      }
+    ],
+    "dim": [
+      {
+        "chord": "C#dim",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 130
+      },
+      {
+        "chord": "C#dim/E",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 197
+      },
+      {
+        "chord": "G#dim",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 213
+      },
+      {
+        "chord": "A#dim/C#",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 219
+      },
+      {
+        "chord": "A#dim",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 219
+      },
+      {
+        "chord": "G#dim/B",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 20
+      },
+      {
+        "chord": "Edim",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 37
+      },
+      {
+        "chord": "D#dim",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 45
+      },
+      {
+        "chord": "Ddim/G#",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 81
+      },
+      {
+        "chord": "C#dim",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 105
+      },
+      {
+        "chord": "Adim",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 123
+      },
+      {
+        "chord": "G#dim",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 144
+      },
+      {
+        "chord": "Fdim/G#",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 145
+      },
+      {
+        "chord": "Fdim/G#",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 155
+      },
+      {
+        "chord": "Cdim/F#",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 187
+      },
+      {
+        "chord": "Adim/C",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 198
+      },
+      {
+        "chord": "G#dim/B",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 212
+      },
+      {
+        "chord": "Cdim/D#",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 228
+      },
+      {
+        "chord": "C#dim",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 8
+      },
+      {
+        "chord": "Edim/G",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 25
+      }
+    ],
+    "maj7": [
+      {
+        "chord": "Dmaj7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 100
+      },
+      {
+        "chord": "Dmaj7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 106
+      },
+      {
+        "chord": "A#maj7",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 131
+      },
+      {
+        "chord": "Dmaj7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 149
+      },
+      {
+        "chord": "Dmaj7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 167
+      },
+      {
+        "chord": "Dmaj7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 182
+      },
+      {
+        "chord": "Dmaj7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 182
+      },
+      {
+        "chord": "Dmaj7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 187
+      },
+      {
+        "chord": "F#maj7",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 9
+      },
+      {
+        "chord": "A#maj7",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 22
+      },
+      {
+        "chord": "Dmaj7/C#",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 25
+      },
+      {
+        "chord": "C#maj7",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 43
+      },
+      {
+        "chord": "Gmaj7",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 43
+      },
+      {
+        "chord": "A#maj7/F",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 63
+      },
+      {
+        "chord": "Gmaj7/D",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 65
+      },
+      {
+        "chord": "Gmaj7",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 65
+      },
+      {
+        "chord": "F#maj7",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 73
+      },
+      {
+        "chord": "Amaj7/E",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 75
+      },
+      {
+        "chord": "Cmaj7/B",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 100
+      },
+      {
+        "chord": "Emaj7",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 102
+      }
+    ],
+    "m9": [
+      {
+        "chord": "Em9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 165
+      },
+      {
+        "chord": "C#m9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 139
+      },
+      {
+        "chord": "D#m9",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 177
+      },
+      {
+        "chord": "Cm9",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 201
+      },
+      {
+        "chord": "Gm9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 220
+      },
+      {
+        "chord": "Dm9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 221
+      },
+      {
+        "chord": "Am9",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 221
+      },
+      {
+        "chord": "Cm9",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 223
+      },
+      {
+        "chord": "Em9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 235
+      },
+      {
+        "chord": "Cm9/A#",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 247
+      },
+      {
+        "chord": "Em9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 1
+      },
+      {
+        "chord": "Bm9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 3
+      },
+      {
+        "chord": "Em9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 9
+      },
+      {
+        "chord": "Em9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 48
+      },
+      {
+        "chord": "Em9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 48
+      },
+      {
+        "chord": "Am9",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 78
+      },
+      {
+        "chord": "Dm9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 86
+      },
+      {
+        "chord": "Dm9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 87
+      },
+      {
+        "chord": "Dm9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 89
+      },
+      {
+        "chord": "Dm9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 89
+      }
+    ],
+    "m7b5": [
+      {
+        "chord": "C#m7b5",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 157
+      },
+      {
+        "chord": "Em7b5/A#",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 3
+      },
+      {
+        "chord": "C#m7b5",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 8
+      },
+      {
+        "chord": "Am7b5",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 13
+      },
+      {
+        "chord": "G#m7b5",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 17
+      },
+      {
+        "chord": "C#m7b5",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 23
+      },
+      {
+        "chord": "Cm7b5",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 24
+      },
+      {
+        "chord": "C#m7b5",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 46
+      },
+      {
+        "chord": "Cm7b5",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 58
+      },
+      {
+        "chord": "Gm7b5",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 59
+      },
+      {
+        "chord": "Em7b5/A#",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 67
+      },
+      {
+        "chord": "Am7b5",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 77
+      },
+      {
+        "chord": "Cm7b5",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 87
+      },
+      {
+        "chord": "Cm7b5",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 88
+      },
+      {
+        "chord": "Em7b5",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 111
+      },
+      {
+        "chord": "Cm7b5",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 120
+      },
+      {
+        "chord": "Fm7b5/B",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 122
+      },
+      {
+        "chord": "Dm7b5",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 133
+      },
+      {
+        "chord": "Em7b5",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 136
+      },
+      {
+        "chord": "F#m7b5",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 140
+      }
+    ],
+    "13": [
+      {
+        "chord": "D13",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 175
+      },
+      {
+        "chord": "G#13",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 107
+      },
+      {
+        "chord": "E13",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 108
+      },
+      {
+        "chord": "C#13",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 216
+      },
+      {
+        "chord": "G13",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 216
+      },
+      {
+        "chord": "C#13",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 309
+      },
+      {
+        "chord": "A13",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 83
+      },
+      {
+        "chord": "A13",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 89
+      },
+      {
+        "chord": "E13",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 91
+      },
+      {
+        "chord": "F#13",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 197
+      },
+      {
+        "chord": "F#13",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 198
+      },
+      {
+        "chord": "F#13",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 204
+      },
+      {
+        "chord": "F#13",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 339
+      },
+      {
+        "chord": "B13",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 358
+      },
+      {
+        "chord": "B13",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 385
+      },
+      {
+        "chord": "D#13",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 412
+      },
+      {
+        "chord": "D#13",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 412
+      },
+      {
+        "chord": "F#13",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 477
+      },
+      {
+        "chord": "F#13",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 495
+      },
+      {
+        "chord": "F#13",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 498
+      }
+    ],
+    "9": [
+      {
+        "chord": "A9",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber2_MID--AUDIO_09_R3_2018_wav--1.json",
+        "bar": 221
+      },
+      {
+        "chord": "G#9",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 24
+      },
+      {
+        "chord": "E9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 45
+      },
+      {
+        "chord": "D9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 56
+      },
+      {
+        "chord": "C9",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 109
+      },
+      {
+        "chord": "B9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 168
+      },
+      {
+        "chord": "B9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 169
+      },
+      {
+        "chord": "C#9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 210
+      },
+      {
+        "chord": "B9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 211
+      },
+      {
+        "chord": "G9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 50
+      },
+      {
+        "chord": "D9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 102
+      },
+      {
+        "chord": "E9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 140
+      },
+      {
+        "chord": "D9/C",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 169
+      },
+      {
+        "chord": "F9",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 235
+      },
+      {
+        "chord": "F9",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 245
+      },
+      {
+        "chord": "C9",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 254
+      },
+      {
+        "chord": "F#9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 313
+      },
+      {
+        "chord": "D#9",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 316
+      },
+      {
+        "chord": "A9",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 273
+      },
+      {
+        "chord": "A9",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 313
+      }
+    ],
+    "7#9": [
+      {
+        "chord": "D7#9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 14
+      },
+      {
+        "chord": "F#7#9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 49
+      },
+      {
+        "chord": "F#7#9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 52
+      },
+      {
+        "chord": "E7#9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 75
+      },
+      {
+        "chord": "F#7#9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 112
+      },
+      {
+        "chord": "A#7#9",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 181
+      },
+      {
+        "chord": "F#7#9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 237
+      },
+      {
+        "chord": "F#7#9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 243
+      },
+      {
+        "chord": "G#7#9/D#",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 112
+      },
+      {
+        "chord": "A7#9/G",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 416
+      },
+      {
+        "chord": "F#7#9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 14
+      },
+      {
+        "chord": "F#7#9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 14
+      },
+      {
+        "chord": "D7#9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 90
+      },
+      {
+        "chord": "E7#9/B",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 93
+      },
+      {
+        "chord": "A#7#9",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 152
+      },
+      {
+        "chord": "D#7#9",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 601
+      },
+      {
+        "chord": "E7#9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 624
+      },
+      {
+        "chord": "F7#9/C",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.json",
+        "bar": 18
+      },
+      {
+        "chord": "B7#9/A",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.json",
+        "bar": 124
+      },
+      {
+        "chord": "D#7#9/A#",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber6_MID--AUDIO_20_R3_2018_wav--2.json",
+        "bar": 125
+      }
+    ],
+    "7b9": [
+      {
+        "chord": "B7b9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 18
+      },
+      {
+        "chord": "F#7b9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 48
+      },
+      {
+        "chord": "F#7b9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 68
+      },
+      {
+        "chord": "E7b9",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 91
+      },
+      {
+        "chord": "C#7b9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 109
+      },
+      {
+        "chord": "B7b9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 138
+      },
+      {
+        "chord": "D7b9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 152
+      },
+      {
+        "chord": "C#7b9",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 179
+      },
+      {
+        "chord": "B7b9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 203
+      },
+      {
+        "chord": "D#7b9",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 229
+      },
+      {
+        "chord": "A7b9",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 27
+      },
+      {
+        "chord": "F#7b9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 68
+      },
+      {
+        "chord": "G7b9",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 90
+      },
+      {
+        "chord": "G#7b9",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 230
+      },
+      {
+        "chord": "B7b9",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 102
+      },
+      {
+        "chord": "F#7b9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 297
+      },
+      {
+        "chord": "F#7b9",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 13
+      },
+      {
+        "chord": "D7b9",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 25
+      },
+      {
+        "chord": "A7b9",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 29
+      },
+      {
+        "chord": "A7b9",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 30
+      }
+    ],
+    "11": [
+      {
+        "chord": "C11",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 37
+      },
+      {
+        "chord": "D#11",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 41
+      },
+      {
+        "chord": "C11",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 101
+      },
+      {
+        "chord": "A11",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 28
+      },
+      {
+        "chord": "G11",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 293
+      },
+      {
+        "chord": "A#11",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 327
+      },
+      {
+        "chord": "B11",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 90
+      },
+      {
+        "chord": "A11",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 127
+      },
+      {
+        "chord": "E11",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 254
+      },
+      {
+        "chord": "E11",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 287
+      },
+      {
+        "chord": "A11",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 353
+      },
+      {
+        "chord": "A11",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 420
+      },
+      {
+        "chord": "D11",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 423
+      },
+      {
+        "chord": "A11",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 60
+      },
+      {
+        "chord": "B11",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 142
+      },
+      {
+        "chord": "C#11",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 182
+      },
+      {
+        "chord": "G#11",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 187
+      },
+      {
+        "chord": "F#11",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 191
+      },
+      {
+        "chord": "G#11",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 192
+      },
+      {
+        "chord": "C#11",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 206
+      }
+    ],
+    "m6": [
+      {
+        "chord": "Fm6",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 55
+      },
+      {
+        "chord": "Gm6",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 85
+      },
+      {
+        "chord": "F#m6",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 98
+      },
+      {
+        "chord": "F#m6",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 98
+      },
+      {
+        "chord": "D#m6",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 101
+      },
+      {
+        "chord": "C#m6",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 103
+      },
+      {
+        "chord": "Dm6/A",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 149
+      },
+      {
+        "chord": "Cm6",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 189
+      },
+      {
+        "chord": "G#m6",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 215
+      },
+      {
+        "chord": "G#m6",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 215
+      },
+      {
+        "chord": "Em6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 252
+      },
+      {
+        "chord": "Em6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 255
+      },
+      {
+        "chord": "Cm6/G",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 303
+      },
+      {
+        "chord": "Em6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 190
+      },
+      {
+        "chord": "C#m6",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 336
+      },
+      {
+        "chord": "Em6",
+        "root": "E",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 353
+      },
+      {
+        "chord": "F#m6",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 408
+      },
+      {
+        "chord": "Cm6/D#",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 67
+      },
+      {
+        "chord": "F#m6",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 478
+      },
+      {
+        "chord": "Cm6/G",
+        "root": "C",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber5_MID--AUDIO_18_R3_2018_wav--1.json",
+        "bar": 560
+      }
+    ],
+    "dim7": [
+      {
+        "chord": "Bdim7",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 84
+      },
+      {
+        "chord": "Ddim7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 87
+      },
+      {
+        "chord": "Bdim7",
+        "root": "B",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 194
+      },
+      {
+        "chord": "Fdim7",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 207
+      },
+      {
+        "chord": "Adim7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--1.json",
+        "bar": 224
+      },
+      {
+        "chord": "A#dim7",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 34
+      },
+      {
+        "chord": "C#dim7",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 55
+      },
+      {
+        "chord": "C#dim7",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 106
+      },
+      {
+        "chord": "C#dim7",
+        "root": "C#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 173
+      },
+      {
+        "chord": "F#dim7",
+        "root": "F#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 302
+      },
+      {
+        "chord": "D#dim7",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 324
+      },
+      {
+        "chord": "D#dim7",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber3_MID--AUDIO_10_R3_2018_wav--2.json",
+        "bar": 330
+      },
+      {
+        "chord": "Adim7",
+        "root": "A",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 29
+      },
+      {
+        "chord": "D#dim7",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 29
+      },
+      {
+        "chord": "A#dim7",
+        "root": "A#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 153
+      },
+      {
+        "chord": "D#dim7",
+        "root": "D#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 160
+      },
+      {
+        "chord": "Fdim7",
+        "root": "F",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 168
+      },
+      {
+        "chord": "Ddim7",
+        "root": "D",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 176
+      },
+      {
+        "chord": "G#dim7",
+        "root": "G#",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 178
+      },
+      {
+        "chord": "Gdim7",
+        "root": "G",
+        "confidence": 1.0,
+        "source": "MIDI-Unprocessed_Chamber4_MID--AUDIO_11_R3_2018_wav--1.json",
+        "bar": 192
+      }
+    ]
+  }
+}
