@@ -229,48 +229,65 @@ class HarmonyEngine:
         bass_root_q, bass_root_match, bass_root_total = _best_template(root_pc)
         bass_root_conf = bass_root_match / max(bass_root_total, 1) if bass_root_q else 0
 
-        # ── Step 4: Test slash/inversion from other roots ──
+        # ── Step 4: Test slash/inversion from ALL roots x ALL qualities ──
+        # hc_mandatory_per_segment_pipeline: Step 4 skip 금지
+        # 화성학적 우선순위: 7th chords > triads, functional (m7b5, 7) > color (6, add9)
+        _FUNCTIONAL_PRIORITY = {
+            "m7b5": 10, "dim7": 9, "7": 8, "m7": 8, "maj7": 7,
+            "7sus4": 7, "7b9": 8, "7#9": 8, "9": 7, "m9": 7,
+            "min": 5, "maj": 5, "dim": 6, "aug": 5, "sus4": 4, "sus2": 4,
+            "m6": 3, "6": 3, "add9": 3, "madd9": 3,
+            "11": 6, "13": 6, "maj9": 6,
+        }
         slash_candidates = []
         for alt_root in range(12):
             if alt_root == bass_pc:
                 continue
-            alt_q, am, at = _best_template(alt_root)
-            if alt_q is None:
-                continue
-            conf = am / max(at, 1)
-            # slash is valid only if bass is a chord tone of alt_root's chord
-            alt_template = _CHORD_TEMPLATES[alt_q]
-            alt_expected = set((alt_root + iv) % 12 for iv in alt_template)
-            bass_is_chord_tone = bass_pc in alt_expected
-            if bass_is_chord_tone:
-                slash_candidates.append((alt_root, alt_q, conf, am, at))
-
-        # ── Step 6: Select final label ──
-        # Rule: prefer bass=root unless slash interpretation is significantly better
-        # "significantly better" = slash has full match AND bass=root is weak
+            # 모든 quality를 테스트 (best만이 아님)
+            for alt_q, alt_tmpl in _CHORD_TEMPLATES.items():
+                alt_expected = set((alt_root + iv) % 12 for iv in alt_tmpl)
+                am = len(alt_expected & pcs_set)
+                at = len(alt_expected)
+                if am < max(2, at - 1):
+                    continue
+                # bass가 이 코드의 chord tone인지 확인
+                if bass_pc not in alt_expected:
+                    continue
+                conf = am / max(at, 1)
+                priority = _FUNCTIONAL_PRIORITY.get(alt_q, 1)
+                slash_candidates.append((alt_root, alt_q, conf, am, at, priority))
 
         best_slash = None
         if slash_candidates:
-            # pick best slash by match ratio
-            slash_candidates.sort(key=lambda x: (-x[2], -x[3]))
+            # 정렬: 매칭 비율 > 기능적 우선순위 > match count
+            slash_candidates.sort(key=lambda x: (-x[2], -x[5], -x[3]))
             best_slash = slash_candidates[0]
 
-        # Decision logic
+        # ── Step 6: Decision — bass=root vs slash ──
+        # hc_mandatory_per_segment_pipeline: Step 4를 절대 건너뛰지 않음
+        # slash가 bass=root보다 나은 경우:
+        #   a) bass=root 해석이 없음
+        #   b) slash가 완전 매칭(4/4 이상)이고 bass=root는 불완전
+        #   c) slash의 match_count가 bass=root보다 엄격히 높음
         use_slash = False
         if bass_root_q is None and best_slash is not None:
-            # bass=root has no valid interpretation, must use slash
             use_slash = True
         elif bass_root_q is not None and best_slash is not None:
             slash_conf = best_slash[2]
-            # Only prefer slash if it's a perfect match AND bass_root is poor
-            if slash_conf >= 1.0 and bass_root_conf < 0.6:
+            slash_match = best_slash[3]
+            slash_total = best_slash[4]
+            # bass=root가 불완전(match < total)이고 slash가 완전 매칭이면 slash 선택
+            if slash_match >= slash_total and bass_root_match < bass_root_total:
                 use_slash = True
-            # Or if slash match count is strictly higher
-            elif best_slash[3] > bass_root_match and slash_conf > bass_root_conf + 0.2:
+            # slash match_count가 bass=root보다 2개 이상 많으면 slash
+            elif slash_match >= bass_root_match + 2:
+                use_slash = True
+            # bass=root가 약하고(conf<0.7) slash가 완전 매칭이면 slash
+            elif slash_conf >= 1.0 and bass_root_conf < 0.7:
                 use_slash = True
 
         if use_slash and best_slash:
-            s_root, s_qual, s_conf, _, _ = best_slash
+            s_root, s_qual, s_conf = best_slash[0], best_slash[1], best_slash[2]
             label, root_name, is_slash = _make_label(s_root, s_qual, slash_bass_pc=bass_pc)
             # bass=root as alternative
             if bass_root_q:
@@ -337,63 +354,65 @@ class HarmonyEngine:
                 "issues": ["Track is empty"],
             }
 
-        # Determine segmentation window (half-bar for 4/4)
+        # ── Beat-level segmentation (hc_mid_measure_harmony_split_required) ──
+        # 1박 단위로 분석 후, split audit으로 필요 시 합치거나 유지
         beat_per_bar = time_sig_num
         bar_ticks = _BEAT * beat_per_bar
-        window_ticks = bar_ticks // 2  # half-bar segmentation
 
         total_ticks = max(n.end_tick for n in track.notes)
-        num_windows = max(1, int(math.ceil(total_ticks / window_ticks)))
+        total_beats = max(1, int(math.ceil(total_ticks / _BEAT)))
 
-        segments: list[dict] = []
+        raw_segments: list[dict] = []
         prev_label = ""
 
-        for i in range(num_windows):
-            win_start = i * window_ticks
-            win_end = win_start + window_ticks
+        for beat_idx in range(total_beats):
+            win_start = beat_idx * _BEAT
+            win_end = win_start + _BEAT
+            bar_num = beat_idx // beat_per_bar + 1
+            beat_in_bar = beat_idx % beat_per_bar + 1
             notes_in_win = track.get_notes_in_range(win_start, win_end)
 
             if not notes_in_win:
-                segments.append({
+                raw_segments.append({
                     "start_tick": win_start,
                     "end_tick": win_end,
-                    "bar": i // 2 + 1,
-                    "beat_position": "1" if i % 2 == 0 else "3",
+                    "bar": bar_num,
+                    "beat_in_bar": beat_in_bar,
+                    "beat_position": str(beat_in_bar),
                     "chord": prev_label or "N.C.",
                     "confidence": 0.0,
                     "notes_count": 0,
                     "bass": None,
+                    "root": None,
+                    "quality": None,
+                    "alternatives": [],
+                    "is_slash": False,
                     "is_continuation": True,
                 })
                 continue
 
-            # ── Pipeline step 1: identify structural bass ──
-            # bass = 가장 낮은 음 중 duration이 긴 것 우선 (Feedback #1, #5)
+            # Step 1: bass identification
             bass_candidates = sorted(notes_in_win, key=lambda n: (n.pitch, -n.duration_ticks))
             bass_note = bass_candidates[0]
 
-            # ── Feedback #1 + 2회차 #5: 베이스 구조적 근거 판단 ──
-            # bass 점유율 기준을 완화 (10%) — 너무 엄격하면 실제 코드를 N.C.로 판정
-            bass_effective_start = max(bass_note.start_tick, win_start)
-            bass_effective_end = min(bass_note.end_tick, win_end)
-            bass_occupancy = bass_effective_end - bass_effective_start
-            bass_is_structural = (bass_occupancy >= (window_ticks * 0.10) or
-                                  bass_note.velocity >= 70)
+            # bass structural check (relaxed threshold for beat-level)
+            bass_eff_start = max(bass_note.start_tick, win_start)
+            bass_eff_end = min(bass_note.end_tick, win_end)
+            bass_occ = bass_eff_end - bass_eff_start
+            bass_is_structural = (bass_occ >= (_BEAT * 0.08) or bass_note.velocity >= 60)
 
-            # ── Pipeline step 2: collect structural pitches ──
+            # Step 2: structural pitches
             structural_pitches = self._extract_structural_pitches(
-                notes_in_win, win_start, win_end, window_ticks
+                notes_in_win, win_start, win_end, _BEAT
             )
 
-            # ── Pipeline step 3: identify chord (bass-first) ──
+            # Step 3-6: chord identification
             chord_info = self.identify_chord(
                 structural_pitches, bass_note.pitch,
                 bass_is_structural=bass_is_structural,
             )
 
-            # ── Feedback #3: mid-bar split audit ──
-            # 같은 마디 내에서도 bass가 바뀌면 split 유지 (merge 방지)
-            prev_bass = segments[-1].get("bass") if segments else None
+            prev_bass = raw_segments[-1].get("bass") if raw_segments else None
             bass_changed = (prev_bass is not None and
                             chord_info["bass"] is not None and
                             prev_bass != chord_info["bass"])
@@ -401,11 +420,12 @@ class HarmonyEngine:
                                chord_info["confidence"] < 0.7 and
                                not bass_changed)
 
-            segments.append({
+            raw_segments.append({
                 "start_tick": win_start,
                 "end_tick": win_end,
-                "bar": i // 2 + 1,
-                "beat_position": "1" if i % 2 == 0 else "3",
+                "bar": bar_num,
+                "beat_in_bar": beat_in_bar,
+                "beat_position": str(beat_in_bar),
                 "chord": chord_info["label"],
                 "confidence": chord_info["confidence"],
                 "root": chord_info["root"],
@@ -418,27 +438,30 @@ class HarmonyEngine:
             })
             prev_label = chord_info["label"]
 
-        # Merge consecutive continuations into bar-level labels
-        merged = self._merge_segments(segments)
+        # ── Split audit merge (hc_mandatory_split_audit_on_new_bass_event) ──
+        # 같은 코드 + 같은 bass면 합치고, 다르면 유지
+        merged = self._merge_beat_segments(raw_segments, beat_per_bar)
 
-        # Score the overall analysis
-        avg_confidence = np.mean([s["confidence"] for s in merged if s["confidence"] > 0])
+        # Score
+        conf_vals = [s["confidence"] for s in merged if s["confidence"] > 0]
+        avg_confidence = np.mean(conf_vals) if conf_vals else 0.0
         overall_score = int(round(float(avg_confidence) * 100)) if not np.isnan(avg_confidence) else 0
 
         issues = []
         low_conf = [s for s in merged if 0 < s["confidence"] < 0.5]
         if low_conf:
             issues.append(f"{len(low_conf)} segment(s) with low confidence")
-        slash_count = sum(1 for s in merged if s.get("is_slash"))
-        if slash_count > len(merged) * 0.5:
-            issues.append("Many slash chords — bass line may be independent")
+        nc_count = sum(1 for s in merged if "N.C." in s.get("chord", ""))
+        if nc_count > 0:
+            issues.append(f"{nc_count} segment(s) with no chord")
 
         return {
             "segments": merged,
             "key_estimate": key,
             "meter_verified": True,
             "overall_score": overall_score,
-            "chord_count": len(set(s["chord"] for s in merged if s["chord"] != "N.C.")),
+            "chord_count": len(set(s["chord"] for s in merged
+                                   if s["chord"] != "N.C." and "insufficient" not in s["chord"])),
             "issues": issues,
         }
 
@@ -474,18 +497,12 @@ class HarmonyEngine:
         return structural
 
     def _merge_segments(self, segments: list[dict]) -> list[dict]:
-        """Merge consecutive half-bar segments with the same chord into bar-level.
-
-        Feedback #3 강화: bass가 바뀌면 같은 코드명이라도 merge 금지.
-        hc_mid_measure_harmony_split_required / hc_segment_local_label_scope 집행.
-        """
+        """Legacy merge for half-bar segments. Kept for compatibility."""
         if not segments:
             return []
-
         merged = [segments[0].copy()]
         for seg in segments[1:]:
             prev = merged[-1]
-            # merge 조건: 같은 코드 + continuation 플래그 + 같은 마디 + bass 동일
             same_chord = seg["chord"] == prev["chord"]
             is_cont = seg.get("is_continuation", False)
             same_bar = seg["bar"] == prev["bar"]
@@ -495,6 +512,44 @@ class HarmonyEngine:
                 prev["notes_count"] += seg["notes_count"]
             else:
                 merged.append(seg.copy())
+        return merged
+
+    def _merge_beat_segments(self, segments: list[dict], beats_per_bar: int) -> list[dict]:
+        """Merge beat-level segments using split audit rules.
+
+        hc_mandatory_split_audit_on_new_bass_event:
+        - 같은 코드 + 같은 bass → 합침 (beat_position 업데이트)
+        - 코드 변경 또는 bass 변경 → 분리 유지
+        - N.C. continuation → 이전 코드로 흡수
+        """
+        if not segments:
+            return []
+
+        merged = [segments[0].copy()]
+        for seg in segments[1:]:
+            prev = merged[-1]
+            same_chord = seg["chord"] == prev["chord"]
+            same_bass = seg.get("bass") == prev.get("bass")
+            is_cont = seg.get("is_continuation", False)
+            is_nc = "N.C." in seg.get("chord", "")
+
+            # N.C. continuation은 이전에 흡수
+            if is_nc and is_cont and prev["chord"] != "N.C.":
+                prev["end_tick"] = seg["end_tick"]
+                prev["notes_count"] += seg.get("notes_count", 0)
+                continue
+
+            # 같은 코드 + 같은 bass → 합침
+            if same_chord and same_bass:
+                prev["end_tick"] = seg["end_tick"]
+                prev["notes_count"] += seg.get("notes_count", 0)
+            else:
+                merged.append(seg.copy())
+
+        # beat_position을 bar 기준으로 정리
+        for seg in merged:
+            seg["beat_position"] = str(seg.get("beat_in_bar", 1))
+
         return merged
 
     # ------------------------------------------------------------------
