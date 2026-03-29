@@ -376,6 +376,235 @@ class HarmonyEngine:
     # 3. Voicing Generation
     # ------------------------------------------------------------------
 
+    # Degree-name to semitone offset mapping for voicing template resolution
+    _DEGREE_TO_SEMITONE = {
+        "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "b5": 6,
+        "5": 7, "#5": 8, "6": 9, "b7": 10, "7": 11,
+        "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9,
+        "10": 16, "b10": 15,  # 10th = 3rd + octave
+    }
+
+    def _resolve_degree(self, degree_str: str, quality: str) -> Optional[int]:
+        """Resolve a degree string like '3_or_b3' to semitone offset based on quality."""
+        parts = degree_str.replace("_optional", "").split("_or_")
+        # Choose the appropriate variant based on chord quality
+        minor_qualities = {"min", "m7", "m7b5", "dim", "dim7", "m9", "m6", "madd9"}
+        is_minor = quality in minor_qualities
+
+        for part in parts:
+            part = part.strip()
+            if part in self._DEGREE_TO_SEMITONE:
+                # For "3_or_b3": pick b3 for minor, 3 for major
+                if part == "3" and is_minor:
+                    continue  # skip major 3rd for minor chords
+                if part == "b3" and not is_minor:
+                    continue  # skip minor 3rd for major chords
+                return self._DEGREE_TO_SEMITONE[part]
+            # Handle compound like "7_or_b7" or "7_or_6_or_b7"
+            if part == "7" and quality in ("7", "m7", "m7b5", "7sus4"):
+                return 10  # b7 for dominant/minor7
+            if part == "7" and quality in ("maj7", "maj9"):
+                return 11  # major 7
+        # Fallback: try first part
+        first = parts[0].strip()
+        return self._DEGREE_TO_SEMITONE.get(first)
+
+    def _select_voicing_template(self, quality: str, style: str, has_melody: bool) -> Optional[dict]:
+        """Select the best voicing template from Rule DB for this chord quality and style."""
+        candidates = []
+        for vt in self.voicing_templates:
+            applies = vt.get("applies_to", [])
+            if quality in applies or any(quality.startswith(a.split("_")[0]) for a in applies):
+                candidates.append(vt)
+
+        if not candidates:
+            return None
+
+        # Prefer melody-support template when melody is present
+        if has_melody:
+            for c in candidates:
+                if "melody" in c.get("id", ""):
+                    return c
+
+        # Style-based selection
+        style_map = {
+            "jazz": ["vt_rootless_A", "vt_shell_root"],
+            "ballad": ["vt_spread_ballad", "vt_ballad_root10"],
+            "pop": ["vt_shell_root", "vt_spread_ballad"],
+            "classical": ["vt_spread_ballad", "vt_shell_root"],
+        }
+        preferred = style_map.get(style, ["vt_shell_root"])
+        for pref_id in preferred:
+            for c in candidates:
+                if c.get("id") == pref_id:
+                    return c
+
+        return candidates[0]
+
+    def _get_inversion_bass(
+        self, root_pc: int, quality: str, chord_function: str,
+        prev_bass_pc: Optional[int], bass_octave: int,
+    ) -> tuple[int, str]:
+        """Select bass note using Rule DB inversion rules.
+
+        Returns (bass_midi, inversion_description).
+        """
+        # Map chord function to inversion rule
+        func_map = {
+            "tonic": "inv_tonic_stability",
+            "predominant": "inv_predominant_flex",
+            "dominant": "inv_dominant_resolution_bias",
+        }
+        rule_id = func_map.get(chord_function, "inv_tonic_stability")
+
+        # Find matching rule
+        rule = None
+        for ir in self.inversion_rules:
+            if ir.get("id") == rule_id:
+                rule = ir
+                break
+
+        if not rule:
+            bass_midi = (bass_octave + 1) * 12 + root_pc
+            return bass_midi, "root (no inversion rule)"
+
+        inversions = rule.get("preferred_inversions", [])
+        template = _CHORD_TEMPLATES.get(quality, [0, 4, 7])
+
+        best_score = -1
+        best_bass_pc = root_pc
+        best_desc = "root"
+
+        for inv in inversions:
+            degree = inv.get("bass_degree", "1")
+            score = inv.get("score", 0.5)
+
+            sem = self._DEGREE_TO_SEMITONE.get(degree)
+            if sem is None:
+                continue
+            # Only allow degrees that are in the chord
+            if sem not in template and sem % 12 not in [t % 12 for t in template]:
+                continue
+
+            candidate_pc = (root_pc + sem) % 12
+
+            # Bonus for smooth bass motion from previous chord
+            if prev_bass_pc is not None:
+                dist = min(abs(candidate_pc - prev_bass_pc), 12 - abs(candidate_pc - prev_bass_pc))
+                if dist <= 2:
+                    score += 0.15  # Stepwise bass motion bonus
+
+            if score > best_score:
+                best_score = score
+                best_bass_pc = candidate_pc
+                best_desc = degree
+
+        bass_midi = (bass_octave + 1) * 12 + best_bass_pc
+        return bass_midi, best_desc
+
+    def _detect_chord_function(self, quality: str) -> str:
+        """Detect harmonic function (tonic/predominant/dominant) from quality."""
+        if quality in ("7", "7sus4", "7b9", "7#9", "dim7"):
+            return "dominant"
+        if quality in ("m7", "m7b5", "madd9", "m6"):
+            return "predominant"
+        return "tonic"
+
+    def _check_hard_constraints(
+        self, pitches: list[int], melody_pitch: Optional[int]
+    ) -> list[str]:
+        """Check voicing against hard constraints from Rule DB. Return violations."""
+        violations = []
+        if not pitches:
+            return violations
+
+        for hc in self.hard_constraints:
+            hc_id = hc.get("id", "")
+            hc_type = hc.get("type", "")
+
+            # HC: melody minor 9th clash
+            if hc_type == "melody_clash" and melody_pitch is not None:
+                forbidden = hc.get("forbidden_intervals_semitones", [1, -1, 11, -11, 13, -13])
+                top_note = max(pitches)
+                interval = top_note - melody_pitch
+                if interval in forbidden:
+                    violations.append(f"HC {hc_id}: minor 9th clash (interval {interval})")
+
+            # HC: unplayable span
+            elif hc_type == "playability":
+                lh_max = hc.get("left_hand_max_semitones", 12)
+                rh_max = hc.get("right_hand_max_semitones", 11)
+                total_span = pitches[-1] - pitches[0] if len(pitches) >= 2 else 0
+                if total_span > lh_max + rh_max:
+                    violations.append(f"HC {hc_id}: span {total_span} exceeds {lh_max}+{rh_max}")
+
+            # HC: low register mud cluster
+            elif hc_type == "register_density":
+                cond = hc.get("forbidden_if", {})
+                below = cond.get("lowest_note_below_midi", 48)
+                interval_lte = cond.get("adjacent_interval_semitones_lte", 2)
+                simul_gte = cond.get("simultaneous_notes_gte", 3)
+                low_notes = [p for p in pitches if p < below]
+                if len(low_notes) >= simul_gte:
+                    for i in range(len(low_notes) - 1):
+                        if low_notes[i + 1] - low_notes[i] <= interval_lte:
+                            violations.append(f"HC {hc_id}: mud cluster below MIDI {below}")
+                            break
+
+            # HC: cross-hand
+            elif hc_type == "hand_order" and len(pitches) >= 3:
+                mid = len(pitches) // 2
+                lh_top = pitches[mid - 1] if mid > 0 else pitches[0]
+                rh_bottom = pitches[mid]
+                if rh_bottom < lh_top:
+                    violations.append(f"HC {hc_id}: RH below LH")
+
+        return violations
+
+    def _apply_melody_alignment(
+        self, rh_pitches: list[int], melody_pitch: int, quality: str
+    ) -> tuple[list[int], list[str]]:
+        """Apply melody alignment rules from Rule DB. Return (adjusted_pitches, applied_rules)."""
+        applied = []
+        result = list(rh_pitches)
+
+        for mr in self.melody_rules:
+            mr_id = mr.get("id", "")
+            mode = mr.get("mode", "")
+
+            # mar_avoid_minor9_clash
+            if mr_id == "mar_avoid_minor9_clash":
+                forbidden = mr.get("forbidden_intervals_against_melody_on_strong_beat", [1, 13, -1, -13])
+                new_result = []
+                for p in result:
+                    interval = p - melody_pitch
+                    if interval in forbidden:
+                        applied.append(f"MAR {mr_id}: removed {midi_to_note_name(p)} (interval {interval})")
+                    else:
+                        new_result.append(p)
+                result = new_result if new_result else result  # Don't empty the voicing
+
+            # mar_melody_declared_function_tone_dedup
+            elif mr_id == "mar_melody_declared_function_tone_dedup":
+                melody_pc = melody_pitch % 12
+                # Don't duplicate melody's pitch class in upper register close by
+                new_result = []
+                for p in result:
+                    if p % 12 == melody_pc and abs(p - melody_pitch) <= 12:
+                        applied.append(f"MAR {mr_id}: removed {midi_to_note_name(p)} (duplicates melody)")
+                    else:
+                        new_result.append(p)
+                result = new_result if new_result else result
+
+            # mar_prefer_melody_as_top_note_when_stable
+            elif mr_id == "mar_prefer_melody_as_top_note_when_stable":
+                # Ensure accompaniment stays below melody
+                result = [p for p in result if p < melody_pitch or p - melody_pitch > 12]
+                if not result:
+                    result = list(rh_pitches)  # Fallback
+
+        return result, applied
+
     def generate_voicing(
         self,
         chord_label: str,
@@ -384,10 +613,12 @@ class HarmonyEngine:
         melody_pitch: Optional[int] = None,
         style: str = "pop",
         with_rationale: bool = False,
+        prev_chord: Optional[str] = None,
+        prev_bass_pc: Optional[int] = None,
     ) -> list[int] | tuple[list[int], dict]:
-        """Generate a voiced chord (list of MIDI pitches) from a chord label.
+        """Generate a voiced chord using Rule DB v2.07 voicing templates,
+        inversion rules, hard constraints, and melody alignment.
 
-        Applies playability constraints and melody protection from rule DB.
         When with_rationale=True, returns (pitches, rationale_dict).
         """
         rationale: list[str] = []
@@ -395,62 +626,104 @@ class HarmonyEngine:
 
         root_name, quality = self._parse_chord_label(chord_label)
         if root_name is None:
-            if with_rationale:
-                return [], {"steps": [], "constraints": [], "warnings": ["Unparseable chord label"]}
-            return []
+            empty_report = {"steps": [], "constraints": [], "warnings": ["Unparseable chord label"]}
+            return ([], empty_report) if with_rationale else []
 
         root_pc = _PC_NAMES.index(root_name) if root_name in _PC_NAMES else 0
-        template = _CHORD_TEMPLATES.get(quality, _CHORD_TEMPLATES.get("maj", [0, 4, 7]))
         rationale.append(f"Chord: {chord_label} -> root={root_name}(pc={root_pc}), quality={quality}")
-        rationale.append(f"Template intervals: {template}")
 
-        # Bass note (left hand)
-        bass_midi = (bass_octave + 1) * 12 + root_pc
-        rationale.append(f"Bass: {midi_to_note_name(bass_midi)} (root position, octave {bass_octave})")
+        # --- Step 1: Select voicing template from Rule DB ---
+        vt = self._select_voicing_template(quality, style, melody_pitch is not None)
+        using_db_template = False
 
-        # Right hand voices
+        if vt:
+            vt_name = vt.get("name", vt.get("id", "?"))
+            rationale.append(f"Voicing template: {vt_name} (Rule DB)")
+            using_db_template = True
+
+            # Resolve LH and RH degrees from template
+            lh_degrees = vt.get("hands", {}).get("left_hand", ["1"])
+            rh_degrees = vt.get("hands", {}).get("right_hand", ["3_or_b3", "5_or_tension"])
+        else:
+            rationale.append("Voicing template: fallback (no DB match)")
+            lh_degrees = ["1"]
+            rh_degrees = ["3_or_b3", "5", "7_or_b7"]
+
+        # --- Step 2: Determine bass via inversion rules ---
+        chord_func = self._detect_chord_function(quality)
+        bass_midi, inv_desc = self._get_inversion_bass(
+            root_pc, quality, chord_func, prev_bass_pc, bass_octave
+        )
+        rationale.append(f"Bass: {midi_to_note_name(bass_midi)} (function={chord_func}, inversion={inv_desc})")
+        if inv_desc != "1" and inv_desc != "root":
+            constraints_applied.append(f"Inversion rule: bass on {inv_desc} (function={chord_func})")
+
+        # --- Step 3: Build LH pitches from template degrees ---
+        lh_pitches = [bass_midi]
+        for deg_str in lh_degrees[1:]:  # Skip first (already bass)
+            sem = self._resolve_degree(deg_str, quality)
+            if sem is not None:
+                p = (bass_octave + 1) * 12 + (root_pc + sem) % 12
+                while p <= bass_midi:
+                    p += 12
+                # Keep LH within reach
+                if abs(p - bass_midi) <= self.playability.get("left_hand_max_semitones", 12):
+                    lh_pitches.append(p)
+
+        # --- Step 4: Build RH pitches from template degrees ---
         rh_pitches = []
-        rh_labels = []
-        degree_names = ["root", "3rd", "5th", "7th", "9th", "11th", "13th"]
-        for idx, iv in enumerate(template[1:]):
-            p = (rh_octave + 1) * 12 + (root_pc + iv) % 12
-            while p <= bass_midi:
-                p += 12
-            rh_pitches.append(p)
-            deg = degree_names[idx + 1] if idx + 1 < len(degree_names) else f"ext{idx+1}"
-            rh_labels.append(f"{midi_to_note_name(p)}({deg})")
-        rationale.append(f"RH voices: {', '.join(rh_labels)}")
+        for deg_str in rh_degrees:
+            if "guide_tone" in deg_str:
+                # Guide tone = 3rd or 7th depending on quality
+                sem = self._resolve_degree("3_or_b3", quality)
+            elif "tension" in deg_str:
+                sem = self._resolve_degree("9", quality)
+                if sem is None:
+                    sem = self._resolve_degree("5", quality)
+            else:
+                sem = self._resolve_degree(deg_str, quality)
+            if sem is not None:
+                p = (rh_octave + 1) * 12 + (root_pc + sem) % 12
+                while p <= bass_midi:
+                    p += 12
+                rh_pitches.append(p)
 
-        # Melody protection: avoid collision
-        melody_removed = []
+        rh_labels = [midi_to_note_name(p) for p in rh_pitches]
+        rationale.append(f"LH: {[midi_to_note_name(p) for p in lh_pitches]}")
+        rationale.append(f"RH: {rh_labels}")
+
+        # --- Step 5: Apply melody alignment rules ---
         if melody_pitch is not None:
-            before = len(rh_pitches)
-            melody_pc = melody_pitch % 12
-            rh_pitches_new = [p for p in rh_pitches if p % 12 != melody_pc or abs(p - melody_pitch) > 0]
-            rh_pitches_new = [p for p in rh_pitches_new if abs(p - melody_pitch) > 1]
-            melody_removed = [midi_to_note_name(p) for p in rh_pitches if p not in rh_pitches_new]
-            rh_pitches = rh_pitches_new
-            if melody_removed:
-                constraints_applied.append(
-                    f"Melody protection: removed {melody_removed} (collision with melody {midi_to_note_name(melody_pitch)})"
-                )
+            rh_pitches, mel_applied = self._apply_melody_alignment(rh_pitches, melody_pitch, quality)
+            for ma in mel_applied:
+                constraints_applied.append(ma)
 
-        # Playability: right hand span check
+        # --- Step 6: Check hard constraints ---
+        all_pitches = sorted(set(lh_pitches + rh_pitches))
+        hc_violations = self._check_hard_constraints(all_pitches, melody_pitch)
+        for v in hc_violations:
+            constraints_applied.append(v)
+
+        # If hard constraint violated, try to fix
+        if hc_violations:
+            # Remove the offending top note and retry
+            if len(rh_pitches) > 1 and melody_pitch is not None:
+                top = max(rh_pitches)
+                interval = top - melody_pitch
+                if abs(interval) in [1, 11, 13]:
+                    rh_pitches.remove(top)
+                    constraints_applied.append(f"Fix: removed top {midi_to_note_name(top)} to resolve clash")
+
+        # --- Step 7: Playability check (RH span) ---
         rh_max_span = self.playability.get("right_hand_max_semitones", 11)
-        span_removed = []
-        if rh_pitches:
+        if rh_pitches and max(rh_pitches) - min(rh_pitches) > rh_max_span:
             while max(rh_pitches) - min(rh_pitches) > rh_max_span and len(rh_pitches) > 2:
                 removed = rh_pitches.pop()
-                span_removed.append(midi_to_note_name(removed))
-        if span_removed:
-            constraints_applied.append(
-                f"RH span limit ({rh_max_span} semitones): removed {span_removed}"
-            )
+                constraints_applied.append(f"RH span limit: removed {midi_to_note_name(removed)}")
 
-        # Low register interval rules from DB
+        # --- Step 8: Low register rules ---
         low_rules = self.playability.get("low_register_interval_rules", [])
-        filtered = [bass_midi]
-        low_removed = []
+        final_pitches = list(lh_pitches)
         for p in sorted(rh_pitches):
             ok = True
             for rule in low_rules:
@@ -460,16 +733,14 @@ class HarmonyEngine:
                     interval = p - bass_midi
                     if interval in forbid:
                         ok = False
-                        low_removed.append(
-                            f"{midi_to_note_name(p)} (interval {interval} below MIDI {below})"
+                        constraints_applied.append(
+                            f"Low register: removed {midi_to_note_name(p)} (interval {interval})"
                         )
                         break
             if ok:
-                filtered.append(p)
-        if low_removed:
-            constraints_applied.append(f"Low register rule: removed {low_removed}")
+                final_pitches.append(p)
 
-        result = sorted(filtered)
+        result = sorted(set(final_pitches))
 
         if with_rationale:
             final_names = [midi_to_note_name(p) for p in result]
@@ -478,18 +749,26 @@ class HarmonyEngine:
                 "chord": chord_label,
                 "root": root_name,
                 "quality": quality,
-                "template": template,
+                "voicing_template": vt.get("name", "fallback") if vt else "fallback",
+                "chord_function": chord_func,
+                "inversion": inv_desc,
                 "steps": rationale,
                 "constraints": constraints_applied,
                 "result": final_names,
                 "total_span": span,
                 "voice_count": len(result),
+                "rules_enforced": {
+                    "voicing_templates": using_db_template,
+                    "inversion_rules": inv_desc != "1",
+                    "hard_constraints": len(hc_violations),
+                    "melody_alignment": len([c for c in constraints_applied if "MAR" in c]),
+                    "playability": True,
+                    "low_register": True,
+                },
                 "warnings": [],
             }
             if not constraints_applied:
-                report["warnings"].append("No constraints triggered — clean voicing")
-            if span > 20:
-                report["warnings"].append(f"Wide span ({span} semitones)")
+                report["warnings"].append("No constraints triggered")
             return result, report
 
         return result
@@ -1198,10 +1477,16 @@ class HarmonyEngine:
         octave: int = 4,
         melody_track: Optional[Track] = None,
     ) -> Track:
-        """Generate a voiced MIDI track from a settings.json chord progression."""
+        """Generate a voiced MIDI track from a settings.json chord progression.
+
+        Uses Rule DB voicing templates, inversion rules, and progression
+        resolution for guide-tone voice leading.
+        """
         segments = self.parse_settings_progression(chord_list, key)
         notes: list[Note] = []
         prev_pitches: list[int] = []
+        prev_chord: Optional[str] = None
+        prev_bass_pc: Optional[int] = None
 
         for seg in segments:
             chord_label = seg["chord"]
@@ -1222,6 +1507,8 @@ class HarmonyEngine:
                 rh_octave=octave,
                 melody_pitch=melody_p,
                 style=style,
+                prev_chord=prev_chord,
+                prev_bass_pc=prev_bass_pc,
             )
 
             if prev_pitches and voicing:
@@ -1266,5 +1553,7 @@ class HarmonyEngine:
                     ))
 
             prev_pitches = voicing
+            prev_chord = chord_label
+            prev_bass_pc = voicing[0] % 12 if voicing else None
 
         return Track(name="AI Harmony Voicing", notes=notes, color="#CF9FFF")
