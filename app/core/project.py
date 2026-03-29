@@ -209,6 +209,8 @@ class ProjectManager(QObject):
             if notes:
                 color = TRACK_COLORS[idx % len(TRACK_COLORS)]
                 track_name = midi_track.name or f"Track {idx + 1}"
+                # Use the actual MIDI channel from the notes
+                note_channel = notes[0].channel
                 # Auto-detect instrument from track name if no program_change
                 if instrument == 0:
                     name_lower = track_name.lower()
@@ -223,7 +225,7 @@ class ProjectManager(QObject):
                     elif "pad" in name_lower:
                         instrument = 88  # Pad
                 self._state.tracks.append(
-                    Track(name=track_name, channel=idx, notes=notes,
+                    Track(name=track_name, channel=note_channel, notes=notes,
                           color=color, instrument=instrument))
 
         # Detect tempo from first track
