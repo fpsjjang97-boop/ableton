@@ -250,6 +250,19 @@ class ReviewPanel(QWidget):
         play_row.addWidget(self._playability_val)
         harmony_col.addLayout(play_row)
 
+        # Difficulty + Genre
+        self._difficulty_label = QLabel("")
+        self._difficulty_label.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; font-size: 11px;"
+        )
+        harmony_col.addWidget(self._difficulty_label)
+
+        self._genre_label = QLabel("")
+        self._genre_label.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; font-size: 11px;"
+        )
+        harmony_col.addWidget(self._genre_label)
+
         # Rule DB version label
         self._rule_db_label = QLabel("")
         self._rule_db_label.setStyleSheet(
@@ -355,6 +368,28 @@ class ReviewPanel(QWidget):
             )
             self._playability_val.setText(f"{play_score}%")
 
+        difficulty = review.get("difficulty", "")
+        if difficulty:
+            diff_colors = {
+                "beginner": COLORS["accent_green"],
+                "intermediate": COLORS["accent_yellow"],
+                "advanced": COLORS["accent_orange"],
+                "virtuoso": COLORS["accent"],
+            }
+            dc = diff_colors.get(difficulty, COLORS["text_secondary"])
+            self._difficulty_label.setText(f"Difficulty: {difficulty.upper()}")
+            self._difficulty_label.setStyleSheet(f"color: {dc}; font-size: 11px; font-weight: bold;")
+        else:
+            self._difficulty_label.setText("")
+
+        genre_label = review.get("genre_label", "")
+        genre_fit = review.get("genre_fit")
+        if genre_label:
+            fit_str = f" (fit: {genre_fit}%)" if genre_fit is not None else ""
+            self._genre_label.setText(f"Genre: {genre_label}{fit_str}")
+        else:
+            self._genre_label.setText("")
+
         db_ver = review.get("rule_db_version")
         if db_ver:
             self._rule_db_label.setText(f"Rule DB v{db_ver}")
@@ -379,4 +414,6 @@ class ReviewPanel(QWidget):
         self._playability_bar.setValue(0)
         self._playability_bar.setStyleSheet("")
         self._playability_val.setText("--")
+        self._difficulty_label.setText("")
+        self._genre_label.setText("")
         self._rule_db_label.setText("")

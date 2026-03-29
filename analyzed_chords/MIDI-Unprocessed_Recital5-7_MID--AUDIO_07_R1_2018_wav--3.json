@@ -6648,12 +6648,10 @@
     ]
   },
   "playability": {
-    "score": 90,
-    "pass": false,
-    "num_issues": 1,
-    "issues_sample": [
-      "Tick 175003: total span 24 semitones exceeds two-hand reach"
-    ]
+    "score": 100,
+    "pass": true,
+    "num_issues": 0,
+    "issues_sample": []
   },
   "success": true
 }

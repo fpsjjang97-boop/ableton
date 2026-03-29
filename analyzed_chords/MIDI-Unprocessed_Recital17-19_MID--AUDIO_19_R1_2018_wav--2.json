@@ -21813,20 +21813,13 @@
     ]
   },
   "playability": {
-    "score": 0,
-    "pass": false,
-    "num_issues": 68,
+    "score": 99,
+    "pass": true,
+    "num_issues": 3,
     "issues_sample": [
-      "Tick 42686: total span 30 semitones exceeds two-hand reach",
-      "Tick 66579: total span 29 semitones exceeds two-hand reach",
-      "Tick 92461: total span 34 semitones exceeds two-hand reach",
-      "Tick 126871: total span 27 semitones exceeds two-hand reach",
-      "Tick 133298: total span 31 semitones exceeds two-hand reach",
-      "Tick 154546: forbidden interval 5 in low register",
-      "Tick 160521: total span 32 semitones exceeds two-hand reach",
-      "Tick 192967: total span 29 semitones exceeds two-hand reach",
-      "Tick 199742: total span 29 semitones exceeds two-hand reach",
-      "Tick 214353: total span 31 semitones exceeds two-hand reach"
+      "Span exceeds 26 semitones in 57/7808 clusters (0.7%)",
+      "4 clusters span >4 octaves (physically impossible single attack)",
+      "3 forbidden low-register intervals"
     ]
   },
   "success": true

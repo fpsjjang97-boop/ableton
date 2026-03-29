@@ -747,54 +747,266 @@ class HarmonyEngine:
         return "through-composed"
 
     # ------------------------------------------------------------------
-    # 5. Playability Validation
+    # 5. Playability Validation (Genre-Aware)
     # ------------------------------------------------------------------
 
-    def validate_playability(self, notes: list[Note]) -> dict:
-        """Check a set of notes against piano playability constraints from rule DB."""
-        issues: list[str] = []
-        score = 100
+    # Genre profiles: different genres have different playability expectations
+    _GENRE_PROFILES = {
+        "pop": {
+            "label": "Pop / Accompaniment",
+            "two_hand_span_max": 23,      # LH 12 + RH 11
+            "max_simultaneous": 6,
+            "max_density_per_beat": 4,
+            "difficulty_ceiling": "intermediate",
+            "low_register_strict": True,
+        },
+        "jazz": {
+            "label": "Jazz",
+            "two_hand_span_max": 26,      # Wider voicings
+            "max_simultaneous": 8,
+            "max_density_per_beat": 6,
+            "difficulty_ceiling": "advanced",
+            "low_register_strict": True,
+        },
+        "classical": {
+            "label": "Classical Piano",
+            "two_hand_span_max": 36,      # Virtuoso passages allowed
+            "max_simultaneous": 10,
+            "max_density_per_beat": 16,
+            "difficulty_ceiling": "virtuoso",
+            "low_register_strict": False,  # Composers write what they want
+        },
+        "edm": {
+            "label": "EDM / Electronic",
+            "two_hand_span_max": 48,      # Not hand-played
+            "max_simultaneous": 16,
+            "max_density_per_beat": 32,
+            "difficulty_ceiling": "any",
+            "low_register_strict": False,
+        },
+    }
 
+    def detect_genre_profile(self, notes: list[Note]) -> str:
+        """Auto-detect the most likely genre profile from note characteristics.
+
+        Uses: note density, pitch range, simultaneous note count, velocity patterns.
+        """
         if not notes:
-            return {"score": 100, "issues": [], "pass": True}
+            return "pop"
 
-        # Check simultaneous notes (per-tick clusters)
         from collections import defaultdict
+
+        # Compute features
         tick_clusters: dict[int, list[int]] = defaultdict(list)
         for n in notes:
             tick_clusters[n.start_tick].append(n.pitch)
 
-        lh_max = self.playability.get("left_hand_max_semitones", 12)
-        rh_max = self.playability.get("right_hand_max_semitones", 11)
-        max_lh_notes = self.playability.get("max_simultaneous_left_hand_notes", 3)
+        # Max simultaneous notes
+        max_simul = max(len(v) for v in tick_clusters.values()) if tick_clusters else 1
 
+        # Average density (notes per beat)
+        total_ticks = max(n.end_tick for n in notes) if notes else 1
+        total_beats = total_ticks / _BEAT if total_ticks > 0 else 1
+        density = len(notes) / total_beats
+
+        # Pitch range
+        pitches = [n.pitch for n in notes]
+        pitch_range = max(pitches) - min(pitches) if pitches else 0
+
+        # Velocity variance
+        velocities = np.array([n.velocity for n in notes])
+        vel_std = float(velocities.std()) if len(velocities) > 1 else 0
+
+        # Cluster span statistics
+        spans = []
+        for pitches_in_tick in tick_clusters.values():
+            if len(pitches_in_tick) >= 2:
+                s = sorted(pitches_in_tick)
+                spans.append(s[-1] - s[0])
+        avg_span = np.mean(spans) if spans else 0
+
+        # Classification logic
+        if density > 8 and max_simul > 6 and pitch_range > 48:
+            return "classical"
+        if density > 4 and max_simul > 4 and vel_std > 15:
+            return "classical"
+        if avg_span > 24 and max_simul > 5:
+            return "classical"
+        if density > 10 and vel_std < 10:
+            return "edm"
+        if max_simul <= 6 and density < 6:
+            if vel_std > 12:
+                return "jazz"
+            return "pop"
+
+        return "pop"
+
+    def validate_playability(
+        self,
+        notes: list[Note],
+        genre: Optional[str] = None,
+    ) -> dict:
+        """Check notes against genre-appropriate playability constraints.
+
+        Evaluates three separate dimensions:
+        - playability: Can a human physically play this? (0-100)
+        - difficulty:  How hard is it? (beginner/intermediate/advanced/virtuoso)
+        - genre_fit:   Does it match the expected genre profile? (0-100)
+
+        When genre is None, auto-detects from note characteristics.
+        """
+        if not notes:
+            return {
+                "score": 100, "issues": [], "pass": True,
+                "difficulty": "beginner", "genre": "pop",
+                "genre_fit": 100, "detail": {},
+            }
+
+        from collections import defaultdict
+
+        # Auto-detect genre if not specified
+        detected_genre = genre or self.detect_genre_profile(notes)
+        profile = self._GENRE_PROFILES.get(detected_genre, self._GENRE_PROFILES["pop"])
+
+        # Build tick clusters
+        tick_clusters: dict[int, list[int]] = defaultdict(list)
+        for n in notes:
+            tick_clusters[n.start_tick].append(n.pitch)
+
+        total_clusters = len(tick_clusters)
+        if total_clusters == 0:
+            return {
+                "score": 100, "issues": [], "pass": True,
+                "difficulty": "beginner", "genre": detected_genre,
+                "genre_fit": 100, "detail": {},
+            }
+
+        # --- Metric 1: Span violations (percentage-based) ---
+        span_max = profile["two_hand_span_max"]
+        span_violations = 0
+        extreme_spans = 0
         for tick, pitches in tick_clusters.items():
-            pitches_sorted = sorted(pitches)
-            if len(pitches_sorted) >= 2:
-                span = pitches_sorted[-1] - pitches_sorted[0]
-                if span > rh_max + lh_max:
-                    issues.append(
-                        f"Tick {tick}: total span {span} semitones exceeds two-hand reach"
-                    )
-                    score -= 10
+            if len(pitches) >= 2:
+                s = sorted(pitches)
+                span = s[-1] - s[0]
+                if span > span_max:
+                    span_violations += 1
+                if span > 48:  # 4 octaves = physically impossible in one attack
+                    extreme_spans += 1
 
-            # Low register interval check
-            low_rules = self.playability.get("low_register_interval_rules", [])
-            for rule in low_rules:
-                below = rule.get("below_midi", 0)
-                forbid = rule.get("forbid_intervals", [])
-                low_pitches = [p for p in pitches_sorted if p < below]
-                if len(low_pitches) >= 2:
-                    for i in range(len(low_pitches) - 1):
-                        interval = low_pitches[i + 1] - low_pitches[i]
-                        if interval in forbid:
-                            issues.append(
-                                f"Tick {tick}: forbidden interval {interval} in low register"
-                            )
-                            score -= 5
+        span_violation_rate = span_violations / max(total_clusters, 1)
 
-        score = max(0, score)
-        return {"score": score, "issues": issues, "pass": len(issues) == 0}
+        # --- Metric 2: Density analysis ---
+        total_ticks = max(n.end_tick for n in notes)
+        total_beats = max(1, total_ticks / _BEAT)
+        density = len(notes) / total_beats
+        density_limit = profile["max_density_per_beat"]
+        density_score = min(100, int(100 * min(1.0, density_limit / max(density, 0.1))))
+
+        # --- Metric 3: Simultaneous note count ---
+        simul_counts = [len(v) for v in tick_clusters.values()]
+        max_simul = max(simul_counts) if simul_counts else 0
+        avg_simul = np.mean(simul_counts) if simul_counts else 0
+        simul_limit = profile["max_simultaneous"]
+        simul_violations = sum(1 for c in simul_counts if c > simul_limit)
+        simul_violation_rate = simul_violations / max(total_clusters, 1)
+
+        # --- Metric 4: Low register intervals ---
+        low_rules = self.playability.get("low_register_interval_rules", [])
+        low_violations = 0
+        if profile["low_register_strict"]:
+            for tick, pitches in tick_clusters.items():
+                pitches_sorted = sorted(pitches)
+                for rule in low_rules:
+                    below = rule.get("below_midi", 0)
+                    forbid = rule.get("forbid_intervals", [])
+                    low_pitches = [p for p in pitches_sorted if p < below]
+                    if len(low_pitches) >= 2:
+                        for i in range(len(low_pitches) - 1):
+                            if low_pitches[i + 1] - low_pitches[i] in forbid:
+                                low_violations += 1
+        low_violation_rate = low_violations / max(total_clusters, 1)
+
+        # --- Compute Playability Score (percentage-based, not cumulative deduction) ---
+        # Each metric contributes proportionally
+        span_score = max(0, int(100 * (1.0 - span_violation_rate * 2)))
+        simul_score = max(0, int(100 * (1.0 - simul_violation_rate * 2)))
+        low_reg_score = max(0, int(100 * (1.0 - low_violation_rate * 3)))
+
+        # Weighted combination
+        playability_score = int(
+            span_score * 0.35 +
+            density_score * 0.15 +
+            simul_score * 0.30 +
+            low_reg_score * 0.20
+        )
+        playability_score = max(0, min(100, playability_score))
+
+        # --- Difficulty Classification ---
+        if density > 10 or max_simul > 8 or span_violation_rate > 0.3:
+            difficulty = "virtuoso"
+        elif density > 6 or max_simul > 6 or span_violation_rate > 0.15:
+            difficulty = "advanced"
+        elif density > 3 or max_simul > 4 or span_violation_rate > 0.05:
+            difficulty = "intermediate"
+        else:
+            difficulty = "beginner"
+
+        # --- Genre Fit Score ---
+        # How well does the music match the detected genre's typical patterns?
+        difficulty_levels = ["beginner", "intermediate", "advanced", "virtuoso"]
+        ceiling = profile["difficulty_ceiling"]
+        if ceiling == "any":
+            genre_fit = 100
+        else:
+            ceiling_idx = difficulty_levels.index(ceiling) if ceiling in difficulty_levels else 3
+            actual_idx = difficulty_levels.index(difficulty)
+            if actual_idx <= ceiling_idx:
+                genre_fit = 100
+            else:
+                genre_fit = max(30, 100 - (actual_idx - ceiling_idx) * 25)
+
+        # --- Issues (summarized, not per-tick) ---
+        issues: list[str] = []
+        if span_violations > 0:
+            issues.append(
+                f"Span exceeds {span_max} semitones in {span_violations}/{total_clusters} "
+                f"clusters ({span_violation_rate*100:.1f}%)"
+            )
+        if extreme_spans > 0:
+            issues.append(
+                f"{extreme_spans} clusters span >4 octaves (physically impossible single attack)"
+            )
+        if simul_violations > 0:
+            issues.append(
+                f">{simul_limit} simultaneous notes in {simul_violations} clusters"
+            )
+        if low_violations > 0:
+            issues.append(
+                f"{low_violations} forbidden low-register intervals"
+            )
+
+        return {
+            "score": playability_score,
+            "issues": issues,
+            "pass": playability_score >= 60,
+            "difficulty": difficulty,
+            "genre": detected_genre,
+            "genre_label": profile["label"],
+            "genre_fit": genre_fit,
+            "detail": {
+                "span_score": span_score,
+                "density_score": density_score,
+                "simul_score": simul_score,
+                "low_register_score": low_reg_score,
+                "span_violations": span_violations,
+                "span_violation_rate": round(span_violation_rate, 4),
+                "max_simultaneous": max_simul,
+                "avg_simultaneous": round(float(avg_simul), 2),
+                "notes_per_beat": round(density, 2),
+                "total_clusters": total_clusters,
+            },
+        }
 
     # ------------------------------------------------------------------
     # 6. Enhanced Track Analysis (integrates with AIEngine)
@@ -822,15 +1034,13 @@ class HarmonyEngine:
         for comp in components:
             name = comp.get("name", "")
             weight = comp.get("weight", 0)
-            # Approximate component scores from available data
             if name == "harmonic_fit":
                 component_scores[name] = base_score
             elif name == "playability":
                 component_scores[name] = playability["score"]
             elif name == "melody_support":
-                component_scores[name] = 70  # Placeholder
+                component_scores[name] = 70
             elif name == "bass_motion_coherence":
-                # Evaluate bass motion from segments
                 segments = harmony.get("segments", [])
                 if len(segments) > 1:
                     bass_notes = [s.get("bass", "") for s in segments if s.get("bass")]
@@ -841,7 +1051,7 @@ class HarmonyEngine:
             else:
                 component_scores[name] = 60
 
-        # Weighted final score
+        # Weighted final score (normalize weights)
         weighted_sum = sum(
             component_scores.get(c["name"], 50) * c.get("weight", 0)
             for c in components
@@ -849,15 +1059,16 @@ class HarmonyEngine:
         total_weight = sum(c.get("weight", 0) for c in components)
         final_score = int(round(weighted_sum / total_weight)) if total_weight > 0 else base_score
 
-        # Hard constraint violations
+        # Hard constraint violations (genre-aware: skip for virtuoso)
         hard_violations = []
-        for rule in self.hard_constraints[:5]:
-            rule_id = rule.get("id", "")
-            if "playability" in rule_id and playability["score"] < 80:
-                hard_violations.append(rule.get("label", rule_id))
+        if playability.get("difficulty") not in ("virtuoso", "advanced"):
+            for rule in self.hard_constraints[:5]:
+                rule_id = rule.get("id", "")
+                if "playability" in rule_id and playability["score"] < 80:
+                    hard_violations.append(rule.get("label", rule_id))
 
         # Compile issues
-        all_issues = harmony.get("issues", []) + playability.get("issues", [])[:3]
+        all_issues = harmony.get("issues", []) + playability.get("issues", [])
         if hard_violations:
             all_issues.extend([f"Hard constraint: {v}" for v in hard_violations])
 
@@ -867,6 +1078,11 @@ class HarmonyEngine:
             "key_estimate": harmony.get("key_estimate", key),
             "playability_score": playability["score"],
             "playability_issues": playability.get("issues", []),
+            "difficulty": playability.get("difficulty", "intermediate"),
+            "genre_detected": playability.get("genre", "pop"),
+            "genre_label": playability.get("genre_label", ""),
+            "genre_fit": playability.get("genre_fit", 100),
+            "playability_detail": playability.get("detail", {}),
             "component_scores": component_scores,
             "overall_score": final_score,
             "issues": all_issues,

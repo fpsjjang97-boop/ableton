@@ -13383,14 +13383,11 @@
     ]
   },
   "playability": {
-    "score": 60,
-    "pass": false,
-    "num_issues": 4,
+    "score": 99,
+    "pass": true,
+    "num_issues": 1,
     "issues_sample": [
-      "Tick 215685: total span 31 semitones exceeds two-hand reach",
-      "Tick 419505: total span 39 semitones exceeds two-hand reach",
-      "Tick 438835: total span 27 semitones exceeds two-hand reach",
-      "Tick 463667: total span 27 semitones exceeds two-hand reach"
+      "Span exceeds 26 semitones in 4/5072 clusters (0.1%)"
     ]
   },
   "success": true
