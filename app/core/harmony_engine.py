@@ -368,47 +368,74 @@ class HarmonyEngine:
         rh_octave: int = 4,
         melody_pitch: Optional[int] = None,
         style: str = "pop",
-    ) -> list[int]:
+        with_rationale: bool = False,
+    ) -> list[int] | tuple[list[int], dict]:
         """Generate a voiced chord (list of MIDI pitches) from a chord label.
 
         Applies playability constraints and melody protection from rule DB.
+        When with_rationale=True, returns (pitches, rationale_dict).
         """
+        rationale: list[str] = []
+        constraints_applied: list[str] = []
+
         root_name, quality = self._parse_chord_label(chord_label)
         if root_name is None:
+            if with_rationale:
+                return [], {"steps": [], "constraints": [], "warnings": ["Unparseable chord label"]}
             return []
 
         root_pc = _PC_NAMES.index(root_name) if root_name in _PC_NAMES else 0
         template = _CHORD_TEMPLATES.get(quality, _CHORD_TEMPLATES.get("maj", [0, 4, 7]))
+        rationale.append(f"Chord: {chord_label} -> root={root_name}(pc={root_pc}), quality={quality}")
+        rationale.append(f"Template intervals: {template}")
 
         # Bass note (left hand)
         bass_midi = (bass_octave + 1) * 12 + root_pc
+        rationale.append(f"Bass: {midi_to_note_name(bass_midi)} (root position, octave {bass_octave})")
 
         # Right hand voices
         rh_pitches = []
-        for iv in template[1:]:  # Skip root (already in bass)
+        rh_labels = []
+        degree_names = ["root", "3rd", "5th", "7th", "9th", "11th", "13th"]
+        for idx, iv in enumerate(template[1:]):
             p = (rh_octave + 1) * 12 + (root_pc + iv) % 12
-            # Ensure pitch is above bass
             while p <= bass_midi:
                 p += 12
             rh_pitches.append(p)
+            deg = degree_names[idx + 1] if idx + 1 < len(degree_names) else f"ext{idx+1}"
+            rh_labels.append(f"{midi_to_note_name(p)}({deg})")
+        rationale.append(f"RH voices: {', '.join(rh_labels)}")
 
         # Melody protection: avoid collision
+        melody_removed = []
         if melody_pitch is not None:
+            before = len(rh_pitches)
             melody_pc = melody_pitch % 12
-            rh_pitches = [p for p in rh_pitches if p % 12 != melody_pc or abs(p - melody_pitch) > 0]
-            # If melody is a chord tone, don't duplicate it close by
-            rh_pitches = [p for p in rh_pitches if abs(p - melody_pitch) > 1]
+            rh_pitches_new = [p for p in rh_pitches if p % 12 != melody_pc or abs(p - melody_pitch) > 0]
+            rh_pitches_new = [p for p in rh_pitches_new if abs(p - melody_pitch) > 1]
+            melody_removed = [midi_to_note_name(p) for p in rh_pitches if p not in rh_pitches_new]
+            rh_pitches = rh_pitches_new
+            if melody_removed:
+                constraints_applied.append(
+                    f"Melody protection: removed {melody_removed} (collision with melody {midi_to_note_name(melody_pitch)})"
+                )
 
         # Playability: right hand span check
         rh_max_span = self.playability.get("right_hand_max_semitones", 11)
+        span_removed = []
         if rh_pitches:
             while max(rh_pitches) - min(rh_pitches) > rh_max_span and len(rh_pitches) > 2:
-                rh_pitches.pop()
+                removed = rh_pitches.pop()
+                span_removed.append(midi_to_note_name(removed))
+        if span_removed:
+            constraints_applied.append(
+                f"RH span limit ({rh_max_span} semitones): removed {span_removed}"
+            )
 
         # Low register interval rules from DB
         low_rules = self.playability.get("low_register_interval_rules", [])
-        all_pitches = [bass_midi] + sorted(rh_pitches)
         filtered = [bass_midi]
+        low_removed = []
         for p in sorted(rh_pitches):
             ok = True
             for rule in low_rules:
@@ -418,11 +445,39 @@ class HarmonyEngine:
                     interval = p - bass_midi
                     if interval in forbid:
                         ok = False
+                        low_removed.append(
+                            f"{midi_to_note_name(p)} (interval {interval} below MIDI {below})"
+                        )
                         break
             if ok:
                 filtered.append(p)
+        if low_removed:
+            constraints_applied.append(f"Low register rule: removed {low_removed}")
 
-        return sorted(filtered)
+        result = sorted(filtered)
+
+        if with_rationale:
+            final_names = [midi_to_note_name(p) for p in result]
+            span = result[-1] - result[0] if len(result) >= 2 else 0
+            report = {
+                "chord": chord_label,
+                "root": root_name,
+                "quality": quality,
+                "template": template,
+                "steps": rationale,
+                "constraints": constraints_applied,
+                "result": final_names,
+                "total_span": span,
+                "voice_count": len(result),
+                "warnings": [],
+            }
+            if not constraints_applied:
+                report["warnings"].append("No constraints triggered — clean voicing")
+            if span > 20:
+                report["warnings"].append(f"Wide span ({span} semitones)")
+            return result, report
+
+        return result
 
     def generate_voicing_track(
         self,

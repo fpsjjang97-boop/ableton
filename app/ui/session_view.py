@@ -12,10 +12,10 @@ from PyQt6.QtWidgets import (
     QScrollArea, QFrame, QMenu, QSizePolicy, QToolButton,
     QAbstractScrollArea,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer, QRect, QPoint
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer, QRect, QPoint, QMimeData, QUrl
 from PyQt6.QtGui import (
     QColor, QPainter, QFont, QPen, QBrush, QMouseEvent, QPaintEvent,
-    QAction, QLinearGradient, QWheelEvent,
+    QAction, QLinearGradient, QWheelEvent, QDrag,
 )
 
 from core.models import Track, ProjectState, Note, TICKS_PER_BEAT, TRACK_COLORS
@@ -355,7 +355,65 @@ class ClipSlot(QFrame):
 
     def mousePressEvent(self, ev: QMouseEvent | None):
         if ev and ev.button() == Qt.MouseButton.LeftButton:
+            self._drag_start_pos = ev.pos()
             self.clip_selected.emit(self._track_idx, self._scene_idx)
+
+    def mouseMoveEvent(self, ev: QMouseEvent | None):
+        if (ev and ev.buttons() & Qt.MouseButton.LeftButton
+                and self._state != self.EMPTY
+                and hasattr(self, '_drag_start_pos')):
+            distance = (ev.pos() - self._drag_start_pos).manhattanLength()
+            if distance >= 10:
+                self._start_midi_drag()
+        super().mouseMoveEvent(ev)
+
+    def _start_midi_drag(self):
+        """Export the track as a temp MIDI file and start a drag operation."""
+        try:
+            import tempfile, os
+            # Find the project via parent chain
+            session = self.parent()
+            while session and not hasattr(session, '_project'):
+                session = session.parent()
+            if not session or not session._project:
+                return
+            project = session._project
+            if self._track_idx >= len(project.tracks):
+                return
+            track = project.tracks[self._track_idx]
+            if not track.notes:
+                return
+
+            # Write temp MIDI file
+            try:
+                import mido
+                mid = mido.MidiFile(ticks_per_beat=project.ticks_per_beat)
+                midi_track = mido.MidiTrack()
+                mid.tracks.append(midi_track)
+                events = []
+                for n in track.notes:
+                    events.append((n.start_tick, 'note_on', n.pitch, n.velocity, n.channel))
+                    events.append((n.end_tick, 'note_off', n.pitch, 0, n.channel))
+                events.sort(key=lambda e: e[0])
+                prev_tick = 0
+                for tick, msg_type, pitch, vel, ch in events:
+                    delta = tick - prev_tick
+                    midi_track.append(mido.Message(msg_type, note=pitch, velocity=vel, channel=ch, time=delta))
+                    prev_tick = tick
+
+                tmp = os.path.join(tempfile.gettempdir(), f"{track.name.replace(' ', '_')}.mid")
+                mid.save(tmp)
+
+                drag = QDrag(self)
+                mime = QMimeData()
+                mime.setUrls([QUrl.fromLocalFile(tmp)])
+                mime.setText(f"MIDI: {track.name}")
+                drag.setMimeData(mime)
+                drag.exec(Qt.DropAction.CopyAction)
+            except ImportError:
+                pass  # mido not available
+        except Exception:
+            pass
 
     def mouseDoubleClickEvent(self, ev: QMouseEvent | None):
         if self._state != self.EMPTY:

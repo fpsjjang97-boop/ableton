@@ -396,6 +396,25 @@ class ReviewPanel(QWidget):
         else:
             self._rule_db_label.setText("")
 
+    def show_voicing_rationale(self, rationale: dict):
+        """Display voicing generation rationale in the harmony text area."""
+        lines = []
+        lines.append(f"Voicing: {rationale.get('chord', '?')} -> {rationale.get('result', [])}")
+        lines.append(f"Span: {rationale.get('total_span', 0)} semitones, Voices: {rationale.get('voice_count', 0)}")
+        lines.append("")
+        for step in rationale.get("steps", []):
+            lines.append(f"  {step}")
+        if rationale.get("constraints"):
+            lines.append("")
+            lines.append("Constraints applied:")
+            for c in rationale["constraints"]:
+                lines.append(f"  * {c}")
+        if rationale.get("warnings"):
+            lines.append("")
+            for w in rationale["warnings"]:
+                lines.append(f"  ! {w}")
+        self._harmony_text.setPlainText("\n".join(lines))
+
     def clear(self):
         """Reset all fields to their default empty state."""
         self._score_label.setText("--")
