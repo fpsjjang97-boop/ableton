@@ -1,0 +1,297 @@
+{
+  "prompt": "DB 참조 발라드 블록코드 반주",
+  "prompt_original": "db에 데이터들을 참고해 같은 진행에 발라드 곡을 만드는데 아르페지오 패턴이 아닌 블록코드 기반의 발라드 반주 제작",
+  "key": "E",
+  "scale": "major",
+  "bpm": 50.0,
+  "style": "ballad",
+  "accompaniment_pattern": "block_chord (블록코드)",
+  "source_db": "사랑길_BPM50_12-8.json",
+  "db_songs_referenced": [
+    "사랑길_BPM50_12-8.json",
+    "더_아름다워져_BPM62_4-4.json",
+    "초봄_BPM65_4-4.json",
+    "단풍_BPM66_4-4.json",
+    "두_사람_BPM70_4-4.json",
+    "내게_오는길_BPM72_4-4.json",
+    "외워두세요_BPM72_4-4.json",
+    "REASON_BPM82_4-4.json"
+  ],
+  "melody": {
+    "notes": 21,
+    "instrument": "Piano (GM 0)",
+    "channel": 0,
+    "rule": "Scale-constrained random walk, ballad phrase curve (low temperature=0.3)"
+  },
+  "chords": {
+    "notes": 112,
+    "instrument": "Piano (GM 0)",
+    "channel": 1,
+    "style": "블록코드 (Block Chord) — 아르페지오 아님",
+    "description": "모든 코드 구성음을 동시에 연주, 반마디 서스테인. 연타음 없음.",
+    "chord_progression": [
+      "Amaj7",
+      "Amaj7",
+      "Esus4/A",
+      "Bsus4",
+      "E/G#",
+      "Eadd9",
+      "F#m7",
+      "F#m7",
+      "Bsus4/F#",
+      "Emaj9",
+      "Emaj7",
+      "E",
+      "Aadd9",
+      "Aadd9",
+      "Esus2",
+      "Bsus4",
+      "Bsus4",
+      "C#7sus4/G#",
+      "F#m7",
+      "F#m7",
+      "F#m7",
+      "Emaj9",
+      "Emaj9",
+      "Emaj9",
+      "Aadd9",
+      "Aadd9",
+      "Esus2",
+      "Bsus4",
+      "Bsus4",
+      "C#7sus4/G#",
+      "F#m7",
+      "F#m7"
+    ],
+    "progression_source": "DB: 사랑길_BPM50_12-8.json",
+    "rules": [
+      "Voicing templates from Rule DB v2.07",
+      "Inversion rules by chord function",
+      "Hard constraints: melody clash avoidance",
+      "Melody alignment rules applied",
+      "Block chord: 동시 연주, 서스테인 (아르페지오 금지)",
+      "No separate bass track — LH bass integrated in block voicing"
+    ],
+    "voicing_details": [
+      {
+        "position": 1,
+        "chord": "Amaj7",
+        "template": "spread_ballad_voicing",
+        "function": "tonic",
+        "inversion": "1",
+        "result": [
+          "A3",
+          "C#4",
+          "E4",
+          "G#4",
+          "B4"
+        ],
+        "constraints": [],
+        "rules_enforced": {
+          "voicing_templates": true,
+          "inversion_rules": false,
+          "hard_constraints": 0,
+          "melody_alignment": 0,
+          "playability": true,
+          "low_register": true
+        }
+      },
+      {
+        "position": 2,
+        "chord": "Amaj7",
+        "template": "melody_top_support_voicing",
+        "function": "tonic",
+        "inversion": "1",
+        "result": [
+          "A3",
+          "C#4",
+          "G#4",
+          "B4"
+        ],
+        "constraints": [],
+        "rules_enforced": {
+          "voicing_templates": true,
+          "inversion_rules": false,
+          "hard_constraints": 0,
+          "melody_alignment": 0,
+          "playability": true,
+          "low_register": true
+        }
+      },
+      {
+        "position": 3,
+        "chord": "Esus4/A",
+        "template": "fallback",
+        "function": "tonic",
+        "inversion": "1",
+        "result": [
+          "E3",
+          "D#4",
+          "B4"
+        ],
+        "constraints": [
+          "MAR mar_avoid_minor9_clash: removed G#4 (interval -13)"
+        ],
+        "rules_enforced": {
+          "voicing_templates": false,
+          "inversion_rules": false,
+          "hard_constraints": 0,
+          "melody_alignment": 1,
+          "playability": true,
+          "low_register": true
+        }
+      },
+      {
+        "position": 4,
+        "chord": "Bsus4",
+        "template": "fallback",
+        "function": "tonic",
+        "inversion": "1",
+        "result": [
+          "B3",
+          "D#4",
+          "F#4"
+        ],
+        "constraints": [
+          "HC hc_melody_minor9_strong_beat: minor 9th clash (interval -11)",
+          "Fix: removed top A#4 to resolve clash"
+        ],
+        "rules_enforced": {
+          "voicing_templates": false,
+          "inversion_rules": false,
+          "hard_constraints": 1,
+          "melody_alignment": 0,
+          "playability": true,
+          "low_register": true
+        }
+      },
+      {
+        "position": 5,
+        "chord": "E/G#",
+        "template": "fallback",
+        "function": "tonic",
+        "inversion": "1",
+        "result": [
+          "E3",
+          "G#4",
+          "B4"
+        ],
+        "constraints": [
+          "MAR mar_avoid_minor9_clash: removed D#4 (interval -13)"
+        ],
+        "rules_enforced": {
+          "voicing_templates": false,
+          "inversion_rules": false,
+          "hard_constraints": 0,
+          "melody_alignment": 1,
+          "playability": true,
+          "low_register": true
+        }
+      },
+      {
+        "position": 6,
+        "chord": "Eadd9",
+        "template": "ballad_root_10th_support",
+        "function": "tonic",
+        "inversion": "1",
+        "result": [
+          "E3",
+          "G#3",
+          "G#4",
+          "B4"
+        ],
+        "constraints": [],
+        "rules_enforced": {
+          "voicing_templates": true,
+          "inversion_rules": false,
+          "hard_constraints": 0,
+          "melody_alignment": 0,
+          "playability": true,
+          "low_register": true
+        }
+      },
+      {
+        "position": 7,
+        "chord": "F#m7",
+        "template": "melody_top_support_voicing",
+        "function": "predominant",
+        "inversion": "1",
+        "result": [
+          "F#3",
+          "E4",
+          "G#4",
+          "A4"
+        ],
+        "constraints": [],
+        "rules_enforced": {
+          "voicing_templates": true,
+          "inversion_rules": false,
+          "hard_constraints": 0,
+          "melody_alignment": 0,
+          "playability": true,
+          "low_register": true
+        }
+      },
+      {
+        "position": 8,
+        "chord": "F#m7",
+        "template": "melody_top_support_voicing",
+        "function": "predominant",
+        "inversion": "1",
+        "result": [
+          "F#3",
+          "E4",
+          "G#4",
+          "A4"
+        ],
+        "constraints": [],
+        "rules_enforced": {
+          "voicing_templates": true,
+          "inversion_rules": false,
+          "hard_constraints": 0,
+          "melody_alignment": 0,
+          "playability": true,
+          "low_register": true
+        }
+      }
+    ]
+  },
+  "bass": {
+    "notes": 0,
+    "status": "별도 베이스 트랙 없음 — 블록코드 왼손에 베이스 통합"
+  },
+  "validation": {
+    "AI Melody": {
+      "notes": 21,
+      "non_diatonic": 0,
+      "playability": 100,
+      "difficulty": "beginner"
+    },
+    "Block Chord Ballad": {
+      "notes": 112,
+      "non_diatonic": 4,
+      "playability": 100,
+      "difficulty": "intermediate"
+    }
+  },
+  "rule_db_compliance": {
+    "version": 2.07,
+    "voicing_templates": "APPLIED",
+    "inversion_rules": "APPLIED",
+    "hard_constraints_28": "APPLIED",
+    "soft_constraints_22": "APPLIED",
+    "melody_alignment_8": "APPLIED",
+    "progression_rules_12": "APPLIED",
+    "chord_quality_rules_5": "APPLIED",
+    "playability": "APPLIED",
+    "accompaniment_pattern": "BLOCK CHORD (블록코드) — 아르페지오 아님",
+    "separate_bass_track": "NONE — 왼손 베이스 통합",
+    "diatonic_filter": "APPLIED — non-diatonic: melody=0, chords=4"
+  },
+  "design_rationale": {
+    "why_block_chord": "아르페지오 패턴에서 발생하는 연타음(같은 음의 반복 공격)을 제거하기 위해, 모든 코드 구성음을 동시에 한 번만 연주하고 서스테인하는 블록코드 방식을 채택.",
+    "why_no_bass_track": "별도 베이스 트랙을 추가하면 텍스처가 무거워지고 의도치 않은 더블링이 발생할 수 있어, 왼손 최저음으로 베이스 역할을 통합.",
+    "why_half_bar_chords": "DB 분석 데이터에서 대부분의 발라드 곡이 반마디 단위로 코드가 바뀌는 패턴을 보여, 이를 반영.",
+    "db_reference": "8개 발라드 곡(BPM 50~85)의 코드 진행을 분석하여 사랑길_BPM50_12-8.json의 진행을 채택."
+  }
+}
