@@ -837,43 +837,206 @@ class HarmonyEngine:
 
         return Track(name="AI Voicing", notes=notes, color="#CF9FFF")
 
-    def _apply_voice_leading(
-        self, prev: list[int], current: list[int]
-    ) -> list[int]:
-        """Minimize voice movement between consecutive voicings.
+    def _find_progression_rule(
+        self, prev_quality: str, cur_quality: str
+    ) -> Optional[dict]:
+        """Find a matching progression resolution rule from Rule DB."""
+        for pr in self.progression_rules:
+            prog = pr.get("progression", [])
+            if len(prog) >= 2:
+                # Match last two: prev_quality -> cur_quality
+                if prog[0] == prev_quality and prog[1] == cur_quality:
+                    return pr
+                # Partial match: dominant patterns
+                if prev_quality in ("7", "7sus4") and prog[0] in ("7", "V7/vi", "X7"):
+                    if cur_quality in ("maj7", "m7") and prog[1] in ("maj7", "m7", "maj7_or_m7_target", "target_diatonic_or_tonicized_chord", "vi_or_vi7"):
+                        return pr
+        return None
 
-        Guide-tone continuity principle from rule DB.
-        Bass note (first element) is always preserved as-is.
-        Only upper voices are adjusted for smooth movement.
+    def _get_priority_tones(self, quality: str) -> list[tuple[int, float]]:
+        """Get priority tones (semitone, score) from chord_quality_rules."""
+        for cq in self.chord_quality_rules:
+            if cq.get("chord_quality") == quality:
+                result = []
+                for pt in cq.get("priority_tones", []):
+                    deg = pt.get("degree", "1")
+                    sem = self._DEGREE_TO_SEMITONE.get(deg)
+                    if sem is not None:
+                        result.append((sem, pt.get("score", 0.5)))
+                return result
+        return []
+
+    def _score_soft_constraints(
+        self, prev_pitches: list[int], candidate: list[int]
+    ) -> float:
+        """Score a voicing candidate against soft constraints. Higher = better."""
+        score = 0.0
+
+        if len(prev_pitches) < 2 or len(candidate) < 2:
+            return score
+
+        prev_top = max(prev_pitches)
+        cur_top = max(candidate)
+        top_interval = cur_top - prev_top
+
+        for sc in self.soft_constraints:
+            sc_id = sc.get("id", "")
+            sc_type = sc.get("type", "")
+
+            # sc_stepwise_top_note: prefer small top-note movement
+            if sc_id == "sc_stepwise_top_note":
+                preferred = sc.get("preferred_intervals_semitones", [0, 1, 2, -1, -2])
+                discouraged = sc.get("discouraged_intervals_semitones", [])
+                if top_interval in preferred:
+                    score += 1.0
+                elif top_interval in discouraged:
+                    score -= 1.0
+                else:
+                    score += 0.3  # acceptable range
+
+            # sc_common_tone_retention: prefer shared notes
+            elif sc_id == "sc_common_tone_retention":
+                prev_pcs = set(p % 12 for p in prev_pitches[1:])
+                cur_pcs = set(p % 12 for p in candidate[1:])
+                common = len(prev_pcs & cur_pcs)
+                score += common * 0.5
+
+            # sc_inner_voice_min_motion: prefer small inner voice movement
+            elif sc_id == "sc_inner_voice_min_motion":
+                prev_inner = prev_pitches[1:-1] if len(prev_pitches) > 2 else []
+                cur_inner = candidate[1:-1] if len(candidate) > 2 else []
+                if prev_inner and cur_inner:
+                    total_motion = sum(
+                        min(abs(c - p) for p in prev_inner)
+                        for c in cur_inner
+                    ) / len(cur_inner)
+                    if total_motion <= 2:
+                        score += 0.8
+                    elif total_motion <= 4:
+                        score += 0.4
+
+            # sc_penalize_static_close_position_defaults
+            elif sc_id == "sc_penalize_static_close_position_defaults":
+                if len(candidate) >= 3:
+                    upper = sorted(candidate[1:])
+                    intervals = [upper[i+1] - upper[i] for i in range(len(upper)-1)]
+                    # Close position = all intervals 3-4 semitones
+                    if all(2 <= iv <= 5 for iv in intervals):
+                        score -= 0.5  # Penalize default stacking
+
+            # sc_prefer_contextual_inversion_from_melody_and_bass
+            elif sc_id == "sc_prefer_contextual_inversion_from_melody_and_bass":
+                # Smooth bass motion bonus
+                if len(prev_pitches) >= 1 and len(candidate) >= 1:
+                    bass_motion = abs(candidate[0] - prev_pitches[0])
+                    if bass_motion <= 2:
+                        score += 0.6
+                    elif bass_motion <= 5:
+                        score += 0.3
+
+        return score
+
+    def _apply_voice_leading(
+        self, prev: list[int], current: list[int],
+        prev_quality: str = "", cur_quality: str = "",
+        root_pc: int = 0,
+    ) -> list[int]:
+        """Apply voice leading using Rule DB soft constraints and progression rules.
+
+        Bass note (first element) is always preserved.
+        Progression resolution rules guide specific voice movements (ii-V, V-I).
+        Soft constraints score candidate voicings for stepwise top, common tones, etc.
         """
         if len(current) <= 1:
             return current
 
-        bass = current[0]  # Always keep the bass note unchanged
+        bass = current[0]
         upper = list(current[1:])
         prev_upper = list(prev[1:]) if len(prev) > 1 else []
 
         if not prev_upper or not upper:
             return current
 
-        # For each upper voice, find the closest octave placement
-        # relative to the previous voicing's upper voices
+        # --- Progression resolution: guide-tone specific voice leading ---
+        pr = self._find_progression_rule(prev_quality, cur_quality)
+        guide_adjustments: dict[int, int] = {}  # cur_pc -> target_pitch
+
+        if pr:
+            for gt in pr.get("guide_tone_rules", []):
+                from_deg = gt.get("from_degree", "")
+                to_deg = gt.get("to_degree", "")
+                motion = gt.get("motion", "")
+
+                from_sem = self._DEGREE_TO_SEMITONE.get(from_deg)
+                to_sem = self._DEGREE_TO_SEMITONE.get(to_deg.split("_or_")[0])
+                if from_sem is None or to_sem is None:
+                    continue
+
+                # Find the prev note matching from_deg
+                prev_root_pc = prev[0] % 12 if prev else 0
+                from_pc = (prev_root_pc + from_sem) % 12
+                to_pc = (root_pc + to_sem) % 12
+
+                # Find matching prev pitch
+                for pv in prev_upper:
+                    if pv % 12 == from_pc:
+                        # Resolve to closest target
+                        if "down_semitone" in motion:
+                            target = pv - 1
+                        elif "up_semitone" in motion:
+                            target = pv + 1
+                        elif "common_tone" in motion:
+                            target = pv  # Hold
+                        else:
+                            target = pv  # Default hold
+                        guide_adjustments[to_pc] = target
+                        break
+
+        # --- Apply adjustments to upper voices ---
         adjusted = []
         for cv in upper:
-            best_pitch = cv
-            best_dist = 999
-            for pv in prev_upper:
-                # Try the voice at its current position and +/- octave
-                for candidate in [cv, cv - 12, cv + 12]:
-                    if candidate <= bass or candidate > 127 or candidate < 0:
-                        continue
-                    d = abs(candidate - pv)
-                    if d < best_dist:
-                        best_dist = d
-                        best_pitch = candidate
-            adjusted.append(best_pitch)
+            cv_pc = cv % 12
+            if cv_pc in guide_adjustments:
+                # Use guide-tone resolution
+                target = guide_adjustments[cv_pc]
+                # Ensure it's in a reasonable range
+                if abs(target - cv) <= 14 and target > bass:
+                    adjusted.append(target)
+                else:
+                    adjusted.append(cv)
+            else:
+                # Standard closest-voice approach
+                best_pitch = cv
+                best_dist = 999
+                for pv in prev_upper:
+                    for candidate in [cv, cv - 12, cv + 12]:
+                        if candidate <= bass or candidate > 127 or candidate < 0:
+                            continue
+                        d = abs(candidate - pv)
+                        if d < best_dist:
+                            best_dist = d
+                            best_pitch = candidate
+                adjusted.append(best_pitch)
 
-        return [bass] + sorted(adjusted)
+        result = [bass] + sorted(adjusted)
+
+        # --- Score with soft constraints and pick best octave variant ---
+        # Generate a few candidates by shifting inner voices
+        best = result
+        best_score = self._score_soft_constraints(prev, result)
+
+        # Try alternative: swap one inner voice octave
+        for i in range(1, len(result)):
+            alt = list(result)
+            alt[i] = alt[i] + 12 if alt[i] + 12 <= 127 else alt[i] - 12
+            if alt[i] > bass and alt[i] > 0:
+                alt_sorted = [alt[0]] + sorted(alt[1:])
+                alt_score = self._score_soft_constraints(prev, alt_sorted)
+                if alt_score > best_score:
+                    best = alt_sorted
+                    best_score = alt_score
+
+        return best
 
     def _parse_chord_label(self, label: str) -> tuple[Optional[str], str]:
         """Parse 'C#m7/B' into (root_name, quality). Returns (None, '') on failure."""
@@ -1512,7 +1675,15 @@ class HarmonyEngine:
             )
 
             if prev_pitches and voicing:
-                voicing = self._apply_voice_leading(prev_pitches, voicing)
+                _, cur_quality = self._parse_chord_label(chord_label)
+                _, prev_q = self._parse_chord_label(prev_chord) if prev_chord else ("", "")
+                root_name_cur, _ = self._parse_chord_label(chord_label)
+                cur_root_pc = _PC_NAMES.index(root_name_cur) if root_name_cur in _PC_NAMES else 0
+                voicing = self._apply_voice_leading(
+                    prev_pitches, voicing,
+                    prev_quality=prev_q, cur_quality=cur_quality,
+                    root_pc=cur_root_pc,
+                )
 
             # Style-aware rhythm
             if style in ("jazz", "lo-fi"):
