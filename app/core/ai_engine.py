@@ -139,10 +139,78 @@ class AIEngine:
             self._harmony_engine = HarmonyEngine()
         except Exception:
             pass
+        # Pattern DB (pattern_library/*.json)
+        self._pattern_db = None
+        try:
+            from core.pattern_db import PatternDB
+            self._pattern_db = PatternDB.get()
+        except Exception:
+            pass
+        # Similarity engine (embeddings)
+        self._similarity_engine = None
+        try:
+            from core.similarity_engine import SimilarityEngine
+            self._similarity_engine = SimilarityEngine()
+        except Exception:
+            pass
+        # Prompt parser
+        self._prompt_parser = None
+        try:
+            from core.prompt_parser import PromptParser
+            self._prompt_parser = PromptParser()
+        except Exception:
+            pass
 
     @property
     def harmony_engine(self):
         return self._harmony_engine
+
+    @property
+    def pattern_db(self):
+        return self._pattern_db
+
+    @property
+    def similarity_engine(self):
+        return self._similarity_engine
+
+    def parse_prompt(self, prompt: str) -> dict:
+        """Parse a natural language prompt into generation parameters."""
+        if self._prompt_parser and prompt:
+            return self._prompt_parser.parse(prompt)
+        return {}
+
+    def generate_from_prompt(
+        self,
+        params: dict,
+        project_key: str = "C",
+        project_scale: str = "minor",
+    ) -> Track:
+        """Generate a track from UI params + optional prompt.
+
+        Merges prompt-parsed params with UI params, queries PatternDB
+        for chord progressions, and generates with HarmonyEngine voicing.
+        """
+        # Parse prompt if present
+        if params.get("prompt") and self._prompt_parser:
+            prompt_params = self._prompt_parser.parse(params["prompt"])
+            merged = self._prompt_parser.merge_with_ui(prompt_params, params)
+        else:
+            merged = dict(params)
+
+        key = merged.get("key", project_key)
+        scale = merged.get("scale", project_scale)
+        style = merged.get("style", "pop")
+        kind = merged.get("track_type", "melody")
+        length_bars = merged.get("length_bars", 8)
+        length_beats = length_bars * 4
+        density = merged.get("density", 0.6)
+
+        if kind == "chords":
+            return self.generate_chords(key, scale, length_beats, style)
+        elif kind == "bass":
+            return self.generate_bass(key, scale, length_beats, style)
+        else:
+            return self.generate_melody(key, scale, length_beats, style, density)
 
     # ------------------------------------------------------------------
     # 1. Variation
@@ -548,9 +616,48 @@ class AIEngine:
         octave: int,
         melody_track: Optional[Track] = None,
     ) -> Track:
-        """Generate chords using the harmony engine rule DB for voicing."""
+        """Generate chords using the harmony engine rule DB for voicing.
+
+        Queries PatternDB for real chord progressions when available,
+        falls back to built-in templates.
+        """
         he = self._harmony_engine
         root = key_name_to_root(key)
+
+        # Try PatternDB first for real progression patterns
+        db_chord_labels = None
+        if self._pattern_db is not None:
+            try:
+                candidates = self._pattern_db.query_progressions(
+                    key=key, scale=scale, gram_size=4, min_count=3
+                )
+                if candidates:
+                    # Weighted random selection by count
+                    weights = np.array([c["count"] for c in candidates], dtype=float)
+                    weights /= weights.sum()
+                    chosen = candidates[int(self.rng.choice(len(candidates), p=weights))]
+                    db_chord_labels = chosen["chords"]
+                    # Use PatternDB progression directly via HarmonyEngine
+                    total_ticks = length_beats * _BEAT
+                    bars = max(1, total_ticks // _BAR)
+                    # Tile the pattern to fill requested length
+                    full_labels = []
+                    while len(full_labels) < bars:
+                        full_labels.extend(db_chord_labels)
+                    full_labels = full_labels[:bars]
+                    # Build chord_list in settings format
+                    chord_list = [{"chord": c, "duration": "full"} for c in full_labels]
+                    track = he.generate_from_progression(
+                        chord_list, key=key, scale=scale,
+                        style=style, octave=octave + 1,
+                        melody_track=melody_track,
+                    )
+                    track.name = "AI Chords (Pattern DB)"
+                    return track
+            except Exception:
+                pass
+
+        # Fallback: built-in progression templates
         family = "minor" if scale in ("minor", "dorian", "minor_penta") else "major"
         progs = _PROGRESSIONS.get(family, _PROGRESSIONS["major"])
         prog = list(progs[int(self.rng.integers(len(progs)))])

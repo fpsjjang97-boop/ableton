@@ -603,8 +603,22 @@ def main() -> int:
 
     # Detail view AI signals
     def on_generate(params):
-        kind = params.get("type", "melody").lower()
-        generate_track(kind)
+        prompt = params.get("prompt", "")
+        if prompt or params.get("genre") or params.get("mood"):
+            # New path: prompt + dropdown based generation
+            push_undo("Generate from Prompt")
+            p = project()
+            track = ai_engine.generate_from_prompt(params, p.key, p.scale)
+            track.color = TRACK_COLORS[len(p.tracks) % len(TRACK_COLORS)]
+            p.tracks.append(track)
+            mark_modified()
+            session_view.refresh()
+            detail_view.set_track(track, len(p.tracks) - 1)
+            if prompt:
+                sb.showMessage(f"Generated from prompt: {prompt[:40]}...", 5000)
+        else:
+            kind = params.get("track_type", params.get("type", "melody")).lower()
+            generate_track(kind)
     detail_view.generate_requested.connect(on_generate)
 
     def on_variation(params):
@@ -623,6 +637,24 @@ def main() -> int:
     detail_view.humanize_requested.connect(on_humanize)
 
     detail_view.analyze_requested.connect(analyze_track)
+
+    # Ingest handler
+    def on_ingest(path):
+        try:
+            import subprocess
+            ingest_script = os.path.join(_repo_root, "tools", "auto_ingest.py")
+            python_exe = sys.executable
+            subprocess.Popen(
+                [python_exe, ingest_script, path],
+                cwd=_repo_root,
+                creationflags=0x00000008 if sys.platform == "win32" else 0,  # DETACHED
+            )
+            sb.showMessage(f"Ingesting: {os.path.basename(path)}", 3000)
+        except Exception as e:
+            sb.showMessage(f"Ingest failed: {e}", 5000)
+
+    if hasattr(detail_view, '_ai_panel') and hasattr(detail_view._ai_panel, 'ingest_requested'):
+        detail_view._ai_panel.ingest_requested.connect(on_ingest)
 
     # Scale snap
     def on_scale_snap(key, scale):

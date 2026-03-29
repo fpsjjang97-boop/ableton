@@ -10,9 +10,9 @@ import math
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
     QSlider, QGroupBox, QFrame, QSpinBox, QCheckBox, QSizePolicy,
-    QGridLayout,
+    QGridLayout, QLineEdit, QFileDialog,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QFont, QColor, QPainter, QPaintEvent
 
 from config import COLORS, AI_VARIATION_TYPES, AI_STYLES
@@ -264,7 +264,8 @@ class AIGeneratePanel(QWidget):
         blay.setContentsMargins(8, 6, 8, 6)
         blay.setSpacing(12)
 
-        # Style dropdown
+        # Row 1: Style + Genre + Mood + Type dropdowns
+        # Style dropdown (dynamic from PatternDB)
         style_col = QVBoxLayout()
         style_col.setSpacing(2)
         style_col.addWidget(_tiny_label("STYLE"))
@@ -273,6 +274,26 @@ class AIGeneratePanel(QWidget):
         self._style.addItems([s.title() for s in AI_STYLES])
         style_col.addWidget(self._style)
         blay.addLayout(style_col)
+
+        # Genre dropdown (dynamic)
+        genre_col = QVBoxLayout()
+        genre_col.setSpacing(2)
+        genre_col.addWidget(_tiny_label("GENRE"))
+        self._genre = QComboBox()
+        self._genre.setStyleSheet(_COMPACT_COMBO)
+        self._genre.addItems(["Any", "Classical", "Jazz", "Pop", "Electronic"])
+        genre_col.addWidget(self._genre)
+        blay.addLayout(genre_col)
+
+        # Mood dropdown (dynamic)
+        mood_col = QVBoxLayout()
+        mood_col.setSpacing(2)
+        mood_col.addWidget(_tiny_label("MOOD"))
+        self._mood = QComboBox()
+        self._mood.setStyleSheet(_COMPACT_COMBO)
+        self._mood.addItems(["Any", "Bright", "Calm", "Dark", "Energetic", "Sad", "Warm"])
+        mood_col.addWidget(self._mood)
+        blay.addLayout(mood_col)
 
         # Type dropdown
         type_col = QVBoxLayout()
@@ -317,9 +338,81 @@ class AIGeneratePanel(QWidget):
 
         root.addWidget(body)
 
+        # Row 2: Natural language prompt bar
+        prompt_frame = QFrame()
+        prompt_frame.setStyleSheet(
+            f"QFrame {{ background: {COLORS['bg_dark']}; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 4px; }}"
+        )
+        prompt_lay = QHBoxLayout(prompt_frame)
+        prompt_lay.setContentsMargins(8, 4, 8, 4)
+        prompt_lay.setSpacing(6)
+
+        prompt_lbl = QLabel("Prompt:")
+        prompt_lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        prompt_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; border: none;")
+        prompt_lay.addWidget(prompt_lbl)
+
+        self._prompt = QLineEdit()
+        self._prompt.setPlaceholderText("e.g. '슬픈 발라드 다단조' or 'gentle jazz piano in Cm'")
+        self._prompt.setStyleSheet(
+            f"QLineEdit {{ background: {COLORS['bg_input']}; border: 1px solid {COLORS['border']}; "
+            f"border-radius: 3px; padding: 3px 6px; color: {COLORS['text_primary']}; "
+            f"font-size: 11px; min-height: 20px; }}"
+        )
+        self._prompt.returnPressed.connect(self._on_generate)
+        prompt_lay.addWidget(self._prompt, 1)
+
+        root.addWidget(prompt_frame)
+
+        # Load dynamic dropdown content from PatternDB
+        self._refresh_from_db()
+
+    def _refresh_from_db(self):
+        """Populate dropdowns from PatternDB if available."""
+        try:
+            from core.pattern_db import PatternDB
+            db = PatternDB.get()
+            # Update style dropdown
+            styles = db.available_styles()
+            if styles:
+                self._style.clear()
+                self._style.addItems([s.replace("_", " ").title() for s in styles])
+            # Update genre dropdown
+            genres = db.available_genres()
+            if genres:
+                self._genre.clear()
+                self._genre.addItems(["Any"] + [g.title() for g in genres])
+            # Update mood dropdown
+            moods = db.available_moods()
+            if moods:
+                self._mood.clear()
+                self._mood.addItems(["Any"] + [m.title() for m in moods])
+        except Exception:
+            pass  # PatternDB not available, keep defaults
+
+    def refresh_dropdowns(self):
+        """Public method to refresh dropdowns after DB update."""
+        self._refresh_from_db()
+
     def _on_generate(self):
+        style_text = self._style.currentText().lower().replace(" ", "_")
+        # Map back to AI_STYLES if possible
+        style = style_text if style_text else "pop"
+
+        genre = self._genre.currentText().lower()
+        if genre == "any":
+            genre = ""
+
+        mood = self._mood.currentText().lower()
+        if mood == "any":
+            mood = ""
+
         params = {
-            "style": AI_STYLES[self._style.currentIndex()],
+            "style": style,
+            "genre": genre,
+            "mood": mood,
+            "prompt": self._prompt.text().strip(),
             "track_type": self._track_type.currentText().lower(),
             "length_bars": self._length_knob.value(),
             "density": self._density_knob.value() / 100.0,
@@ -430,6 +523,7 @@ class AIToolsPanel(QWidget):
     quantize_requested = pyqtSignal(float, int)
     scale_snap_requested = pyqtSignal(str, str)
     analyze_requested = pyqtSignal()
+    ingest_requested = pyqtSignal(str)  # path to MIDI file or directory
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -574,6 +668,36 @@ class AIToolsPanel(QWidget):
 
         root.addWidget(a_frame)
 
+        # --- Ingest section ---
+        i_frame = QFrame()
+        i_frame.setStyleSheet(
+            f"QFrame {{ background: {COLORS['bg_dark']}; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 4px; }}"
+        )
+        i_lay = QHBoxLayout(i_frame)
+        i_lay.setContentsMargins(8, 4, 8, 4)
+        i_lay.setSpacing(8)
+
+        i_title = QLabel("Ingest")
+        i_title.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        i_title.setStyleSheet(f"color: {COLORS['text_secondary']}; border: none;")
+        i_lay.addWidget(i_title)
+
+        self._ingest_status = QLabel("Ready")
+        self._ingest_status.setStyleSheet(
+            f"color: {COLORS['text_dim']}; font-size: 10px; border: none;"
+        )
+        i_lay.addWidget(self._ingest_status)
+        i_lay.addStretch()
+
+        btn_ingest = QPushButton("Add MIDI to DB")
+        btn_ingest.setStyleSheet(_BTN_SMALL)
+        btn_ingest.setFixedWidth(100)
+        btn_ingest.clicked.connect(self._on_ingest)
+        i_lay.addWidget(btn_ingest)
+
+        root.addWidget(i_frame)
+
     def _on_analyze(self):
         self.analyze_requested.emit()
 
@@ -597,6 +721,17 @@ class AIToolsPanel(QWidget):
             self._snap_scale.currentText(),
         )
 
+    def _on_ingest(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Select MIDI files to ingest", "",
+            "MIDI Files (*.mid *.midi);;All (*)"
+        )
+        if paths:
+            for path in paths:
+                self._ingest_status.setText(f"Ingesting {len(paths)} file(s)...")
+                self.ingest_requested.emit(path)
+            self._ingest_status.setText(f"Done — {len(paths)} file(s)")
+
 
 # ---------------------------------------------------------------------------
 # AIPanel — main container wrapping sub-panels
@@ -615,6 +750,7 @@ class AIPanel(QWidget):
     quantize_requested = pyqtSignal(float, int)
     analyze_requested = pyqtSignal()
     scale_snap_requested = pyqtSignal(str, str)
+    ingest_requested = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -642,6 +778,7 @@ class AIPanel(QWidget):
         self._tools_panel.quantize_requested.connect(self.quantize_requested)
         self._tools_panel.scale_snap_requested.connect(self.scale_snap_requested)
         self._tools_panel.analyze_requested.connect(self.analyze_requested)
+        self._tools_panel.ingest_requested.connect(self.ingest_requested)
 
     # -- Public accessors --
 
