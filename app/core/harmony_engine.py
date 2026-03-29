@@ -153,17 +153,15 @@ class HarmonyEngine:
                     "label": "N.C.(bass-insufficient)"}
 
         # ── Feedback #4: sus4-first branch lock ──
-        # 3rd 부재 + 4th 존재 시 sus4 분기를 먼저 잠그고 alternate minor7 차단
+        # bass를 root로 봤을 때 3rd가 완전 부재하고 4th만 있는 경우에만 sus4 잠금
         sus4_locked = False
-        for candidate_root in range(12):
-            if candidate_root != bass_pc:
-                continue  # bass-first: bass를 root로 먼저 검사
-            fourth_pc = (candidate_root + 5) % 12
-            third_maj = (candidate_root + 4) % 12
-            third_min = (candidate_root + 3) % 12
-            if fourth_pc in pcs and third_maj not in pcs and third_min not in pcs:
-                sus4_locked = True
-                break
+        fourth_from_bass = (bass_pc + 5) % 12
+        third_maj_from_bass = (bass_pc + 4) % 12
+        third_min_from_bass = (bass_pc + 3) % 12
+        if (fourth_from_bass in pcs and
+                third_maj_from_bass not in pcs and
+                third_min_from_bass not in pcs):
+            sus4_locked = True
 
         best_score = -1.0
         best_label = "N.C."
@@ -172,83 +170,108 @@ class HarmonyEngine:
         best_is_slash = False
         alternatives: list[dict] = []
 
-        # ── 텐션 코드 vs plain shell 분류 (Feedback #2) ──
         _TENSION_QUALITIES = {
             "9", "m9", "maj9", "7b9", "7#9", "11", "13", "add9", "madd9",
         }
-        _PLAIN_SHELLS = {"maj", "min", "7", "m7", "maj7", "sus4", "sus2", "7sus4", "dim", "aug"}
 
-        for root_pc in range(12):
-            for quality, template in _CHORD_TEMPLATES.items():
-                expected = set((root_pc + iv) % 12 for iv in template)
-                match_count = len(expected & set(pcs))
-                total = len(expected)
-                if match_count < max(2, total - 1):
+        # ── Phase 1: bass=root 후보 먼저 (bass-first pipeline) ──
+        # Phase 2: bass≠root 후보 (slash/inversion) — phase1 best에 마진 필요
+        best_bass_root_score = -1.0  # phase 1 최고점 기록
+
+        for phase in (1, 2):
+            for root_pc in range(12):
+                if phase == 1 and root_pc != bass_pc:
+                    continue
+                if phase == 2 and root_pc == bass_pc:
                     continue
 
-                # ── Feedback #4: sus4 잠금 시 alternate-root minor7 차단 ──
-                if sus4_locked and root_pc != bass_pc:
-                    if quality in ("m7", "m7b5", "min", "m9"):
-                        continue  # sus4 먼저 검토 전까지 차단
+                for quality, template in _CHORD_TEMPLATES.items():
+                    expected = set((root_pc + iv) % 12 for iv in template)
+                    match_count = len(expected & set(pcs))
+                    total = len(expected)
+                    if match_count < max(2, total - 1):
+                        continue
 
-                # ── Step 1: Bass-first scoring (Feedback #5) ──
-                score = match_count / total
-                if root_pc == bass_pc:
-                    score += 0.30  # 강화: bass-root 일치 보너스
-                elif bass_pc in expected:
-                    score += 0.10  # bass가 코드 톤 (인버전)
-                else:
-                    score -= 0.15  # bass와 무관한 root 페널티
+                    # sus4 잠금: bass=root일 때만 sus4 우선, 다른 root의 m7 차단
+                    if sus4_locked and root_pc != bass_pc:
+                        if quality in ("m7", "m7b5"):
+                            continue
 
-                # Prefer more specific (longer) templates when tied
-                score += len(template) * 0.01
+                    score = match_count / total
 
-                # ── Feedback #4: sus4 강화 부스트 ──
-                fourth_pc = (root_pc + 5) % 12
-                third_pc_maj = (root_pc + 4) % 12
-                third_pc_min = (root_pc + 3) % 12
-                if quality in ("sus4", "7sus4"):
-                    if fourth_pc in pcs and third_pc_maj not in pcs and third_pc_min not in pcs:
-                        score += 0.25  # 강화: 0.15 → 0.25
+                    # ── Bass alignment scoring ──
+                    if root_pc == bass_pc:
+                        score += 0.25
+                    elif bass_pc in expected:
+                        score += 0.05  # inversion — 최소한
+                    else:
+                        score -= 0.25  # bass와 완전 무관 root
 
-                # ── Feedback #2: tension overpromotion 방지 ──
-                # 텐션 코드는 같은 root의 plain shell보다 높은 점수를 자동 획득할 수 없음
-                if quality in _TENSION_QUALITIES:
-                    score -= 0.08  # plain shell 우선 보상
+                    score += len(template) * 0.01
 
-                root_name = _PC_NAMES[root_pc]
-                label = f"{root_name}{quality}" if quality != "maj" else root_name
+                    # ── sus4: 3rd가 실제로 부재할 때만 부스트 ──
+                    fourth_pc = (root_pc + 5) % 12
+                    third_pc_maj = (root_pc + 4) % 12
+                    third_pc_min = (root_pc + 3) % 12
+                    if quality in ("sus4", "7sus4"):
+                        if fourth_pc in pcs and third_pc_maj not in pcs and third_pc_min not in pcs:
+                            score += 0.10
+                        else:
+                            score -= 0.12  # 3rd 있는데 sus4 → 강한 페널티
 
-                # ── Feedback #5: slash 보존 — bass와 root 불일치 시 반드시 slash 표기 ──
-                is_slash = (bass_pc != root_pc)
-                if is_slash:
-                    bass_name = _PC_NAMES[bass_pc]
-                    label = f"{label}/{bass_name}"
+                    # ── Triad/shell vs tension 균형 ──
+                    if quality in ("maj", "min", "dim", "aug"):
+                        score += 0.04  # plain triad 소폭 보너스
+                    elif quality in _TENSION_QUALITIES:
+                        # tension은 match_count가 높을 때(실제 다 들리면)만 허용
+                        if match_count >= total:
+                            score -= 0.02  # 완전 매칭이면 경미한 페널티만
+                        else:
+                            score -= 0.12  # 불완전 매칭이면 강하게 억제
 
-                if score > best_score:
-                    if best_score > 0:
-                        alternatives.append({
-                            "label": best_label, "confidence": round(best_score, 3)
-                        })
-                    best_score = score
-                    best_label = label
-                    best_root = root_name
-                    best_quality = quality
-                    best_is_slash = is_slash
-                elif score > 0.5:
-                    alternatives.append({"label": label, "confidence": round(score, 3)})
+                    # phase 2 제동: bass=root 후보가 이미 충분히 좋으면 slash를 억제
+                    if phase == 2 and best_bass_root_score > 0.7 and score < best_bass_root_score + 0.15:
+                        # bass-root 해석이 충분히 강한데 slash가 근소하게 이기는 경우 차단
+                        if score > 0.5:
+                            alternatives.append({"label": f"{_PC_NAMES[root_pc]}{quality}/{_PC_NAMES[bass_pc]}",
+                                                 "confidence": round(score, 3)})
+                        continue
+
+                    root_name = _PC_NAMES[root_pc]
+                    label = f"{root_name}{quality}" if quality != "maj" else root_name
+
+                    # ── Slash 표기: bass가 코드톤인 inversion일 때만 ──
+                    is_slash = False
+                    if bass_pc != root_pc:
+                        is_slash = True
+                        label = f"{label}/{_PC_NAMES[bass_pc]}"
+
+                    if score > best_score:
+                        if best_score > 0:
+                            alternatives.append({
+                                "label": best_label, "confidence": round(best_score, 3)
+                            })
+                        best_score = score
+                        best_label = label
+                        best_root = root_name
+                        best_quality = quality
+                        best_is_slash = is_slash
+                    elif score > 0.5:
+                        alternatives.append({"label": label, "confidence": round(score, 3)})
+
+            # phase 1 종료 후 최고점 기록
+            if phase == 1:
+                best_bass_root_score = best_score
 
         # Keep top-3 alternatives
         alternatives = sorted(alternatives, key=lambda x: x["confidence"], reverse=True)[:3]
 
-        # ── Feedback #5: 최종 출력 전 bass refresh check ──
-        # root가 bass와 다른데 slash가 빠져있으면 강제 보정
-        if best_score > 0:
+        # ── 최종 출력 전 bass refresh check ──
+        if best_score > 0 and not best_is_slash:
             root_pc_final = _PC_NAMES.index(best_root) if isinstance(best_root, str) and best_root in _PC_NAMES else -1
-            if root_pc_final >= 0 and root_pc_final != bass_pc and not best_is_slash:
-                bass_name = _PC_NAMES[bass_pc]
-                best_label = f"{best_label}/{bass_name}"
+            if root_pc_final >= 0 and root_pc_final != bass_pc:
                 best_is_slash = True
+                best_label = f"{best_label}/{_PC_NAMES[bass_pc]}"
 
         return {
             "label": best_label,
@@ -322,12 +345,13 @@ class HarmonyEngine:
             bass_candidates = sorted(notes_in_win, key=lambda n: (n.pitch, -n.duration_ticks))
             bass_note = bass_candidates[0]
 
-            # ── Feedback #1: 베이스 구조적 근거 판단 ──
-            # bass가 window의 20% 미만 점유 시 structural bass 아님
+            # ── Feedback #1 + 2회차 #5: 베이스 구조적 근거 판단 ──
+            # bass 점유율 기준을 완화 (10%) — 너무 엄격하면 실제 코드를 N.C.로 판정
             bass_effective_start = max(bass_note.start_tick, win_start)
             bass_effective_end = min(bass_note.end_tick, win_end)
             bass_occupancy = bass_effective_end - bass_effective_start
-            bass_is_structural = bass_occupancy >= (window_ticks * 0.15)
+            bass_is_structural = (bass_occupancy >= (window_ticks * 0.10) or
+                                  bass_note.velocity >= 70)
 
             # ── Pipeline step 2: collect structural pitches ──
             structural_pitches = self._extract_structural_pitches(
