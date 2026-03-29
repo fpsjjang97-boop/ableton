@@ -372,7 +372,29 @@ def main() -> None:
         return
 
     if not args.path:
-        parser.error("Please provide a file or directory path, or use --rebuild-only.")
+        # No path given — open a file dialog (GUI mode for double-click users)
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            paths = filedialog.askopenfilenames(
+                title="Select MIDI files to ingest",
+                filetypes=[("MIDI files", "*.mid *.midi"), ("All files", "*.*")],
+            )
+            root.destroy()
+            if paths:
+                args.path = paths[0] if len(paths) == 1 else os.path.dirname(paths[0])
+                # If multiple files selected, copy them to a temp dir concept
+                # For simplicity, process the parent directory
+                if len(paths) > 1:
+                    args.path = os.path.dirname(paths[0])
+            else:
+                print("No files selected. Exiting.")
+                input("Press Enter to close...")
+                sys.exit(0)
+        except Exception:
+            parser.error("Please provide a file or directory path, or use --rebuild-only.")
 
     target = Path(args.path).resolve()
 
@@ -446,3 +468,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    # Keep console open when run as exe
+    if getattr(sys, 'frozen', False):
+        input("\nPress Enter to close...")
