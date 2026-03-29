@@ -1,15 +1,16 @@
 {
   "version": "0.1.0",
   "generated_date": "2026-03-29",
-  "source_corpus": "MAESTRO 2018 (93 files)",
+  "source_corpus": "auto-ingest (143 files)",
   "status": "auto-generated",
   "statistics": {
     "form_type_distribution": {
-      "AABA": 89,
-      "strophic": 2,
-      "verse-chorus": 2
+      "AABA": 129,
+      "verse-chorus-bridge": 9,
+      "verse-chorus": 3,
+      "strophic": 2
     },
-    "total_analyzed": 93,
+    "total_analyzed": 143,
     "common_section_sequences": [
       [
         "verse",
