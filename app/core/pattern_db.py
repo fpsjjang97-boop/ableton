@@ -273,6 +273,98 @@ class PatternDB:
     # ------------------------------------------------------------------ #
     #  Style / genre introspection                                        #
     # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------
+    # Next-chord suggestion (Markov from 2-grams)
+    # ------------------------------------------------------------------
+
+    def suggest_next_chords(
+        self,
+        current_chords: list[str],
+        key: str = "C",
+        top_k: int = 3,
+    ) -> list[dict]:
+        """Suggest the next chord(s) given a sequence of current chords.
+
+        Uses 2-gram transition frequencies from the pattern DB.
+        Returns up to top_k suggestions, each: {"chord": "Am7", "confidence": 0.75}
+        """
+        if not current_chords:
+            return []
+
+        target_pc = _note_pc(key)
+        shift = target_pc if target_pc >= 0 else 0
+
+        # Build transition map from 2-grams
+        raw_2grams = self._progressions.get("patterns", {}).get("2_gram", [])
+        transitions: dict[str, list[tuple[str, int]]] = {}
+        for entry in raw_2grams:
+            pattern_str = entry.get("pattern", "")
+            count = entry.get("count", 0)
+            parts = [c.strip() for c in pattern_str.split("\u2192") if c.strip()]
+            if not parts or len(parts) < 2:
+                parts = [c.strip() for c in pattern_str.split("->") if c.strip()]
+            if len(parts) == 2 and count >= 2:
+                src = _transpose_chord(parts[0], shift)
+                dst = _transpose_chord(parts[1], shift)
+                transitions.setdefault(src, []).append((dst, count))
+
+        # Also scan 4-grams for context-aware matching
+        raw_4grams = self._progressions.get("patterns", {}).get("4_gram", [])
+        for entry in raw_4grams:
+            pattern_str = entry.get("pattern", "")
+            count = entry.get("count", 0)
+            parts = re.split(r"\s*(?:\u2192|->)\s*", pattern_str)
+            parts = [c.strip() for c in parts if c.strip()]
+            if len(parts) >= 2 and count >= 2:
+                transposed = [_transpose_chord(c, shift) for c in parts]
+                # Check if current_chords matches the beginning
+                n = len(current_chords)
+                for i in range(len(transposed) - 1):
+                    window = transposed[max(0, i - n + 1):i + 1]
+                    if len(window) >= 1 and window[-1] == current_chords[-1]:
+                        if i + 1 < len(transposed):
+                            nxt = transposed[i + 1]
+                            transitions.setdefault(current_chords[-1], []).append((nxt, count))
+
+        # Look up the last chord in current sequence
+        last_chord = current_chords[-1]
+        candidates = transitions.get(last_chord, [])
+
+        if not candidates:
+            # Try without quality (just root matching)
+            last_root, _ = _parse_chord(last_chord)
+            for src, nexts in transitions.items():
+                src_root, _ = _parse_chord(src)
+                if src_root == last_root:
+                    candidates.extend(nexts)
+
+        if not candidates:
+            return []
+
+        # Aggregate counts per chord
+        chord_counts: dict[str, int] = {}
+        for chord, count in candidates:
+            chord_counts[chord] = chord_counts.get(chord, 0) + count
+
+        # Filter out same-chord suggestions
+        chord_counts.pop(last_chord, None)
+
+        if not chord_counts:
+            return []
+
+        # Sort by count, take top_k
+        total = sum(chord_counts.values())
+        sorted_chords = sorted(chord_counts.items(), key=lambda x: -x[1])[:top_k]
+
+        return [
+            {
+                "chord": chord,
+                "confidence": round(count / total, 3),
+                "count": count,
+            }
+            for chord, count in sorted_chords
+        ]
+
     # Base style/genre lists — extended dynamically as DB grows
     _BASE_STYLES = [
         "ambient", "ballad", "bossa_nova", "cinematic", "classical",
