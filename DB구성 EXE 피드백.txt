@@ -1,0 +1,135 @@
+좋아. 아래처럼 **기획자 전달용 체크리스트**로 보내면 된다.
+
+---
+
+## 화성분석 엔진 피드백 체크리스트
+
+### 결론
+
+현재 오분석의 핵심은 **규칙 부족보다는 규칙 집행 실패**다.
+특히 JSON에 이미 들어있는 **bass-first**, **segment-local**, **sus4-first**, **tension overpromotion 금지**, **slash 보존** 규칙이 실제 결과 출력에서 일관되게 적용되지 않았다.   
+
+---
+
+## 1. 베이스 없는 구간에 코드명을 붙이는 문제
+
+**증상**
+
+* 1마디 3박처럼 구조적 베이스 근거가 약한데도 `G` 같은 코드명이 출력됨.
+
+**JSON에 이미 있는 규칙**
+
+* 실제 sounding bass를 먼저 확인해야 함. 
+* 베이스와 모순되는 unslashed label 금지. 
+* 새 bass attack 없이 새 root-position label로 단순화 금지. 
+
+**판단**
+
+* 기존 규칙 위반.
+* 추가로 아래 규칙을 더 직접적으로 넣는 것이 필요함.
+
+**추가 권장**
+
+* `구조적 베이스 근거가 없으면 triad/chord label 금지, N.C. 또는 ambiguous_only 출력`
+
+---
+
+## 2. 텐션을 너무 쉽게 구조 코드로 승격하는 문제
+
+**증상**
+
+* 4마디, 6마디, 7마디 등에서 코드톤/슬래시로 먼저 봐야 할 구간을 tension-rich label로 과하게 해석함.
+
+**JSON에 이미 있는 규칙**
+
+* brief/off-beat/ornamental extension은 structural label로 승격 금지. 
+* 관측되지 않은 7th/tension은 primary label 승격 금지. 
+* literal slash를 same-root no3 tension보다 우선. 
+* plain shell 유지에 보상 부여. 
+
+**판단**
+
+* 규칙 부재가 아니라 **extension promotion gate 집행 실패**.
+
+---
+
+## 3. 마디 내부 분할을 제대로 안 하는 문제
+
+**증상**
+
+* 5마디 1박처럼 박자별 화성을 따로 봐야 하는데, 마디 단위 대표 코드처럼 뭉개짐.
+
+**JSON에 이미 있는 규칙**
+
+* 새 bass event 발생 시 split audit 강제. 
+* mid-measure harmony split required. 
+* beat 3 이후 성립한 화성으로 앞 박자를 덮어쓰기 금지. 
+* 초기 chord guess 관성 유지 금지. 
+
+**판단**
+
+* 명백한 **segment-local labeling 집행 실패**.
+* 후단 요약 단계에서 bar-level simplification이 살아있는 것으로 보임.
+
+---
+
+## 4. 3rd가 없을 때 sus4를 먼저 확인하지 않는 문제
+
+**증상**
+
+* 9마디 3박 같은 구간에서 major/minor를 섣불리 정하고 sus4 확인이 뒤로 밀림.
+
+**JSON에 이미 있는 규칙**
+
+* 3rd 없으면 quality undecided 상태 유지. 
+* 4th above bass가 있으면 sus4를 먼저 검사. 
+* sus4-first branch 후 alternate-root minor7은 나중에 검토. 
+
+**판단**
+
+* 규칙은 이미 충분히 있음.
+* 실제 엔진이 `quality undecided → sus4 check → slash/shell compare → final quality` 순서를 지키지 않음. 
+
+---
+
+## 5. 베이스를 무시하고 상성만 보고 네이밍하는 문제
+
+**증상**
+
+* 10마디 3박처럼 실제 bass와 무관하게 `G` 계열 식으로 이름을 붙이는 오류.
+
+**JSON에 이미 있는 규칙**
+
+* 분석 파이프라인은 무조건 bass identification부터 시작. 
+* upper-structure-first shortcut 금지. 
+* bass와 다른 root를 쓰려면 slash/inversion 표기 필수. 
+* 출력 직전 bass refresh check 필수. 
+
+**판단**
+
+* 이건 사실상 **파이프라인 스킵 버그**에 가까움.
+
+---
+
+## 최종 정리
+
+### 이미 JSON에 있는데 집행이 안 된 핵심 규칙
+
+* bass-first pipeline 
+* unslashed bass mismatch 금지 
+* no extension overpromotion 
+* sus4-first when no 3rd
+* mid-bar split / segment-local scope
+* slash preservation at output 
+
+### 추가로 명시 보강이 필요한 규칙
+
+* **구조적 베이스 근거가 없으면 chord label 금지**
+* **그 경우 N.C. / ambiguous_only / bass-insufficient 상태로 반환**
+
+---
+
+## 기획자에게 전달할 한 문장
+
+“현재 문제는 규칙이 없는 게 아니라, 이미 정의된 bass-first / sus4-first / split-audit / no-overpromotion / slash-preservation 규칙이 실제 추론 및 출력 단계에서 강제되지 않는 실행 버그이며, 추가로 ‘베이스 근거 부족 시 chord label 금지’ 규칙을 하드 제약으로 명시할 필요가 있다.”
+
