@@ -16,3 +16,6 @@ juce_app/build/
 build_log.txt
 fluidsynth/
 C:/soundfonts/
+dist/
+build/
+*.spec
