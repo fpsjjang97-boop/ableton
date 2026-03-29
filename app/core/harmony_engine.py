@@ -494,37 +494,37 @@ class HarmonyEngine:
         """Minimize voice movement between consecutive voicings.
 
         Guide-tone continuity principle from rule DB.
+        Bass note (first element) is always preserved as-is.
+        Only upper voices are adjusted for smooth movement.
         """
         if len(current) <= 1:
             return current
 
-        # Keep bass as-is, adjust inner voices
-        result = [current[0]]  # bass stays
-        remaining = list(current[1:])
-        prev_upper = list(prev[1:]) if len(prev) > 1 else prev
+        bass = current[0]  # Always keep the bass note unchanged
+        upper = list(current[1:])
+        prev_upper = list(prev[1:]) if len(prev) > 1 else []
 
-        used = set()
-        for pv in prev_upper:
-            best_idx = -1
+        if not prev_upper or not upper:
+            return current
+
+        # For each upper voice, find the closest octave placement
+        # relative to the previous voicing's upper voices
+        adjusted = []
+        for cv in upper:
+            best_pitch = cv
             best_dist = 999
-            for i, cv in enumerate(remaining):
-                if i in used:
-                    continue
-                # Try octave-shifted versions
-                candidates = [cv, cv - 12, cv + 12]
-                for c in candidates:
-                    d = abs(c - pv)
-                    if d < best_dist and 0 <= c <= 127:
+            for pv in prev_upper:
+                # Try the voice at its current position and +/- octave
+                for candidate in [cv, cv - 12, cv + 12]:
+                    if candidate <= bass or candidate > 127 or candidate < 0:
+                        continue
+                    d = abs(candidate - pv)
+                    if d < best_dist:
                         best_dist = d
-                        best_idx = i
-            if best_idx >= 0:
-                used.add(best_idx)
+                        best_pitch = candidate
+            adjusted.append(best_pitch)
 
-        # Add remaining pitches that didn't match
-        for i, cv in enumerate(remaining):
-            result.append(cv)
-
-        return sorted(result)
+        return [bass] + sorted(adjusted)
 
     def _parse_chord_label(self, label: str) -> tuple[Optional[str], str]:
         """Parse 'C#m7/B' into (root_name, quality). Returns (None, '') on failure."""

@@ -172,6 +172,8 @@ class PlaybackThread(QThread):
                     if any(t.solo for t in project.tracks) and not trk.solo:
                         continue
 
+                    if trk_idx >= len(track_notes):
+                        continue
                     for note in track_notes[trk_idx]:
                         if note.start_tick > cur_tick:
                             break  # notes are sorted; no point scanning further
