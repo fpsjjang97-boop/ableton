@@ -122,20 +122,48 @@ class HarmonyEngine:
     # ------------------------------------------------------------------
 
     def identify_chord(
-        self, pitches: list[int], bass_pitch: Optional[int] = None
+        self, pitches: list[int], bass_pitch: Optional[int] = None,
+        bass_is_structural: bool = True,
     ) -> dict:
         """Identify the most likely chord from a set of MIDI pitches.
+
+        Enforces v2.09 Rule DB pipeline:
+        1. Bass-first identification (hc_mandatory_per_segment_pipeline)
+        2. sus4-first when no 3rd (hc_sus4_branch_lock_before_alternate_minor7)
+        3. No tension overpromotion (hc_no_extension_overpromotion_from_same_root_recovery)
+        4. Slash preservation (hc_no_slash_erasing_simplification_at_output)
+        5. No label without structural bass (feedback #1)
 
         Returns dict with keys: label, root, quality, bass, confidence,
         alternatives, pitch_classes, is_slash.
         """
+        _nc = {"label": "N.C.", "root": None, "quality": None,
+               "bass": None, "confidence": 0.0, "alternatives": [],
+               "pitch_classes": [], "is_slash": False}
         if not pitches:
-            return {"label": "N.C.", "root": None, "quality": None,
-                    "bass": None, "confidence": 0.0, "alternatives": [],
-                    "pitch_classes": [], "is_slash": False}
+            return _nc
 
         pcs = sorted(set(p % 12 for p in pitches))
         bass_pc = (bass_pitch % 12) if bass_pitch is not None else (min(pitches) % 12)
+
+        # ── Feedback #1: 구조적 베이스 근거 없으면 chord label 금지 ──
+        if not bass_is_structural:
+            return {**_nc, "bass": _PC_NAMES[bass_pc],
+                    "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
+                    "label": "N.C.(bass-insufficient)"}
+
+        # ── Feedback #4: sus4-first branch lock ──
+        # 3rd 부재 + 4th 존재 시 sus4 분기를 먼저 잠그고 alternate minor7 차단
+        sus4_locked = False
+        for candidate_root in range(12):
+            if candidate_root != bass_pc:
+                continue  # bass-first: bass를 root로 먼저 검사
+            fourth_pc = (candidate_root + 5) % 12
+            third_maj = (candidate_root + 4) % 12
+            third_min = (candidate_root + 3) % 12
+            if fourth_pc in pcs and third_maj not in pcs and third_min not in pcs:
+                sus4_locked = True
+                break
 
         best_score = -1.0
         best_label = "N.C."
@@ -144,7 +172,12 @@ class HarmonyEngine:
         best_is_slash = False
         alternatives: list[dict] = []
 
-        # Try every root and every chord template
+        # ── 텐션 코드 vs plain shell 분류 (Feedback #2) ──
+        _TENSION_QUALITIES = {
+            "9", "m9", "maj9", "7b9", "7#9", "11", "13", "add9", "madd9",
+        }
+        _PLAIN_SHELLS = {"maj", "min", "7", "m7", "maj7", "sus4", "sus2", "7sus4", "dim", "aug"}
+
         for root_pc in range(12):
             for quality, template in _CHORD_TEMPLATES.items():
                 expected = set((root_pc + iv) % 12 for iv in template)
@@ -153,35 +186,44 @@ class HarmonyEngine:
                 if match_count < max(2, total - 1):
                     continue
 
-                # Score: match ratio + bass alignment bonus
+                # ── Feedback #4: sus4 잠금 시 alternate-root minor7 차단 ──
+                if sus4_locked and root_pc != bass_pc:
+                    if quality in ("m7", "m7b5", "min", "m9"):
+                        continue  # sus4 먼저 검토 전까지 차단
+
+                # ── Step 1: Bass-first scoring (Feedback #5) ──
                 score = match_count / total
                 if root_pc == bass_pc:
-                    score += 0.25  # bass-root alignment (from design_philosophy)
+                    score += 0.30  # 강화: bass-root 일치 보너스
                 elif bass_pc in expected:
-                    score += 0.1   # bass is a chord tone (inversion)
+                    score += 0.10  # bass가 코드 톤 (인버전)
+                else:
+                    score -= 0.15  # bass와 무관한 root 페널티
 
                 # Prefer more specific (longer) templates when tied
                 score += len(template) * 0.01
 
-                # sus4 priority: if 4th present and 3rd absent, boost sus4
+                # ── Feedback #4: sus4 강화 부스트 ──
                 fourth_pc = (root_pc + 5) % 12
                 third_pc_maj = (root_pc + 4) % 12
                 third_pc_min = (root_pc + 3) % 12
                 if quality in ("sus4", "7sus4"):
                     if fourth_pc in pcs and third_pc_maj not in pcs and third_pc_min not in pcs:
-                        score += 0.15
+                        score += 0.25  # 강화: 0.15 → 0.25
+
+                # ── Feedback #2: tension overpromotion 방지 ──
+                # 텐션 코드는 같은 root의 plain shell보다 높은 점수를 자동 획득할 수 없음
+                if quality in _TENSION_QUALITIES:
+                    score -= 0.08  # plain shell 우선 보상
 
                 root_name = _PC_NAMES[root_pc]
                 label = f"{root_name}{quality}" if quality != "maj" else root_name
-                is_slash = (bass_pc != root_pc and bass_pc in expected)
+
+                # ── Feedback #5: slash 보존 — bass와 root 불일치 시 반드시 slash 표기 ──
+                is_slash = (bass_pc != root_pc)
                 if is_slash:
                     bass_name = _PC_NAMES[bass_pc]
                     label = f"{label}/{bass_name}"
-
-                entry = {
-                    "label": label, "root": root_name, "quality": quality,
-                    "score": round(score, 3), "is_slash": is_slash,
-                }
 
                 if score > best_score:
                     if best_score > 0:
@@ -198,6 +240,15 @@ class HarmonyEngine:
 
         # Keep top-3 alternatives
         alternatives = sorted(alternatives, key=lambda x: x["confidence"], reverse=True)[:3]
+
+        # ── Feedback #5: 최종 출력 전 bass refresh check ──
+        # root가 bass와 다른데 slash가 빠져있으면 강제 보정
+        if best_score > 0:
+            root_pc_final = _PC_NAMES.index(best_root) if isinstance(best_root, str) and best_root in _PC_NAMES else -1
+            if root_pc_final >= 0 and root_pc_final != bass_pc and not best_is_slash:
+                bass_name = _PC_NAMES[bass_pc]
+                best_label = f"{best_label}/{bass_name}"
+                best_is_slash = True
 
         return {
             "label": best_label,
@@ -266,22 +317,38 @@ class HarmonyEngine:
                 })
                 continue
 
-            # Pipeline step: identify structural bass (lowest, longest note)
+            # ── Pipeline step 1: identify structural bass ──
+            # bass = 가장 낮은 음 중 duration이 긴 것 우선 (Feedback #1, #5)
             bass_candidates = sorted(notes_in_win, key=lambda n: (n.pitch, -n.duration_ticks))
             bass_note = bass_candidates[0]
 
-            # Pipeline step: collect structural pitches
-            # Weight by duration (humanized timing tolerance from rule DB)
+            # ── Feedback #1: 베이스 구조적 근거 판단 ──
+            # bass가 window의 20% 미만 점유 시 structural bass 아님
+            bass_effective_start = max(bass_note.start_tick, win_start)
+            bass_effective_end = min(bass_note.end_tick, win_end)
+            bass_occupancy = bass_effective_end - bass_effective_start
+            bass_is_structural = bass_occupancy >= (window_ticks * 0.15)
+
+            # ── Pipeline step 2: collect structural pitches ──
             structural_pitches = self._extract_structural_pitches(
                 notes_in_win, win_start, win_end, window_ticks
             )
 
-            # Pipeline step: identify chord (bass-first approach)
-            chord_info = self.identify_chord(structural_pitches, bass_note.pitch)
+            # ── Pipeline step 3: identify chord (bass-first) ──
+            chord_info = self.identify_chord(
+                structural_pitches, bass_note.pitch,
+                bass_is_structural=bass_is_structural,
+            )
 
-            # Pipeline step: check if this is a continuation of the previous chord
+            # ── Feedback #3: mid-bar split audit ──
+            # 같은 마디 내에서도 bass가 바뀌면 split 유지 (merge 방지)
+            prev_bass = segments[-1].get("bass") if segments else None
+            bass_changed = (prev_bass is not None and
+                            chord_info["bass"] is not None and
+                            prev_bass != chord_info["bass"])
             is_continuation = (chord_info["label"] == prev_label and
-                               chord_info["confidence"] < 0.7)
+                               chord_info["confidence"] < 0.7 and
+                               not bass_changed)
 
             segments.append({
                 "start_tick": win_start,
@@ -356,16 +423,23 @@ class HarmonyEngine:
         return structural
 
     def _merge_segments(self, segments: list[dict]) -> list[dict]:
-        """Merge consecutive half-bar segments with the same chord into bar-level."""
+        """Merge consecutive half-bar segments with the same chord into bar-level.
+
+        Feedback #3 강화: bass가 바뀌면 같은 코드명이라도 merge 금지.
+        hc_mid_measure_harmony_split_required / hc_segment_local_label_scope 집행.
+        """
         if not segments:
             return []
 
         merged = [segments[0].copy()]
         for seg in segments[1:]:
             prev = merged[-1]
-            if (seg["chord"] == prev["chord"] and
-                    seg.get("is_continuation", False) and
-                    seg["bar"] == prev["bar"]):
+            # merge 조건: 같은 코드 + continuation 플래그 + 같은 마디 + bass 동일
+            same_chord = seg["chord"] == prev["chord"]
+            is_cont = seg.get("is_continuation", False)
+            same_bar = seg["bar"] == prev["bar"]
+            same_bass = seg.get("bass") == prev.get("bass")
+            if same_chord and is_cont and same_bar and same_bass:
                 prev["end_tick"] = seg["end_tick"]
                 prev["notes_count"] += seg["notes_count"]
             else:
