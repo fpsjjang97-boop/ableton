@@ -385,28 +385,44 @@ class HarmonyEngine:
     }
 
     def _resolve_degree(self, degree_str: str, quality: str) -> Optional[int]:
-        """Resolve a degree string like '3_or_b3' to semitone offset based on quality."""
+        """Resolve a degree string like '3_or_b3' or '7_or_6_or_b7' to semitone offset.
+
+        Quality-aware: minor chords get b3/b7, major get 3/7, dominant get 3/b7.
+        """
         parts = degree_str.replace("_optional", "").split("_or_")
-        # Choose the appropriate variant based on chord quality
+        parts = [p.strip() for p in parts if p.strip()]
+
         minor_qualities = {"min", "m7", "m7b5", "dim", "dim7", "m9", "m6", "madd9"}
+        dominant_qualities = {"7", "7sus4", "7b9", "7#9", "9", "13"}
         is_minor = quality in minor_qualities
+        is_dominant = quality in dominant_qualities
+        # b7 chords: dominant + minor7 families
+        uses_b7 = is_minor or is_dominant
 
         for part in parts:
-            part = part.strip()
+            # --- 3rd handling ---
+            if part == "3" and is_minor:
+                continue  # minor chords skip major 3rd
+            if part == "b3" and not is_minor:
+                continue  # major/dominant chords skip minor 3rd
+
+            # --- 7th handling (the critical fix) ---
+            if part == "7":
+                if uses_b7:
+                    return 10  # b7 for dominant and minor7 chords
+                else:
+                    return 11  # major 7 for maj7 chords
+            if part == "b7":
+                return 10
+            if part == "6":
+                return 9
+
+            # --- Standard lookup ---
             if part in self._DEGREE_TO_SEMITONE:
-                # For "3_or_b3": pick b3 for minor, 3 for major
-                if part == "3" and is_minor:
-                    continue  # skip major 3rd for minor chords
-                if part == "b3" and not is_minor:
-                    continue  # skip minor 3rd for major chords
                 return self._DEGREE_TO_SEMITONE[part]
-            # Handle compound like "7_or_b7" or "7_or_6_or_b7"
-            if part == "7" and quality in ("7", "m7", "m7b5", "7sus4"):
-                return 10  # b7 for dominant/minor7
-            if part == "7" and quality in ("maj7", "maj9"):
-                return 11  # major 7
-        # Fallback: try first part
-        first = parts[0].strip()
+
+        # Fallback
+        first = parts[0] if parts else ""
         return self._DEGREE_TO_SEMITONE.get(first)
 
     def _select_voicing_template(self, quality: str, style: str, has_melody: bool) -> Optional[dict]:

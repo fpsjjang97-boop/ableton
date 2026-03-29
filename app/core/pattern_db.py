@@ -16,6 +16,35 @@ NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 # Map note name -> pitch class (0-11)
 _NAME_TO_PC: dict[str, int] = {n: i for i, n in enumerate(NOTE_NAMES)}
 
+# Scale intervals for diatonic filtering
+_SCALE_INTERVALS = {
+    "major":       [0, 2, 4, 5, 7, 9, 11],
+    "minor":       [0, 2, 3, 5, 7, 8, 10],
+    "dorian":      [0, 2, 3, 5, 7, 9, 10],
+    "mixolydian":  [0, 2, 4, 5, 7, 9, 10],
+}
+
+# Diatonic chord qualities for each scale degree (major scale)
+_DIATONIC_MAJOR = {
+    0: "maj7",  # I
+    2: "m7",    # ii
+    4: "m7",    # iii
+    5: "maj7",  # IV
+    7: "7",     # V
+    9: "m7",    # vi
+    11: "m7b5", # vii
+}
+
+_DIATONIC_MINOR = {
+    0: "m7",    # i
+    2: "m7b5",  # ii
+    3: "maj7",  # III
+    5: "m7",    # iv
+    7: "m7",    # v (or V7 with harmonic minor)
+    8: "maj7",  # VI
+    10: "7",    # VII
+}
+
 # Also handle flats for robustness
 _FLAT_MAP = {"Db": "C#", "Eb": "D#", "Fb": "E", "Gb": "F#", "Ab": "G#", "Bb": "A#", "Cb": "B"}
 
@@ -171,29 +200,33 @@ class PatternDB:
                 "original": pattern_str,
             })
 
-        # Always filter out static patterns (all chords identical)
-        non_static = [r for r in results if len(set(r["chords"])) > 1]
-        results = non_static if non_static else results
+        # Always filter out static patterns
+        results = [r for r in results if len(set(r["chords"])) > 1]
+
+        # Filter to diatonic progressions
+        if key and scale:
+            results = self._filter_diatonic(results, key, scale)
 
         # Sort by count descending
         results.sort(key=lambda r: r["count"], reverse=True)
 
-        # If too few results from this gram size, also try building
-        # progressions by chaining 2-grams
-        if len(results) < 5 and gram_size >= 4:
+        # If too few, try chaining 2-grams (also diatonic-filtered)
+        if len(results) < 3 and gram_size >= 4:
             chained = self._chain_2grams(key, scale, gram_size)
+            if key and scale:
+                chained = self._filter_diatonic(chained, key, scale)
             results.extend(chained)
-            # Deduplicate
-            seen = set()
-            unique = []
-            for r in results:
-                k = tuple(r["chords"])
-                if k not in seen:
-                    seen.add(k)
-                    unique.append(r)
-            results = unique
 
-        return results
+        # Deduplicate
+        seen = set()
+        unique = []
+        for r in results:
+            k = tuple(r["chords"])
+            if k not in seen:
+                seen.add(k)
+                unique.append(r)
+
+        return unique
 
     def _chain_2grams(
         self, key: str, scale: str, target_len: int = 4
@@ -287,6 +320,115 @@ class PatternDB:
     # ------------------------------------------------------------------ #
     #  Style / genre introspection                                        #
     # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------
+    # Diatonic filtering
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_chord_diatonic(chord_label: str, key_pc: int, scale: str) -> bool:
+        """Check if a chord is diatonic: root must be in the scale AND
+        the chord quality must match the expected diatonic quality for that degree."""
+        root, quality = _parse_chord(chord_label)
+        root_pc = _note_pc(root)
+        if root_pc < 0:
+            return False
+        intervals = _SCALE_INTERVALS.get(scale, _SCALE_INTERVALS.get("major"))
+        if intervals is None:
+            return True
+        diatonic_pcs = set((key_pc + iv) % 12 for iv in intervals)
+
+        # Step 1: Root must be in scale
+        if root_pc not in diatonic_pcs:
+            return False
+
+        # Step 2: Quality must match expected diatonic quality (or be compatible)
+        degree_offset = (root_pc - key_pc) % 12
+        diatonic_map = _DIATONIC_MAJOR if scale in ("major", "mixolydian") else _DIATONIC_MINOR
+        expected_quality = diatonic_map.get(degree_offset, "")
+
+        # Normalize quality for comparison
+        q_norm = quality.lower().replace("min", "m").replace("dom", "").strip()
+        if not q_norm:
+            q_norm = "maj"  # bare root = major triad
+
+        # Compatible quality check
+        expected_norm = expected_quality.lower()
+        # Major family: maj, maj7, add9, 6 are compatible
+        # Minor family: m, m7, m9, m6 are compatible
+        # Dominant: 7, 7sus4
+        major_family = {"maj", "maj7", "maj9", "6", "add9", ""}
+        minor_family = {"m", "m7", "m9", "m6", "min", "madd9"}
+        dominant_family = {"7", "7sus4", "7sus", "9", "13"}
+        half_dim_family = {"m7b5", "dim", "dim7"}
+
+        def _family(q: str) -> str:
+            if q in major_family: return "major"
+            if q in minor_family: return "minor"
+            if q in dominant_family: return "dominant"
+            if q in half_dim_family: return "halfdim"
+            return q
+
+        return _family(q_norm) == _family(expected_norm) or q_norm == "sus4"
+
+    def _filter_diatonic(
+        self, results: list[dict], key: str, scale: str
+    ) -> list[dict]:
+        """Filter progression results to only diatonic chords."""
+        key_pc = _note_pc(key)
+        if key_pc < 0:
+            return results
+        filtered = []
+        for r in results:
+            chords = r.get("chords", [])
+            if all(self._is_chord_diatonic(c, key_pc, scale) for c in chords):
+                filtered.append(r)
+        return filtered
+
+    def generate_diatonic_progression(
+        self, key: str = "C", scale: str = "major", bars: int = 4
+    ) -> list[str]:
+        """Generate a diatonic chord progression when PatternDB has no match.
+
+        Uses common functional progressions based on scale theory.
+        """
+        import random
+        key_pc = _note_pc(key)
+        if key_pc < 0:
+            key_pc = 0
+
+        intervals = _SCALE_INTERVALS.get(scale, _SCALE_INTERVALS["major"])
+        diatonic_map = _DIATONIC_MAJOR if scale in ("major", "mixolydian") else _DIATONIC_MINOR
+
+        # Common 4-bar progressions as scale-degree indices
+        common_progs = [
+            [0, 4, 5, 3],  # I-V-vi-IV / i-v-VI-iv
+            [0, 3, 4, 3],  # I-IV-V-IV / i-iv-v-iv
+            [0, 5, 3, 4],  # I-vi-IV-V
+            [1, 4, 0, 0],  # ii-V-I-I
+            [0, 0, 3, 4],  # I-I-IV-V
+            [0, 3, 0, 4],  # I-IV-I-V
+        ]
+
+        prog = random.choice(common_progs)
+
+        result = []
+        for deg_idx in prog:
+            if deg_idx < len(intervals):
+                root_pc = (key_pc + intervals[deg_idx]) % 12
+                root_name = NOTE_NAMES[root_pc]
+                quality = diatonic_map.get(intervals[deg_idx], "")
+                if quality and quality != "maj7":
+                    label = f"{root_name}{quality}"
+                else:
+                    label = root_name
+                result.append(label)
+
+        # Tile to fill requested bars
+        full = []
+        while len(full) < bars:
+            full.extend(result)
+        return full[:bars]
+
     # ------------------------------------------------------------------
     # Next-chord suggestion (Markov from 2-grams)
     # ------------------------------------------------------------------

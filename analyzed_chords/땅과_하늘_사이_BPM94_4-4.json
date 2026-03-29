@@ -1,0 +1,813 @@
+{
+  "file": "땅과 하늘 사이_BPM94_4-4.mid",
+  "filename": "땅과 하늘 사이_BPM94_4-4.mid",
+  "bpm": 94.0,
+  "ticks_per_beat": 480,
+  "num_tracks": 2,
+  "total_notes": 105,
+  "harmony": {
+    "overall_score": 100,
+    "chord_count": 16,
+    "key_estimate": "C",
+    "issues": [],
+    "num_segments": 25,
+    "segments": [
+      {
+        "start_tick": 0,
+        "end_tick": 1920,
+        "bar": 1,
+        "beat_position": "1",
+        "chord": "N.C.",
+        "confidence": 0.0,
+        "notes_count": 0,
+        "bass": null,
+        "is_continuation": true
+      },
+      {
+        "start_tick": 1920,
+        "end_tick": 2880,
+        "bar": 2,
+        "beat_position": "1",
+        "chord": "G",
+        "confidence": 1.0,
+        "root": "G",
+        "quality": "maj",
+        "bass": "G",
+        "alternatives": [
+          {
+            "label": "G7",
+            "confidence": 1.04
+          },
+          {
+            "label": "Gmaj7",
+            "confidence": 1.04
+          },
+          {
+            "label": "Gadd9",
+            "confidence": 1.04
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 6,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 2880,
+        "end_tick": 3840,
+        "bar": 2,
+        "beat_position": "3",
+        "chord": "G",
+        "confidence": 1.0,
+        "root": "G",
+        "quality": "maj",
+        "bass": "G",
+        "alternatives": [
+          {
+            "label": "G7",
+            "confidence": 1.04
+          },
+          {
+            "label": "Gmaj7",
+            "confidence": 1.04
+          },
+          {
+            "label": "Gadd9",
+            "confidence": 1.04
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 5,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 3840,
+        "end_tick": 4800,
+        "bar": 3,
+        "beat_position": "1",
+        "chord": "Bm7",
+        "confidence": 1.0,
+        "root": "B",
+        "quality": "m7",
+        "bass": "B",
+        "alternatives": [
+          {
+            "label": "Bmin",
+            "confidence": 1.28
+          },
+          {
+            "label": "D6/B",
+            "confidence": 1.14
+          },
+          {
+            "label": "Bm9",
+            "confidence": 1.1
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 7,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 4800,
+        "end_tick": 5760,
+        "bar": 3,
+        "beat_position": "3",
+        "chord": "B7",
+        "confidence": 1.0,
+        "root": "B",
+        "quality": "7",
+        "bass": "B",
+        "alternatives": [
+          {
+            "label": "Bm7",
+            "confidence": 1.04
+          },
+          {
+            "label": "B7sus4",
+            "confidence": 1.04
+          },
+          {
+            "label": "Gmaj9/B",
+            "confidence": 0.95
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 8,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 5760,
+        "end_tick": 6720,
+        "bar": 4,
+        "beat_position": "1",
+        "chord": "Em7",
+        "confidence": 1.0,
+        "root": "E",
+        "quality": "m7",
+        "bass": "E",
+        "alternatives": [
+          {
+            "label": "E7sus4",
+            "confidence": 1.29
+          },
+          {
+            "label": "A7sus4/E",
+            "confidence": 1.29
+          },
+          {
+            "label": "Esus4",
+            "confidence": 1.28
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 7,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 6720,
+        "end_tick": 7680,
+        "bar": 4,
+        "beat_position": "3",
+        "chord": "Em7",
+        "confidence": 1.0,
+        "root": "E",
+        "quality": "m7",
+        "bass": "E",
+        "alternatives": [
+          {
+            "label": "Emin",
+            "confidence": 1.28
+          },
+          {
+            "label": "G6/E",
+            "confidence": 1.14
+          },
+          {
+            "label": "Em9",
+            "confidence": 1.1
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 5,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 7680,
+        "end_tick": 8640,
+        "bar": 5,
+        "beat_position": "1",
+        "chord": "Esus4",
+        "confidence": 1.0,
+        "root": "E",
+        "quality": "sus4",
+        "bass": "E",
+        "alternatives": [
+          {
+            "label": "B7sus4/E",
+            "confidence": 1.04
+          },
+          {
+            "label": "Esus2",
+            "confidence": 0.947
+          },
+          {
+            "label": "Bsus4/E",
+            "confidence": 0.947
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 3,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 8640,
+        "end_tick": 9600,
+        "bar": 5,
+        "beat_position": "3",
+        "chord": "N.C.",
+        "confidence": -1.0,
+        "root": 4,
+        "quality": "",
+        "bass": "E",
+        "alternatives": [],
+        "is_slash": false,
+        "notes_count": 3,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 9600,
+        "end_tick": 10560,
+        "bar": 6,
+        "beat_position": "1",
+        "chord": "D7sus4/A",
+        "confidence": 1.0,
+        "root": "D",
+        "quality": "7sus4",
+        "bass": "A",
+        "alternatives": [
+          {
+            "label": "Am7",
+            "confidence": 1.29
+          },
+          {
+            "label": "A7sus4",
+            "confidence": 1.29
+          },
+          {
+            "label": "Dsus4/A",
+            "confidence": 1.28
+          }
+        ],
+        "is_slash": true,
+        "notes_count": 6,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 10560,
+        "end_tick": 11520,
+        "bar": 6,
+        "beat_position": "3",
+        "chord": "D7sus4/A",
+        "confidence": 1.0,
+        "root": "D",
+        "quality": "7sus4",
+        "bass": "A",
+        "alternatives": [
+          {
+            "label": "Am7",
+            "confidence": 1.29
+          },
+          {
+            "label": "A7sus4",
+            "confidence": 1.29
+          },
+          {
+            "label": "Dsus4/A",
+            "confidence": 1.28
+          }
+        ],
+        "is_slash": true,
+        "notes_count": 5,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 11520,
+        "end_tick": 12480,
+        "bar": 7,
+        "beat_position": "1",
+        "chord": "Amadd9",
+        "confidence": 1.0,
+        "root": "A",
+        "quality": "madd9",
+        "bass": "A",
+        "alternatives": [
+          {
+            "label": "Amin",
+            "confidence": 0.947
+          },
+          {
+            "label": "Adim",
+            "confidence": 0.947
+          },
+          {
+            "label": "Asus2",
+            "confidence": 0.947
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 5,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 12480,
+        "end_tick": 13440,
+        "bar": 7,
+        "beat_position": "3",
+        "chord": "Esus4",
+        "confidence": 1.0,
+        "root": "E",
+        "quality": "sus4",
+        "bass": "C#",
+        "alternatives": [
+          {
+            "label": "Aadd9/C#",
+            "confidence": 1.14
+          },
+          {
+            "label": "A/C#",
+            "confidence": 1.13
+          },
+          {
+            "label": "C#m7b5",
+            "confidence": 1.04
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 7,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 13440,
+        "end_tick": 14400,
+        "bar": 8,
+        "beat_position": "1",
+        "chord": "D11",
+        "confidence": 1.0,
+        "root": "D",
+        "quality": "11",
+        "bass": "D",
+        "alternatives": [
+          {
+            "label": "D9",
+            "confidence": 1.3
+          },
+          {
+            "label": "D7sus4",
+            "confidence": 1.29
+          },
+          {
+            "label": "Dadd9",
+            "confidence": 1.29
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 7,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 14400,
+        "end_tick": 15360,
+        "bar": 8,
+        "beat_position": "3",
+        "chord": "D7sus4",
+        "confidence": 1.0,
+        "root": "D",
+        "quality": "7sus4",
+        "bass": "D",
+        "alternatives": [
+          {
+            "label": "Dsus4",
+            "confidence": 1.43
+          },
+          {
+            "label": "Dsus2",
+            "confidence": 1.28
+          },
+          {
+            "label": "Gsus4/D",
+            "confidence": 1.28
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 5,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 15360,
+        "end_tick": 16320,
+        "bar": 9,
+        "beat_position": "1",
+        "chord": "D",
+        "confidence": 1.0,
+        "root": "D",
+        "quality": "maj",
+        "bass": "D",
+        "alternatives": [
+          {
+            "label": "D7",
+            "confidence": 1.04
+          },
+          {
+            "label": "Dmaj7",
+            "confidence": 1.04
+          },
+          {
+            "label": "Dadd9",
+            "confidence": 1.04
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 4,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 16320,
+        "end_tick": 17280,
+        "bar": 9,
+        "beat_position": "3",
+        "chord": "D7",
+        "confidence": 1.0,
+        "root": "D",
+        "quality": "7",
+        "bass": "D",
+        "alternatives": [
+          {
+            "label": "Dm7",
+            "confidence": 1.04
+          },
+          {
+            "label": "D7sus4",
+            "confidence": 1.04
+          },
+          {
+            "label": "D6",
+            "confidence": 1.04
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 9,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 17280,
+        "end_tick": 18240,
+        "bar": 10,
+        "beat_position": "1",
+        "chord": "Bm7",
+        "confidence": 1.0,
+        "root": "B",
+        "quality": "m7",
+        "bass": "B",
+        "alternatives": [
+          {
+            "label": "Bmin",
+            "confidence": 1.28
+          },
+          {
+            "label": "D6/B",
+            "confidence": 1.14
+          },
+          {
+            "label": "Bm9",
+            "confidence": 1.1
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 6,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 18240,
+        "end_tick": 19200,
+        "bar": 10,
+        "beat_position": "3",
+        "chord": "Bm7",
+        "confidence": 1.0,
+        "root": "B",
+        "quality": "m7",
+        "bass": "B",
+        "alternatives": [
+          {
+            "label": "Bmin",
+            "confidence": 1.28
+          },
+          {
+            "label": "D6/B",
+            "confidence": 1.14
+          },
+          {
+            "label": "Bm9",
+            "confidence": 1.1
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 5,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 19200,
+        "end_tick": 20160,
+        "bar": 11,
+        "beat_position": "1",
+        "chord": "E7sus4",
+        "confidence": 1.0,
+        "root": "E",
+        "quality": "7sus4",
+        "bass": "E",
+        "alternatives": [
+          {
+            "label": "Esus4",
+            "confidence": 1.43
+          },
+          {
+            "label": "Esus2",
+            "confidence": 1.28
+          },
+          {
+            "label": "D13/E",
+            "confidence": 1.16
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 9,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 20160,
+        "end_tick": 21120,
+        "bar": 11,
+        "beat_position": "3",
+        "chord": "E7",
+        "confidence": 1.0,
+        "root": "E",
+        "quality": "7",
+        "bass": "E",
+        "alternatives": [
+          {
+            "label": "Eaug",
+            "confidence": 1.28
+          },
+          {
+            "label": "E",
+            "confidence": 1.28
+          },
+          {
+            "label": "Caug/E",
+            "confidence": 1.13
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 9,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 21120,
+        "end_tick": 22080,
+        "bar": 12,
+        "beat_position": "1",
+        "chord": "Am7",
+        "confidence": 1.0,
+        "root": "A",
+        "quality": "m7",
+        "bass": "A",
+        "alternatives": [
+          {
+            "label": "Amin",
+            "confidence": 1.28
+          },
+          {
+            "label": "C6/A",
+            "confidence": 1.14
+          },
+          {
+            "label": "Am9",
+            "confidence": 1.1
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 5,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 22080,
+        "end_tick": 23040,
+        "bar": 12,
+        "beat_position": "3",
+        "chord": "Am9",
+        "confidence": 1.0,
+        "root": "A",
+        "quality": "m9",
+        "bass": "A",
+        "alternatives": [
+          {
+            "label": "Am7",
+            "confidence": 1.04
+          },
+          {
+            "label": "Amadd9",
+            "confidence": 1.04
+          },
+          {
+            "label": "Cmaj7",
+            "confidence": 1.04
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 6,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 23040,
+        "end_tick": 24000,
+        "bar": 13,
+        "beat_position": "1",
+        "chord": "D7sus4",
+        "confidence": 1.0,
+        "root": "D",
+        "quality": "7sus4",
+        "bass": "D",
+        "alternatives": [
+          {
+            "label": "Dsus4",
+            "confidence": 1.43
+          },
+          {
+            "label": "Dsus2",
+            "confidence": 1.28
+          },
+          {
+            "label": "Cmaj9/D",
+            "confidence": 1.15
+          }
+        ],
+        "is_slash": false,
+        "notes_count": 9,
+        "is_continuation": false
+      },
+      {
+        "start_tick": 24000,
+        "end_tick": 24960,
+        "bar": 13,
+        "beat_position": "3",
+        "chord": "D7/C",
+        "confidence": 1.0,
+        "root": "D",
+        "quality": "7",
+        "bass": "C",
+        "alternatives": [
+          {
+            "label": "F#dim/C",
+            "confidence": 1.13
+          },
+          {
+            "label": "Cdim7",
+            "confidence": 1.04
+          },
+          {
+            "label": "D",
+            "confidence": 1.03
+          }
+        ],
+        "is_slash": true,
+        "notes_count": 8,
+        "is_continuation": false
+      }
+    ]
+  },
+  "song_form": {
+    "form_type": "verse-chorus-bridge",
+    "confidence": 0.665,
+    "total_bars": 13,
+    "sections": [
+      {
+        "label": "intro",
+        "start_bar": 1,
+        "end_bar": 1,
+        "start_tick": 0,
+        "end_tick": 1920,
+        "bars": 1,
+        "avg_energy": 0.0,
+        "confidence": 0.5
+      },
+      {
+        "label": "prechorus",
+        "start_bar": 2,
+        "end_bar": 2,
+        "start_tick": 1920,
+        "end_tick": 3840,
+        "bars": 1,
+        "avg_energy": 0.327,
+        "confidence": 0.598
+      },
+      {
+        "label": "verse",
+        "start_bar": 3,
+        "end_bar": 4,
+        "start_tick": 3840,
+        "end_tick": 7680,
+        "bars": 2,
+        "avg_energy": 0.53,
+        "confidence": 0.659
+      },
+      {
+        "label": "verse",
+        "start_bar": 5,
+        "end_bar": 6,
+        "start_tick": 7680,
+        "end_tick": 11520,
+        "bars": 2,
+        "avg_energy": 0.356,
+        "confidence": 0.607
+      },
+      {
+        "label": "chorus",
+        "start_bar": 7,
+        "end_bar": 7,
+        "start_tick": 11520,
+        "end_tick": 13440,
+        "bars": 1,
+        "avg_energy": 0.787,
+        "confidence": 0.736
+      },
+      {
+        "label": "prechorus",
+        "start_bar": 8,
+        "end_bar": 8,
+        "start_tick": 13440,
+        "end_tick": 15360,
+        "bars": 1,
+        "avg_energy": 0.404,
+        "confidence": 0.621
+      },
+      {
+        "label": "chorus",
+        "start_bar": 9,
+        "end_bar": 9,
+        "start_tick": 15360,
+        "end_tick": 17280,
+        "bars": 1,
+        "avg_energy": 0.757,
+        "confidence": 0.727
+      },
+      {
+        "label": "prechorus",
+        "start_bar": 10,
+        "end_bar": 10,
+        "start_tick": 17280,
+        "end_tick": 19200,
+        "bars": 1,
+        "avg_energy": 0.433,
+        "confidence": 0.63
+      },
+      {
+        "label": "chorus",
+        "start_bar": 11,
+        "end_bar": 11,
+        "start_tick": 19200,
+        "end_tick": 21120,
+        "bars": 1,
+        "avg_energy": 0.883,
+        "confidence": 0.765
+      },
+      {
+        "label": "bridge",
+        "start_bar": 12,
+        "end_bar": 12,
+        "start_tick": 21120,
+        "end_tick": 23040,
+        "bars": 1,
+        "avg_energy": 0.573,
+        "confidence": 0.672
+      },
+      {
+        "label": "outro",
+        "start_bar": 13,
+        "end_bar": 13,
+        "start_tick": 23040,
+        "end_tick": 24960,
+        "bars": 1,
+        "avg_energy": 1.0,
+        "confidence": 0.8
+      }
+    ]
+  },
+  "playability": {
+    "score": 98,
+    "pass": true,
+    "num_issues": 1,
+    "issues_sample": [
+      "Span exceeds 23 semitones in 1/57 clusters (1.8%)"
+    ]
+  },
+  "success": true
+}

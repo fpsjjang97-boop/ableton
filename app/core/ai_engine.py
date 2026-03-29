@@ -624,12 +624,12 @@ class AIEngine:
         he = self._harmony_engine
         root = key_name_to_root(key)
 
-        # Try PatternDB first for real progression patterns
+        # Try PatternDB first — diatonic-filtered progressions only
         db_chord_labels = None
         if self._pattern_db is not None:
             try:
                 candidates = self._pattern_db.query_progressions(
-                    key=key, scale=scale, gram_size=4, min_count=3
+                    key=key, scale=scale, gram_size=4, min_count=2
                 )
                 if candidates:
                     # Weighted random selection by count
@@ -637,22 +637,28 @@ class AIEngine:
                     weights /= weights.sum()
                     chosen = candidates[int(self.rng.choice(len(candidates), p=weights))]
                     db_chord_labels = chosen["chords"]
-                    # Use PatternDB progression directly via HarmonyEngine
+                else:
+                    # No diatonic match in DB — generate diatonic progression
                     total_ticks = length_beats * _BEAT
                     bars = max(1, total_ticks // _BAR)
-                    # Tile the pattern to fill requested length
+                    db_chord_labels = self._pattern_db.generate_diatonic_progression(
+                        key, scale, bars
+                    )
+
+                if db_chord_labels:
+                    total_ticks = length_beats * _BEAT
+                    bars = max(1, total_ticks // _BAR)
                     full_labels = []
                     while len(full_labels) < bars:
                         full_labels.extend(db_chord_labels)
                     full_labels = full_labels[:bars]
-                    # Build chord_list in settings format
                     chord_list = [{"chord": c, "duration": "full"} for c in full_labels]
                     track = he.generate_from_progression(
                         chord_list, key=key, scale=scale,
                         style=style, octave=octave + 1,
                         melody_track=melody_track,
                     )
-                    track.name = "AI Chords (Pattern DB)"
+                    track.name = "AI Chords (Rule DB)"
                     return track
             except Exception:
                 pass

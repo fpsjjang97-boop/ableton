@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "generated_date": "2026-03-29",
-  "source_corpus": "auto-ingest (143 files)",
+  "source_corpus": "auto-ingest (152 files)",
   "status": "auto-generated",
   "patterns": {
     "2_gram": [
@@ -15,7 +15,7 @@
       },
       {
         "pattern": "G → G",
-        "count": 302
+        "count": 303
       },
       {
         "pattern": "A# → A#",
@@ -39,11 +39,11 @@
       },
       {
         "pattern": "A → A",
-        "count": 186
+        "count": 188
       },
       {
         "pattern": "E → E",
-        "count": 182
+        "count": 185
       },
       {
         "pattern": "Cmin → Cmin",
@@ -198,11 +198,11 @@
         "count": 44
       },
       {
-        "pattern": "A#sus4 → A#",
+        "pattern": "Bsus4 → Bsus4",
         "count": 42
       },
       {
-        "pattern": "Gaug → Gaug",
+        "pattern": "A#sus4 → A#",
         "count": 42
       }
     ],
