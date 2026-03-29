@@ -1,137 +1,137 @@
 {
   "version": "0.1.0",
   "generated_date": "2026-03-29",
-  "source_corpus": "auto-ingest (152 files)",
+  "source_corpus": "auto-ingest (9 files)",
   "status": "auto-generated",
   "statistics": {
-    "corpus_size": 152,
+    "corpus_size": 9,
     "total_notes": 0,
     "total_bars": 0,
     "avg_notes_per_file": 0.0,
     "avg_bars_per_file": 0.0,
     "key_distribution": {
-      "C": 152
+      "C": 9
     },
     "top_chords": [
       {
-        "chord": "C",
-        "count": 1283
-      },
-      {
-        "chord": "D",
-        "count": 1229
-      },
-      {
-        "chord": "G",
-        "count": 1118
-      },
-      {
-        "chord": "A#",
-        "count": 1019
-      },
-      {
-        "chord": "D#",
-        "count": 948
-      },
-      {
-        "chord": "C#",
-        "count": 922
+        "chord": "E",
+        "count": 12
       },
       {
         "chord": "A",
-        "count": 887
+        "count": 10
       },
       {
-        "chord": "F",
-        "count": 855
-      },
-      {
-        "chord": "E",
-        "count": 848
-      },
-      {
-        "chord": "G#",
-        "count": 812
-      },
-      {
-        "chord": "Gsus4",
-        "count": 783
-      },
-      {
-        "chord": "Cmin",
-        "count": 758
-      },
-      {
-        "chord": "Dsus4",
-        "count": 701
-      },
-      {
-        "chord": "Esus4",
-        "count": 700
-      },
-      {
-        "chord": "G#sus4",
-        "count": 696
-      },
-      {
-        "chord": "Gmin",
-        "count": 689
-      },
-      {
-        "chord": "Asus4",
-        "count": 683
-      },
-      {
-        "chord": "A#sus4",
-        "count": 683
-      },
-      {
-        "chord": "D#sus4",
-        "count": 659
-      },
-      {
-        "chord": "Csus4",
-        "count": 647
-      },
-      {
-        "chord": "Fsus4",
-        "count": 646
-      },
-      {
-        "chord": "C#min",
-        "count": 615
-      },
-      {
-        "chord": "B",
-        "count": 602
-      },
-      {
-        "chord": "F#",
-        "count": 581
-      },
-      {
-        "chord": "C#sus4",
-        "count": 574
+        "chord": "F#m7",
+        "count": 9
       },
       {
         "chord": "Bsus4",
-        "count": 571
+        "count": 9
+      },
+      {
+        "chord": "Esus4",
+        "count": 8
+      },
+      {
+        "chord": "Aadd9",
+        "count": 6
+      },
+      {
+        "chord": "F",
+        "count": 5
       },
       {
         "chord": "Dmin",
-        "count": 562
+        "count": 5
       },
       {
-        "chord": "Bmin",
-        "count": 538
+        "chord": "Bm7",
+        "count": 5
       },
       {
-        "chord": "F#sus4",
-        "count": 528
+        "chord": "Emaj9",
+        "count": 5
       },
       {
-        "chord": "F#min",
-        "count": 513
+        "chord": "Esus4/A",
+        "count": 4
+      },
+      {
+        "chord": "A/E",
+        "count": 4
+      },
+      {
+        "chord": "B7sus4",
+        "count": 4
+      },
+      {
+        "chord": "Esus2",
+        "count": 4
+      },
+      {
+        "chord": "G",
+        "count": 4
+      },
+      {
+        "chord": "Amadd9",
+        "count": 3
+      },
+      {
+        "chord": "Dm6/F",
+        "count": 3
+      },
+      {
+        "chord": "Emaj7",
+        "count": 3
+      },
+      {
+        "chord": "Ddim/F",
+        "count": 3
+      },
+      {
+        "chord": "D#/G",
+        "count": 3
+      },
+      {
+        "chord": "C#m7",
+        "count": 3
+      },
+      {
+        "chord": "F#7",
+        "count": 3
+      },
+      {
+        "chord": "E/B",
+        "count": 3
+      },
+      {
+        "chord": "Amaj7",
+        "count": 3
+      },
+      {
+        "chord": "C#7sus4/G#",
+        "count": 3
+      },
+      {
+        "chord": "Eaug",
+        "count": 2
+      },
+      {
+        "chord": "D",
+        "count": 2
+      },
+      {
+        "chord": "D#",
+        "count": 2
+      },
+      {
+        "chord": "D#add9",
+        "count": 2
+      },
+      {
+        "chord": "Fm9",
+        "count": 2
       }
     ]
   }

@@ -1,413 +1,413 @@
 {
   "version": "0.1.0",
   "generated_date": "2026-03-29",
-  "source_corpus": "auto-ingest (152 files)",
+  "source_corpus": "auto-ingest (9 files)",
   "status": "auto-generated",
   "patterns": {
     "2_gram": [
       {
-        "pattern": "C → C",
-        "count": 398
+        "pattern": "F#m7 → F#m7",
+        "count": 4
       },
       {
-        "pattern": "D → D",
-        "count": 327
-      },
-      {
-        "pattern": "G → G",
-        "count": 303
-      },
-      {
-        "pattern": "A# → A#",
-        "count": 283
-      },
-      {
-        "pattern": "C# → C#",
-        "count": 232
-      },
-      {
-        "pattern": "D# → D#",
-        "count": 204
-      },
-      {
-        "pattern": "G# → G#",
-        "count": 200
-      },
-      {
-        "pattern": "F → F",
-        "count": 199
-      },
-      {
-        "pattern": "A → A",
-        "count": 188
+        "pattern": "Ddim/F → D#/G",
+        "count": 3
       },
       {
         "pattern": "E → E",
-        "count": 185
-      },
-      {
-        "pattern": "Cmin → Cmin",
-        "count": 163
-      },
-      {
-        "pattern": "Gmin → Gmin",
-        "count": 142
-      },
-      {
-        "pattern": "B → B",
-        "count": 138
-      },
-      {
-        "pattern": "C#min → C#min",
-        "count": 135
-      },
-      {
-        "pattern": "Bmin → Bmin",
-        "count": 120
-      },
-      {
-        "pattern": "F# → F#",
-        "count": 110
-      },
-      {
-        "pattern": "G#min → G#min",
-        "count": 109
-      },
-      {
-        "pattern": "D#min → D#min",
-        "count": 91
-      },
-      {
-        "pattern": "F#min → F#min",
-        "count": 89
-      },
-      {
-        "pattern": "Dmin → Dmin",
-        "count": 88
-      },
-      {
-        "pattern": "Emin → Emin",
-        "count": 86
-      },
-      {
-        "pattern": "D#sus4/G# → D#sus4/G#",
-        "count": 85
-      },
-      {
-        "pattern": "Amin → Amin",
-        "count": 81
-      },
-      {
-        "pattern": "Csus4 → Csus4",
-        "count": 75
-      },
-      {
-        "pattern": "Esus4 → Esus4",
-        "count": 72
-      },
-      {
-        "pattern": "G7 → G7",
-        "count": 72
-      },
-      {
-        "pattern": "A7 → A7",
-        "count": 71
-      },
-      {
-        "pattern": "Asus4 → Asus4",
-        "count": 69
-      },
-      {
-        "pattern": "Gsus4 → Gsus4",
-        "count": 67
-      },
-      {
-        "pattern": "C7 → C7",
-        "count": 67
-      },
-      {
-        "pattern": "B7 → B7",
-        "count": 62
-      },
-      {
-        "pattern": "G#sus4 → G#sus4",
-        "count": 60
-      },
-      {
-        "pattern": "Gsus4 → G",
-        "count": 58
-      },
-      {
-        "pattern": "A#sus4 → A#sus4",
-        "count": 57
-      },
-      {
-        "pattern": "Fmin → Fmin",
-        "count": 56
-      },
-      {
-        "pattern": "Dsus4/G → Dsus4/G",
-        "count": 56
-      },
-      {
-        "pattern": "Esus4 → E",
-        "count": 55
-      },
-      {
-        "pattern": "D#sus4 → D#sus4",
-        "count": 53
-      },
-      {
-        "pattern": "Dsus4 → D",
-        "count": 51
-      },
-      {
-        "pattern": "D7 → D7",
-        "count": 50
-      },
-      {
-        "pattern": "F#sus4 → F#sus4",
-        "count": 50
-      },
-      {
-        "pattern": "Gm7 → Gm7",
-        "count": 49
-      },
-      {
-        "pattern": "Fsus4 → Fsus4",
-        "count": 47
-      },
-      {
-        "pattern": "Csus4 → C",
-        "count": 46
-      },
-      {
-        "pattern": "E7 → E7",
-        "count": 46
-      },
-      {
-        "pattern": "F7 → F7",
-        "count": 45
-      },
-      {
-        "pattern": "C#sus4 → C#sus4",
-        "count": 44
-      },
-      {
-        "pattern": "G → Gsus4",
-        "count": 44
+        "count": 3
       },
       {
         "pattern": "Bsus4 → Bsus4",
-        "count": 42
+        "count": 3
       },
       {
-        "pattern": "A#sus4 → A#",
-        "count": 42
+        "pattern": "F → Dmin",
+        "count": 2
+      },
+      {
+        "pattern": "Dmin → E",
+        "count": 2
+      },
+      {
+        "pattern": "Dmin → Eaug",
+        "count": 2
+      },
+      {
+        "pattern": "D# → Ddim/F",
+        "count": 2
+      },
+      {
+        "pattern": "E → A/E",
+        "count": 2
+      },
+      {
+        "pattern": "A/E → Esus4",
+        "count": 2
+      },
+      {
+        "pattern": "Esus4 → F#m9",
+        "count": 2
+      },
+      {
+        "pattern": "F#m9 → B7sus4",
+        "count": 2
+      },
+      {
+        "pattern": "B7sus4 → Esus4",
+        "count": 2
+      },
+      {
+        "pattern": "Esus4 → Emaj7/B",
+        "count": 2
+      },
+      {
+        "pattern": "E → E/B",
+        "count": 2
+      },
+      {
+        "pattern": "A → A",
+        "count": 2
+      },
+      {
+        "pattern": "Aadd9 → Aadd9",
+        "count": 2
+      },
+      {
+        "pattern": "Aadd9 → Esus2",
+        "count": 2
+      },
+      {
+        "pattern": "Esus2 → Bsus4",
+        "count": 2
+      },
+      {
+        "pattern": "Bsus4 → C#7sus4/G#",
+        "count": 2
+      },
+      {
+        "pattern": "C#7sus4/G# → F#m7",
+        "count": 2
+      },
+      {
+        "pattern": "Emaj9 → Emaj9",
+        "count": 2
+      },
+      {
+        "pattern": "Esus4/B → E7b9",
+        "count": 2
+      },
+      {
+        "pattern": "E7b9 → Dsus4/A",
+        "count": 2
+      },
+      {
+        "pattern": "Bm7 → Asus4/E",
+        "count": 2
+      },
+      {
+        "pattern": "E → F",
+        "count": 1
+      },
+      {
+        "pattern": "E → Esus4/A",
+        "count": 1
+      },
+      {
+        "pattern": "Esus4/A → Fmaj7",
+        "count": 1
+      },
+      {
+        "pattern": "Fmaj7 → Dmin",
+        "count": 1
+      },
+      {
+        "pattern": "Eaug → Esus4/A",
+        "count": 1
+      },
+      {
+        "pattern": "Esus4/A → Asus4",
+        "count": 1
+      },
+      {
+        "pattern": "Asus4 → Dmin",
+        "count": 1
+      },
+      {
+        "pattern": "Eaug → Amadd9",
+        "count": 1
+      },
+      {
+        "pattern": "Amadd9 → F",
+        "count": 1
+      },
+      {
+        "pattern": "F → D",
+        "count": 1
+      },
+      {
+        "pattern": "D → Cmaj9/B",
+        "count": 1
+      },
+      {
+        "pattern": "Cmaj9/B → Amadd9",
+        "count": 1
+      },
+      {
+        "pattern": "Amadd9 → Dm6/F",
+        "count": 1
+      },
+      {
+        "pattern": "Dm6/F → Dmin",
+        "count": 1
+      },
+      {
+        "pattern": "Dmin → Emaj7",
+        "count": 1
+      },
+      {
+        "pattern": "D#/G → F7sus4",
+        "count": 1
+      },
+      {
+        "pattern": "F7sus4 → D#",
+        "count": 1
+      },
+      {
+        "pattern": "D#/G → D#sus4/A#",
+        "count": 1
+      },
+      {
+        "pattern": "D#sus4/A# → A#9",
+        "count": 1
+      },
+      {
+        "pattern": "A#9 → D#add9",
+        "count": 1
+      },
+      {
+        "pattern": "D#add9 → Ddim/F",
+        "count": 1
+      },
+      {
+        "pattern": "D#/G → G#sus2",
+        "count": 1
+      },
+      {
+        "pattern": "G#sus2 → Fm9",
+        "count": 1
+      },
+      {
+        "pattern": "Fm9 → Ddim",
+        "count": 1
+      },
+      {
+        "pattern": "Ddim → D#add9",
+        "count": 1
       }
     ],
     "4_gram": [
       {
-        "pattern": "C → C → C → C",
-        "count": 141
+        "pattern": "E → E → A/E → Esus4",
+        "count": 2
       },
       {
-        "pattern": "G → G → G → G",
-        "count": 90
+        "pattern": "E → A/E → Esus4 → F#m9",
+        "count": 2
       },
       {
-        "pattern": "D → D → D → D",
-        "count": 89
+        "pattern": "A/E → Esus4 → F#m9 → B7sus4",
+        "count": 2
       },
       {
-        "pattern": "A# → A# → A# → A#",
-        "count": 65
+        "pattern": "Esus4 → F#m9 → B7sus4 → Esus4",
+        "count": 2
       },
       {
-        "pattern": "D# → D# → D# → D#",
-        "count": 57
+        "pattern": "F#m9 → B7sus4 → Esus4 → Emaj7/B",
+        "count": 2
       },
       {
-        "pattern": "C# → C# → C# → C#",
-        "count": 50
+        "pattern": "Aadd9 → Aadd9 → Esus2 → Bsus4",
+        "count": 2
       },
       {
-        "pattern": "Cmin → Cmin → Cmin → Cmin",
-        "count": 48
+        "pattern": "Aadd9 → Esus2 → Bsus4 → Bsus4",
+        "count": 2
       },
       {
-        "pattern": "G# → G# → G# → G#",
-        "count": 45
+        "pattern": "Esus2 → Bsus4 → Bsus4 → C#7sus4/G#",
+        "count": 2
       },
       {
-        "pattern": "A → A → A → A",
-        "count": 40
+        "pattern": "Bsus4 → Bsus4 → C#7sus4/G# → F#m7",
+        "count": 2
       },
       {
-        "pattern": "B → B → B → B",
-        "count": 35
+        "pattern": "Bsus4 → C#7sus4/G# → F#m7 → F#m7",
+        "count": 2
       },
       {
-        "pattern": "F → F → F → F",
-        "count": 33
+        "pattern": "F → Dmin → E → F",
+        "count": 1
       },
       {
-        "pattern": "A/C# → A/C# → A/C# → A/C#",
-        "count": 24
+        "pattern": "Dmin → E → F → Dmin",
+        "count": 1
       },
       {
-        "pattern": "E → E → E → E",
-        "count": 23
+        "pattern": "E → F → Dmin → E",
+        "count": 1
       },
       {
-        "pattern": "Gmin → Gmin → Gmin → Gmin",
-        "count": 22
+        "pattern": "F → Dmin → E → Esus4/A",
+        "count": 1
       },
       {
-        "pattern": "C/E → C/E → C/E → C/E",
-        "count": 22
+        "pattern": "Dmin → E → Esus4/A → Fmaj7",
+        "count": 1
       },
       {
-        "pattern": "C#min → C#min → C#min → C#min",
-        "count": 20
+        "pattern": "E → Esus4/A → Fmaj7 → Dmin",
+        "count": 1
       },
       {
-        "pattern": "Dmin → Dmin → Dmin → Dmin",
-        "count": 19
+        "pattern": "Esus4/A → Fmaj7 → Dmin → Eaug",
+        "count": 1
       },
       {
-        "pattern": "D#min → D#min → D#min → D#min",
-        "count": 19
+        "pattern": "Fmaj7 → Dmin → Eaug → Esus4/A",
+        "count": 1
       },
       {
-        "pattern": "Dsus4/G → Dsus4/G → Dsus4/G → Dsus4/G",
-        "count": 19
+        "pattern": "Dmin → Eaug → Esus4/A → Asus4",
+        "count": 1
       },
       {
-        "pattern": "B7 → B7 → B7 → B7",
-        "count": 18
+        "pattern": "Eaug → Esus4/A → Asus4 → Dmin",
+        "count": 1
       },
       {
-        "pattern": "Bmin → Bmin → Bmin → Bmin",
-        "count": 17
+        "pattern": "Esus4/A → Asus4 → Dmin → Eaug",
+        "count": 1
       },
       {
-        "pattern": "B/F# → B/F# → B/F# → B/F#",
-        "count": 17
+        "pattern": "Asus4 → Dmin → Eaug → Amadd9",
+        "count": 1
       },
       {
-        "pattern": "Gm7 → Gm7 → G#maj7 → G#maj9",
-        "count": 17
+        "pattern": "Dmin → Eaug → Amadd9 → F",
+        "count": 1
       },
       {
-        "pattern": "G#min → G#min → G#min → G#min",
-        "count": 15
+        "pattern": "Eaug → Amadd9 → F → D",
+        "count": 1
       },
       {
-        "pattern": "Gm7 → G#maj7 → G#maj9 → Gm7",
-        "count": 15
+        "pattern": "Amadd9 → F → D → Cmaj9/B",
+        "count": 1
       },
       {
-        "pattern": "Esus4 → Esus4 → Esus4 → Esus4",
-        "count": 14
+        "pattern": "F → D → Cmaj9/B → Amadd9",
+        "count": 1
       },
       {
-        "pattern": "G#maj9 → Gm7 → Gm7 → G#maj7",
-        "count": 14
+        "pattern": "D → Cmaj9/B → Amadd9 → Dm6/F",
+        "count": 1
       },
       {
-        "pattern": "Gsus4 → Gsus4 → Gsus4 → Gsus4",
-        "count": 12
+        "pattern": "Cmaj9/B → Amadd9 → Dm6/F → Dmin",
+        "count": 1
       },
       {
-        "pattern": "G#maj7 → G#maj9 → Gm7 → Gm7",
-        "count": 12
+        "pattern": "Amadd9 → Dm6/F → Dmin → Emaj7",
+        "count": 1
       },
       {
-        "pattern": "Gaug → Gaug → Gaug → Gaug",
-        "count": 11
+        "pattern": "D# → Ddim/F → D#/G → F7sus4",
+        "count": 1
       }
     ],
     "8_gram": [
       {
-        "pattern": "C → C → C → C → C → C → C → C",
-        "count": 55
+        "pattern": "E → E → A/E → Esus4 → F#m9 → B7sus4 → Esus4 → Emaj7/B",
+        "count": 2
       },
       {
-        "pattern": "A# → A# → A# → A# → A# → A# → A# → A#",
-        "count": 32
+        "pattern": "Aadd9 → Aadd9 → Esus2 → Bsus4 → Bsus4 → C#7sus4/G# → F#m7 → F#m7",
+        "count": 2
       },
       {
-        "pattern": "G → G → G → G → G → G → G → G",
-        "count": 24
+        "pattern": "F → Dmin → E → F → Dmin → E → Esus4/A → Fmaj7",
+        "count": 1
       },
       {
-        "pattern": "D# → D# → D# → D# → D# → D# → D# → D#",
-        "count": 20
+        "pattern": "Dmin → E → F → Dmin → E → Esus4/A → Fmaj7 → Dmin",
+        "count": 1
       },
       {
-        "pattern": "Cmin → Cmin → Cmin → Cmin → Cmin → Cmin → Cmin → Cmin",
-        "count": 20
+        "pattern": "E → F → Dmin → E → Esus4/A → Fmaj7 → Dmin → Eaug",
+        "count": 1
       },
       {
-        "pattern": "D → D → D → D → D → D → D → D",
-        "count": 13
+        "pattern": "F → Dmin → E → Esus4/A → Fmaj7 → Dmin → Eaug → Esus4/A",
+        "count": 1
       },
       {
-        "pattern": "C# → C# → C# → C# → C# → C# → C# → C#",
-        "count": 11
+        "pattern": "Dmin → E → Esus4/A → Fmaj7 → Dmin → Eaug → Esus4/A → Asus4",
+        "count": 1
       },
       {
-        "pattern": "C/E → C/E → C/E → C/E → C/E → C/E → C/E → C/E",
-        "count": 10
+        "pattern": "E → Esus4/A → Fmaj7 → Dmin → Eaug → Esus4/A → Asus4 → Dmin",
+        "count": 1
       },
       {
-        "pattern": "B/F# → B/F# → B/F# → B/F# → B/F# → B/F# → B/F# → B/F#",
-        "count": 9
+        "pattern": "Esus4/A → Fmaj7 → Dmin → Eaug → Esus4/A → Asus4 → Dmin → Eaug",
+        "count": 1
       },
       {
-        "pattern": "Gm7 → G#maj7 → G#maj9 → Gm7 → Gm7 → G#maj7 → G#maj9 → Gm7",
-        "count": 9
+        "pattern": "Fmaj7 → Dmin → Eaug → Esus4/A → Asus4 → Dmin → Eaug → Amadd9",
+        "count": 1
       },
       {
-        "pattern": "B → B → B → B → B → B → B → B",
-        "count": 8
+        "pattern": "Dmin → Eaug → Esus4/A → Asus4 → Dmin → Eaug → Amadd9 → F",
+        "count": 1
       },
       {
-        "pattern": "Gmin → Gmin → Gmin → Gmin → Gmin → Gmin → Gmin → Gmin",
-        "count": 8
+        "pattern": "Eaug → Esus4/A → Asus4 → Dmin → Eaug → Amadd9 → F → D",
+        "count": 1
       },
       {
-        "pattern": "A/C# → A/C# → A/C# → A/C# → A/C# → A/C# → A/C# → A/C#",
-        "count": 8
+        "pattern": "Esus4/A → Asus4 → Dmin → Eaug → Amadd9 → F → D → Cmaj9/B",
+        "count": 1
       },
       {
-        "pattern": "B7 → B7 → B7 → B7 → B7 → B7 → B7 → B7",
-        "count": 7
+        "pattern": "Asus4 → Dmin → Eaug → Amadd9 → F → D → Cmaj9/B → Amadd9",
+        "count": 1
       },
       {
-        "pattern": "A → A → A → A → A → A → A → A",
-        "count": 7
+        "pattern": "Dmin → Eaug → Amadd9 → F → D → Cmaj9/B → Amadd9 → Dm6/F",
+        "count": 1
       },
       {
-        "pattern": "E → E → E → E → E → E → E → E",
-        "count": 6
+        "pattern": "Eaug → Amadd9 → F → D → Cmaj9/B → Amadd9 → Dm6/F → Dmin",
+        "count": 1
       },
       {
-        "pattern": "Esus4 → Esus4 → Esus4 → Esus4 → Esus4 → Esus4 → Esus4 → Esus4",
-        "count": 6
+        "pattern": "Amadd9 → F → D → Cmaj9/B → Amadd9 → Dm6/F → Dmin → Emaj7",
+        "count": 1
       },
       {
-        "pattern": "G#maj7 → G#maj9 → Gm7 → Gm7 → G#maj7 → G#maj9 → Gm7 → Gm7",
-        "count": 6
+        "pattern": "D# → Ddim/F → D#/G → F7sus4 → D# → Ddim/F → D#/G → D#sus4/A#",
+        "count": 1
       },
       {
-        "pattern": "G#maj9 → Gm7 → Gm7 → G#maj7 → G#maj9 → Gm7 → Gm7 → G#maj7",
-        "count": 6
+        "pattern": "Ddim/F → D#/G → F7sus4 → D# → Ddim/F → D#/G → D#sus4/A# → A#9",
+        "count": 1
       },
       {
-        "pattern": "Gm7 → Gm7 → G#maj7 → G#maj9 → Gm7 → Gm7 → G#maj7 → G#maj9",
-        "count": 6
+        "pattern": "D#/G → F7sus4 → D# → Ddim/F → D#/G → D#sus4/A# → A#9 → D#add9",
+        "count": 1
       }
     ]
   }
