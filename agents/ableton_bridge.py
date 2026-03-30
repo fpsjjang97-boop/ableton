@@ -12,6 +12,8 @@ import socket
 import json
 import os
 import sys
+from pathlib import Path
+
 import mido
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,6 +53,13 @@ class AbletonBridge:
             self.connected = False
             print("✓ Ableton 연결 해제")
 
+    def _validate_response(self, result):
+        """Validate JSON response structure from Ableton MCP."""
+        if not isinstance(result, dict):
+            print(f"  [warn] 응답이 dict가 아님: {type(result).__name__}")
+            return None
+        return result
+
     def send_command(self, cmd_type, params=None):
         """Ableton에 명령 전송"""
         if not self.connected:
@@ -73,14 +82,15 @@ class AbletonBridge:
                     data = b''.join(chunks)
                     try:
                         result = json.loads(data.decode('utf-8'))
-                        return result
+                        return self._validate_response(result)
                     except json.JSONDecodeError:
                         continue
                 except socket.timeout:
                     break
 
             if chunks:
-                return json.loads(b''.join(chunks).decode('utf-8'))
+                raw = json.loads(b''.join(chunks).decode('utf-8'))
+                return self._validate_response(raw)
         except Exception as e:
             print(f"✗ 명령 전송 실패: {e}")
             self.connected = False
@@ -301,7 +311,7 @@ if __name__ == '__main__':
         cmd = sys.argv[1]
         if cmd == 'push' and len(sys.argv) > 2:
             bridge.connect()
-            bridge.push_midi_to_ableton(sys.argv[2])
+            bridge.push_midi_to_ableton(str(Path(sys.argv[2]).resolve()))
         elif cmd == 'session':
             bridge.connect()
             bridge.get_session_info()
@@ -339,6 +349,7 @@ if __name__ == '__main__':
                             filepath = candidate
                         elif not os.path.exists(filepath):
                             filepath = os.path.join(PROJECT_DIR, filepath)
+                    filepath = str(Path(filepath).resolve())
                     bridge.push_midi_to_ableton(filepath)
                 elif cmd == 'play':
                     bridge.start_playback()

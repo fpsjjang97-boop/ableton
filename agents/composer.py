@@ -13,6 +13,7 @@ import sys
 import json
 import random
 from datetime import datetime
+from pathlib import Path
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(PROJECT_DIR, "output")
@@ -1173,7 +1174,7 @@ if __name__ == '__main__':
         if cmd == 'compose':
             compose()
         elif cmd == 'analyze' and len(sys.argv) > 2:
-            analyze_midi(sys.argv[2])
+            analyze_midi(str(Path(sys.argv[2]).resolve()))
         elif cmd == 'settings':
             s = load_settings()
             print(json.dumps(s, indent=2, ensure_ascii=False))
@@ -1201,7 +1202,7 @@ if __name__ == '__main__':
                 elif cmd.startswith('analyze'):
                     parts = cmd.split(maxsplit=1)
                     if len(parts) > 1:
-                        analyze_midi(parts[1])
+                        analyze_midi(str(Path(parts[1]).resolve()))
                     else:
                         analyze_midi(os.path.join(PROJECT_DIR, '11.mid'))
                 elif cmd == 'settings':

@@ -503,12 +503,16 @@ class SongContext:
         return max(s.end_tick for s in self.sections)
 
 
+TRACK_TYPES = ["midi", "audio", "group", "send", "master"]
+
+
 @dataclass
 class ProjectState:
     """Complete state of a project."""
     name: str = "Untitled"
     file_path: Optional[str] = None
     tracks: list[Track] = field(default_factory=list)
+    audio_tracks: list = field(default_factory=list)  # AudioTrack from audio_io
     bpm: float = 120.0
     time_signature: TimeSignature = field(default_factory=TimeSignature)
     key: str = "C"
