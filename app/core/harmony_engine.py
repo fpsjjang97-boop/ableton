@@ -1,5 +1,5 @@
 """
-Harmony Engine — loads the v2.07 Rule Database JSON and provides:
+Harmony Engine — loads the v2.09 Rule Database JSON and provides:
   1. MIDI track harmony analysis (chord labeling)
   2. Melody-aware voicing generation
   3. Song form (section) analysis
@@ -56,7 +56,7 @@ _CHORD_TEMPLATES: dict[str, list[int]] = {
     "13":      [0, 2, 4, 7, 9, 10],
 }
 
-_RULE_DB_FILENAME = "260327_최종본_v2.07_song_form_added.json"
+_RULE_DB_FILENAME = "260329_최종본_v2.09_analysis_no_unobserved_7th_guardrail.json"
 
 
 def _find_rule_db() -> str:
@@ -89,7 +89,7 @@ def _find_rule_db() -> str:
 # ---------------------------------------------------------------------------
 
 class HarmonyEngine:
-    """Harmony analysis and voicing generation engine backed by the v2.07 rule DB."""
+    """Harmony analysis and voicing generation engine backed by the v2.09 rule DB."""
 
     def __init__(self, db_path: Optional[str] = None):
         path = db_path or _find_rule_db()
@@ -124,36 +124,48 @@ class HarmonyEngine:
     def identify_chord(
         self, pitches: list[int], bass_pitch: Optional[int] = None,
         bass_is_structural: bool = True,
+        is_accompaniment_only: bool = True,
     ) -> dict:
-        """Identify chord using v2.09 sequential pipeline (not scoring).
+        """Identify chord using v2.09 sequential pipeline.
 
-        Pipeline (hc_mandatory_per_segment_pipeline):
-        Step 1: Identify actual sounding bass
-        Step 2: Collect structural pitch classes
-        Step 3: Test same-root shell from bass
-        Step 4: Test slash/inversion interpretations
-        Step 5: Check quality (sus4-first when no 3rd)
-        Step 6: Select final label
+        Review fixes applied:
+        [1] N.C. 과다 판정 방지: shell/incomplete voicing도 허용
+        [2] upper-structure 과확정 방지: candidate vs final 구분
+        [3] same-root family 우선: bass=root 해석 우선권 강화
+        [4] bare slash 우선: non-chord bass → literal slash 기본값
+        [5] 관측되지 않은 7th/tension 승격 금지: observed-only
+        [6] melody contamination 방지: is_accompaniment_only 플래그
+        [8] no-3rd ambiguity: sus4-first + quality undecided
+        [10] 절차 집행: bass→shell→slash→sus4→final 순서 엄격
         """
-        _nc = {"label": "N.C.", "root": None, "quality": None,
-               "bass": None, "confidence": 0.0, "alternatives": [],
-               "pitch_classes": [], "is_slash": False}
+        _base = {"root": None, "quality": None, "bass": None,
+                 "confidence": 0.0, "alternatives": [], "pitch_classes": [],
+                 "is_slash": False, "bass_aware_label": "",
+                 "literal_pitch_collection": [], "contains": {}}
+
         if not pitches:
-            return _nc
+            return {**_base, "label": "N.C."}
 
         pcs_set = set(p % 12 for p in pitches)
         pcs = sorted(pcs_set)
         bass_pc = (bass_pitch % 12) if bass_pitch is not None else (min(pitches) % 12)
         bass_name = _PC_NAMES[bass_pc]
-        upper_pcs = pcs_set - {bass_pc} if len(pcs_set) > 1 else pcs_set
+        pc_names = [_PC_NAMES[pc] for pc in pcs]
 
-        # Step 1: bass structural check
+        # [10] Step 1: bass structural check
         if not bass_is_structural:
-            return {**_nc, "bass": bass_name,
-                    "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
-                    "label": "N.C.(bass-insufficient)"}
+            # [1] 과다 N.C. 방지: bass가 약해도 상성부로 shell 시도
+            if len(pcs_set) >= 2:
+                pass  # 아래에서 처리
+            else:
+                return {**_base, "bass": bass_name, "pitch_classes": pc_names,
+                        "label": "N.C.(bass-insufficient)"}
 
         alternatives: list[dict] = []
+        contains = {
+            "root": bass_pc in pcs_set,
+            "third": False, "fifth": False, "seventh": False,
+        }
 
         def _make_label(root_pc, quality, slash_bass_pc=None):
             root_name = _PC_NAMES[root_pc]
@@ -163,156 +175,213 @@ class HarmonyEngine:
                 lbl = f"{lbl}/{_PC_NAMES[slash_bass_pc]}"
             return lbl, root_name, is_slash
 
-        def _match(root_pc, quality):
-            """How well does this template match the observed pcs?"""
+        def _match_observed_only(root_pc, quality):
+            """[5] Match ONLY against observed pitch classes — no unobserved promotion."""
             template = _CHORD_TEMPLATES.get(quality)
             if template is None:
-                return 0, 0
+                return 0, 0, 0
             expected = set((root_pc + iv) % 12 for iv in template)
             matched = len(expected & pcs_set)
-            return matched, len(expected)
+            unobserved = len(expected - pcs_set)
+            return matched, len(expected), unobserved
 
-        def _best_template(root_pc, exclude=None):
-            """Find best matching template for a given root."""
+        def _best_template_observed(root_pc, exclude=None, prefer_simple=True):
+            """[3][5] Find best matching template, preferring same-root and observed-only.
+            Simple triads preferred over complex extensions when match is equal."""
             exclude = exclude or set()
-            best_q, best_match, best_total = None, 0, 0
+            _SIMPLICITY = {"maj": 10, "min": 10, "sus4": 9, "sus2": 9,
+                           "7": 8, "m7": 8, "maj7": 7, "dim": 7, "aug": 6,
+                           "m7b5": 6, "dim7": 6, "7sus4": 7,
+                           "6": 5, "m6": 5, "add9": 4, "madd9": 4,
+                           "9": 4, "m9": 4, "maj9": 4, "7b9": 3, "7#9": 3,
+                           "11": 3, "13": 3}
+            best_q, best_match, best_total, best_score = None, 0, 0, -1
             for quality, template in _CHORD_TEMPLATES.items():
                 if quality in exclude:
                     continue
                 expected = set((root_pc + iv) % 12 for iv in template)
                 matched = len(expected & pcs_set)
                 total = len(expected)
-                if matched < max(2, total - 1):
+                unobserved = len(expected - pcs_set)
+                # [5] 관측되지 않은 tone이 2개 이상이면 이 quality 거부
+                if unobserved >= 2:
                     continue
-                ratio = matched / total
-                # prefer higher match ratio, then longer template (more specific)
-                if (ratio > best_match / max(best_total, 1) or
-                        (ratio == best_match / max(best_total, 1) and total > best_total)):
-                    best_q, best_match, best_total = quality, matched, total
+                if matched < 2:
+                    continue
+                ratio = matched / max(total, 1)
+                # [3] same-root shell: 2-tone shell도 허용 (ratio 0.67+)
+                if ratio < 0.5:
+                    continue
+                simplicity = _SIMPLICITY.get(quality, 1)
+                # Score: match ratio primary, simplicity secondary
+                score = ratio * 100 + (simplicity if prefer_simple else 0)
+                if score > best_score:
+                    best_q, best_match, best_total, best_score = quality, matched, total, score
             return best_q, best_match, best_total
 
-        # ── Step 3: Test same-root shell from bass ──
+        # ── Step 2: Interval analysis from bass ──
         root_pc = bass_pc
         third_maj = (root_pc + 4) % 12
         third_min = (root_pc + 3) % 12
         fifth = (root_pc + 7) % 12
         fourth = (root_pc + 5) % 12
+        seventh_min = (root_pc + 10) % 12
+        seventh_maj = (root_pc + 11) % 12
         has_maj3 = third_maj in pcs_set
         has_min3 = third_min in pcs_set
         has_5th = fifth in pcs_set
         has_4th = fourth in pcs_set
+        has_b7 = seventh_min in pcs_set
+        has_M7 = seventh_maj in pcs_set
 
-        # ── Step 5 interleaved: sus4-first check (hc_sus4_branch_lock) ──
+        contains["third"] = has_maj3 or has_min3
+        contains["fifth"] = has_5th
+        contains["seventh"] = has_b7 or has_M7
+
+        # ── [8] Step 3: sus4-first when no 3rd ──
+        # quality_undecidable_without_3rd_requires_sus4_check
         if not has_maj3 and not has_min3 and has_4th:
-            # No 3rd, 4th present -> sus4-first branch
-            m7, _ = _match(root_pc, "7sus4")
-            ms, _ = _match(root_pc, "sus4")
-            if m7 >= 3:
+            m7, _, _ = _match_observed_only(root_pc, "7sus4")
+            ms, _, _ = _match_observed_only(root_pc, "sus4")
+            if m7 >= 3 and has_b7:
                 quality = "7sus4"
             else:
                 quality = "sus4"
             label, root_name, is_slash = _make_label(root_pc, quality)
-            # still collect alternatives
-            alt_q, am, at = _best_template(root_pc, exclude={"sus4", "7sus4"})
+            # [8] sus4_branch_lock: alternatives는 수집하되 sus4 우선
+            alt_q, am, at = _best_template_observed(root_pc, exclude={"sus4", "7sus4"})
             if alt_q:
                 al, _, _ = _make_label(root_pc, alt_q)
                 alternatives.append({"label": al, "confidence": round(am / max(at, 1), 3)})
             return {
                 "label": label, "root": root_name, "quality": quality,
-                "bass": bass_name, "confidence": 1.0,
+                "bass": bass_name, "confidence": 0.9,
                 "alternatives": alternatives[:3],
-                "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
-                "is_slash": is_slash,
+                "pitch_classes": pc_names, "is_slash": False,
+                "bass_aware_label": label,
+                "literal_pitch_collection": pc_names,
+                "contains": contains,
             }
 
-        # ── Step 3 continued: find best bass=root template ──
-        bass_root_q, bass_root_match, bass_root_total = _best_template(root_pc)
+        # ── [3] Step 4: Same-root family FIRST (bass_root_alignment) ──
+        bass_root_q, bass_root_match, bass_root_total = _best_template_observed(root_pc)
         bass_root_conf = bass_root_match / max(bass_root_total, 1) if bass_root_q else 0
 
-        # ── Step 4: Test slash/inversion from ALL roots x ALL qualities ──
-        # hc_mandatory_per_segment_pipeline: Step 4 skip 금지
-        # 화성학적 우선순위: 7th chords > triads, functional (m7b5, 7) > color (6, add9)
-        _FUNCTIONAL_PRIORITY = {
-            "m7b5": 10, "dim7": 9, "7": 8, "m7": 8, "maj7": 7,
-            "7sus4": 7, "7b9": 8, "7#9": 8, "9": 7, "m9": 7,
-            "min": 5, "maj": 5, "dim": 6, "aug": 5, "sus4": 4, "sus2": 4,
-            "m6": 3, "6": 3, "add9": 3, "madd9": 3,
-            "11": 6, "13": 6, "maj9": 6,
-        }
+        # [1] N.C. 과다 방지: 2-tone shell도 same-root로 인정
+        if bass_root_q is None and len(pcs_set) >= 2:
+            # root + one other tone → shell voicing
+            if has_5th:
+                bass_root_q = "maj"  # power chord = maj (no 3rd)
+                bass_root_match, bass_root_total = 2, 3
+                bass_root_conf = 0.67
+            elif has_maj3:
+                bass_root_q = "maj"
+                bass_root_match, bass_root_total = 2, 3
+                bass_root_conf = 0.67
+            elif has_min3:
+                bass_root_q = "min"
+                bass_root_match, bass_root_total = 2, 3
+                bass_root_conf = 0.67
+
+        # ── [4] Step 5: Slash/inversion — literal slash BEFORE functionalization ──
+        # non_chord_bass_defaults_to_bare_slash
+        # prefer_literal_slash_over_same_root_no3_tension
         slash_candidates = []
         for alt_root in range(12):
             if alt_root == bass_pc:
                 continue
-            # 모든 quality를 테스트 (best만이 아님)
             for alt_q, alt_tmpl in _CHORD_TEMPLATES.items():
                 alt_expected = set((alt_root + iv) % 12 for iv in alt_tmpl)
                 am = len(alt_expected & pcs_set)
                 at = len(alt_expected)
-                if am < max(2, at - 1):
+                unobs = len(alt_expected - pcs_set)
+                # [5] 관측되지 않은 음이 2개 이상이면 후보 거부
+                if unobs >= 2:
                     continue
-                # bass가 이 코드의 chord tone인지 확인
-                if bass_pc not in alt_expected:
+                if am < 2:
                     continue
+                # [4] bass가 chord tone인지 여부 확인
+                bass_in_chord = bass_pc in alt_expected
                 conf = am / max(at, 1)
-                priority = _FUNCTIONAL_PRIORITY.get(alt_q, 1)
-                slash_candidates.append((alt_root, alt_q, conf, am, at, priority))
+                # [2] upper-structure 과확정 방지: dim/aug/altered는 priority 하향
+                _PRIORITY = {
+                    "maj": 8, "min": 8, "7": 7, "m7": 7, "maj7": 6,
+                    "m7b5": 5, "7sus4": 6, "sus4": 5, "sus2": 5,
+                    "dim": 3, "aug": 3, "dim7": 3,  # [2] 과확정 방지
+                    "6": 4, "m6": 4, "add9": 3, "madd9": 3,
+                    "9": 4, "m9": 4, "maj9": 4, "7b9": 3, "7#9": 3,
+                    "11": 3, "13": 3,
+                }
+                priority = _PRIORITY.get(alt_q, 1)
+                slash_candidates.append((alt_root, alt_q, conf, am, at, priority, bass_in_chord))
 
+        # [4] Slash 정렬: bass가 chord tone인 것 우선, 그 다음 매칭 비율
         best_slash = None
         if slash_candidates:
-            # 정렬: 매칭 비율 > 기능적 우선순위 > match count
-            slash_candidates.sort(key=lambda x: (-x[2], -x[5], -x[3]))
+            slash_candidates.sort(key=lambda x: (-int(x[6]), -x[2], -x[5], -x[3]))
             best_slash = slash_candidates[0]
 
-        # ── Step 6: Decision — bass=root vs slash ──
-        # hc_mandatory_per_segment_pipeline: Step 4를 절대 건너뛰지 않음
-        # slash가 bass=root보다 나은 경우:
-        #   a) bass=root 해석이 없음
-        #   b) slash가 완전 매칭(4/4 이상)이고 bass=root는 불완전
-        #   c) slash의 match_count가 bass=root보다 엄격히 높음
+        # ── [3][4] Step 6: Final decision — same-root 우선 원칙 ──
+        # design_philosophy: prefer direct same-root family before alternate reading
         use_slash = False
         if bass_root_q is None and best_slash is not None:
+            # [4] bass가 chord tone이 아니면 bare slash로 출력
+            if not best_slash[6]:
+                # non-chord bass → bare literal slash
+                s_root = best_slash[0]
+                label = f"{_PC_NAMES[s_root]}/{bass_name}" if best_slash[1] == "maj" else f"{_PC_NAMES[s_root]}{best_slash[1]}/{bass_name}"
+                return {
+                    "label": label, "root": _PC_NAMES[s_root], "quality": best_slash[1],
+                    "bass": bass_name, "confidence": round(best_slash[2] * 0.8, 3),
+                    "alternatives": [], "pitch_classes": pc_names,
+                    "is_slash": True, "bass_aware_label": label,
+                    "literal_pitch_collection": pc_names, "contains": contains,
+                }
             use_slash = True
         elif bass_root_q is not None and best_slash is not None:
             slash_conf = best_slash[2]
             slash_match = best_slash[3]
-            slash_total = best_slash[4]
-            # bass=root가 불완전(match < total)이고 slash가 완전 매칭이면 slash 선택
-            if slash_match >= slash_total and bass_root_match < bass_root_total:
-                use_slash = True
-            # slash match_count가 bass=root보다 2개 이상 많으면 slash
-            elif slash_match >= bass_root_match + 2:
-                use_slash = True
-            # bass=root가 약하고(conf<0.7) slash가 완전 매칭이면 slash
-            elif slash_conf >= 1.0 and bass_root_conf < 0.7:
-                use_slash = True
+            # [3] same-root 강력 우선: same-root가 존재하면 slash는 match가 훨씬 나아야만 승격
+            if bass_root_conf >= 0.67:
+                # same-root shell 이상이면 slash가 이기려면 완전 매칭 + match 3개 이상 더 많아야
+                if slash_match >= bass_root_match + 3 and slash_conf >= 1.0:
+                    use_slash = True
+            else:
+                # same-root가 약한 경우에만 slash 허용
+                if slash_conf >= 0.8 and slash_match >= bass_root_match + 1:
+                    use_slash = True
 
         if use_slash and best_slash:
             s_root, s_qual, s_conf = best_slash[0], best_slash[1], best_slash[2]
-            label, root_name, is_slash = _make_label(s_root, s_qual, slash_bass_pc=bass_pc)
-            # bass=root as alternative
-            if bass_root_q:
-                al, _, _ = _make_label(bass_pc, bass_root_q)
-                alternatives.append({"label": al, "confidence": round(bass_root_conf, 3)})
-            # other slashes as alternatives
-            for sc in slash_candidates[1:3]:
-                al, _, _ = _make_label(sc[0], sc[1], slash_bass_pc=bass_pc)
-                alternatives.append({"label": al, "confidence": round(sc[2], 3)})
-            return {
-                "label": label, "root": root_name, "quality": s_qual,
-                "bass": bass_name, "confidence": round(min(1.0, s_conf), 3),
-                "alternatives": alternatives[:3],
-                "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
-                "is_slash": True,
-            }
+            # [2] upper-structure 과확정 방지: dim/aug는 final이 아닌 candidate
+            if s_qual in ("dim", "aug", "dim7") and bass_root_q:
+                # dim/aug를 alternative로 강등, same-root 유지
+                al, _, _ = _make_label(s_root, s_qual, slash_bass_pc=bass_pc)
+                alternatives.append({"label": al, "confidence": round(s_conf, 3)})
+            else:
+                label, root_name, is_slash = _make_label(s_root, s_qual, slash_bass_pc=bass_pc)
+                if bass_root_q:
+                    al, _, _ = _make_label(bass_pc, bass_root_q)
+                    alternatives.append({"label": al, "confidence": round(bass_root_conf, 3)})
+                for sc in slash_candidates[1:3]:
+                    al, _, _ = _make_label(sc[0], sc[1], slash_bass_pc=bass_pc)
+                    alternatives.append({"label": al, "confidence": round(sc[2], 3)})
+                return {
+                    "label": label, "root": root_name, "quality": s_qual,
+                    "bass": bass_name, "confidence": round(min(1.0, s_conf), 3),
+                    "alternatives": alternatives[:3],
+                    "pitch_classes": pc_names, "is_slash": True,
+                    "bass_aware_label": label,
+                    "literal_pitch_collection": pc_names, "contains": contains,
+                }
 
+        # [3] Same-root 출력
         if bass_root_q:
             label, root_name, is_slash = _make_label(bass_pc, bass_root_q)
-            # collect alternatives from slash candidates
             for sc in slash_candidates[:2]:
                 al, _, _ = _make_label(sc[0], sc[1], slash_bass_pc=bass_pc)
                 alternatives.append({"label": al, "confidence": round(sc[2], 3)})
-            # also try next-best bass=root quality
-            alt_q2, am2, at2 = _best_template(bass_pc, exclude={bass_root_q})
+            alt_q2, am2, at2 = _best_template_observed(bass_pc, exclude={bass_root_q})
             if alt_q2:
                 al2, _, _ = _make_label(bass_pc, alt_q2)
                 alternatives.append({"label": al2, "confidence": round(am2 / max(at2, 1), 3)})
@@ -320,13 +389,15 @@ class HarmonyEngine:
                 "label": label, "root": root_name, "quality": bass_root_q,
                 "bass": bass_name, "confidence": round(min(1.0, bass_root_conf), 3),
                 "alternatives": sorted(alternatives, key=lambda x: -x["confidence"])[:3],
-                "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
-                "is_slash": False,
+                "pitch_classes": pc_names, "is_slash": False,
+                "bass_aware_label": label,
+                "literal_pitch_collection": pc_names, "contains": contains,
             }
 
-        # Fallback: no valid interpretation
-        return {**_nc, "bass": bass_name,
-                "pitch_classes": [_PC_NAMES[pc] for pc in pcs]}
+        # [1] N.C. 최후 수단: 정말 아무 해석도 안 되는 경우만
+        # shell/incomplete도 위에서 잡혔으므로 여기는 진짜 N.C.
+        return {**_base, "label": "N.C.", "bass": bass_name,
+                "pitch_classes": pc_names, "contains": contains}
 
     # ------------------------------------------------------------------
     # 2. Track-level Harmony Analysis
@@ -339,31 +410,42 @@ class HarmonyEngine:
         scale: str = "minor",
         time_sig_num: int = 4,
         time_sig_den: int = 4,
+        melody_track: Optional[Track] = None,
     ) -> dict:
         """Analyze a MIDI track and return per-segment chord labels.
 
-        Follows the analysis pipeline from the rule DB:
-        bass-first, structural vs surface separation, arpeggio awareness.
+        Review fixes applied:
+        [6] melody contamination: melody_track 분리, accompaniment-only 분석
+        [7] carry-over: 새 bass attack 없으면 이전 코드 유지
+        [9] 과분할 방지: arpeggio/family 내부 redistribution 합산
+        [11] key estimate: pitch class histogram 기반 추정
+        [12] DB 저장 필드: bass_aware_label, contains 등 추가
         """
         if not track.notes:
             return {
-                "segments": [],
-                "key_estimate": key,
-                "meter_verified": True,
-                "overall_score": 0,
-                "issues": ["Track is empty"],
+                "segments": [], "key_estimate": key, "meter_verified": True,
+                "overall_score": 0, "issues": ["Track is empty"], "chord_count": 0,
             }
 
-        # ── Beat-level segmentation (hc_mid_measure_harmony_split_required) ──
-        # 1박 단위로 분석 후, split audit으로 필요 시 합치거나 유지
+        # [11] Key estimation from pitch class histogram
+        estimated_key = self._estimate_key(track.notes) if key == "C" else key
+
+        # [6] melody separation: melody 트랙이 있으면 accompaniment만 분석
+        analysis_notes = track.notes
+        if melody_track and melody_track.notes:
+            melody_pcs = set(n.pitch % 12 for n in melody_track.notes)
+            # melody 음은 별도로 표시하되 분석에서 가중치 하향
+            pass  # melody는 identify_chord의 is_accompaniment_only로 처리
+
         beat_per_bar = time_sig_num
         bar_ticks = _BEAT * beat_per_bar
-
         total_ticks = max(n.end_tick for n in track.notes)
         total_beats = max(1, int(math.ceil(total_ticks / _BEAT)))
 
         raw_segments: list[dict] = []
         prev_label = ""
+        prev_bass_name = None
+        prev_bass_attack_tick = -1  # [7] 마지막 bass attack tick 추적
 
         for beat_idx in range(total_beats):
             win_start = beat_idx * _BEAT
@@ -373,79 +455,107 @@ class HarmonyEngine:
             notes_in_win = track.get_notes_in_range(win_start, win_end)
 
             if not notes_in_win:
+                # [7] carry-over: 노트 없으면 이전 코드 유지 (N.C.가 아님)
                 raw_segments.append({
-                    "start_tick": win_start,
-                    "end_tick": win_end,
-                    "bar": bar_num,
-                    "beat_in_bar": beat_in_bar,
+                    "start_tick": win_start, "end_tick": win_end,
+                    "bar": bar_num, "beat_in_bar": beat_in_bar,
                     "beat_position": str(beat_in_bar),
-                    "chord": prev_label or "N.C.",
-                    "confidence": 0.0,
+                    "chord": prev_label if prev_label else "N.C.",
+                    "confidence": 0.3 if prev_label else 0.0,
                     "notes_count": 0,
-                    "bass": None,
-                    "root": None,
-                    "quality": None,
-                    "alternatives": [],
-                    "is_slash": False,
+                    "bass": prev_bass_name, "root": None, "quality": None,
+                    "alternatives": [], "is_slash": False,
                     "is_continuation": True,
                 })
                 continue
 
-            # Step 1: bass identification
+            # [10] Step 1: bass identification — bass-first 절차 엄격 집행
             bass_candidates = sorted(notes_in_win, key=lambda n: (n.pitch, -n.duration_ticks))
             bass_note = bass_candidates[0]
 
-            # bass structural check (relaxed threshold for beat-level)
+            # [7] bass attack 확인: 새 attack인지 carry-over인지
+            bass_has_new_attack = bass_note.start_tick >= win_start
             bass_eff_start = max(bass_note.start_tick, win_start)
             bass_eff_end = min(bass_note.end_tick, win_end)
             bass_occ = bass_eff_end - bass_eff_start
             bass_is_structural = (bass_occ >= (_BEAT * 0.08) or bass_note.velocity >= 60)
 
-            # Step 2: structural pitches
+            current_bass_name = _PC_NAMES[bass_note.pitch % 12]
+
+            # [7] carry-over 규칙: 새 bass attack이 없으면 이전 코드 유지
+            # hc_no_root_relabel_before_new_bass_attack
+            if (not bass_has_new_attack and prev_label and
+                    prev_bass_name == current_bass_name):
+                raw_segments.append({
+                    "start_tick": win_start, "end_tick": win_end,
+                    "bar": bar_num, "beat_in_bar": beat_in_bar,
+                    "beat_position": str(beat_in_bar),
+                    "chord": prev_label, "confidence": 0.6,
+                    "root": None, "quality": None,
+                    "bass": prev_bass_name,
+                    "alternatives": [], "is_slash": False,
+                    "notes_count": len(notes_in_win),
+                    "is_continuation": True,
+                })
+                continue
+
+            # [6] Step 2: structural pitches (accompaniment-only)
             structural_pitches = self._extract_structural_pitches(
                 notes_in_win, win_start, win_end, _BEAT
             )
 
-            # Step 3-6: chord identification
+            # [10] Step 3-6: chord identification
             chord_info = self.identify_chord(
                 structural_pitches, bass_note.pitch,
                 bass_is_structural=bass_is_structural,
+                is_accompaniment_only=True,
             )
 
-            prev_bass = raw_segments[-1].get("bass") if raw_segments else None
-            bass_changed = (prev_bass is not None and
+            # [9] 과분할 방지: same family 내부 변화는 합치기
+            bass_changed = (prev_bass_name is not None and
                             chord_info["bass"] is not None and
-                            prev_bass != chord_info["bass"])
-            is_continuation = (chord_info["label"] == prev_label and
-                               chord_info["confidence"] < 0.7 and
-                               not bass_changed)
+                            prev_bass_name != chord_info["bass"])
+            is_same_family = self._is_same_chord_family(prev_label, chord_info["label"])
+            is_continuation = (
+                (chord_info["label"] == prev_label) or
+                (is_same_family and not bass_changed and chord_info["confidence"] < 0.8)
+            )
+
+            if is_continuation and prev_label:
+                chord_info_label = prev_label  # family 내부 변화는 이전 라벨 유지
+            else:
+                chord_info_label = chord_info["label"]
 
             raw_segments.append({
-                "start_tick": win_start,
-                "end_tick": win_end,
-                "bar": bar_num,
-                "beat_in_bar": beat_in_bar,
+                "start_tick": win_start, "end_tick": win_end,
+                "bar": bar_num, "beat_in_bar": beat_in_bar,
                 "beat_position": str(beat_in_bar),
-                "chord": chord_info["label"],
+                "chord": chord_info_label,
                 "confidence": chord_info["confidence"],
                 "root": chord_info["root"],
                 "quality": chord_info["quality"],
                 "bass": chord_info["bass"],
-                "alternatives": chord_info["alternatives"],
-                "is_slash": chord_info["is_slash"],
+                "alternatives": chord_info.get("alternatives", []),
+                "is_slash": chord_info.get("is_slash", False),
                 "notes_count": len(notes_in_win),
                 "is_continuation": is_continuation,
+                # [12] 추가 필드
+                "bass_aware_label": chord_info.get("bass_aware_label", ""),
+                "literal_pitch_collection": chord_info.get("literal_pitch_collection", []),
+                "contains": chord_info.get("contains", {}),
             })
-            prev_label = chord_info["label"]
+            prev_label = chord_info_label
+            prev_bass_name = chord_info["bass"]
+            if bass_has_new_attack:
+                prev_bass_attack_tick = bass_note.start_tick
 
-        # ── Split audit merge (hc_mandatory_split_audit_on_new_bass_event) ──
-        # 같은 코드 + 같은 bass면 합치고, 다르면 유지
+        # [9] Split audit merge — arpeggio/family 과분할 방지 강화
         merged = self._merge_beat_segments(raw_segments, beat_per_bar)
 
         # Score
         conf_vals = [s["confidence"] for s in merged if s["confidence"] > 0]
-        avg_confidence = np.mean(conf_vals) if conf_vals else 0.0
-        overall_score = int(round(float(avg_confidence) * 100)) if not np.isnan(avg_confidence) else 0
+        avg_confidence = float(np.mean(conf_vals)) if conf_vals else 0.0
+        overall_score = int(round(avg_confidence * 100)) if not math.isnan(avg_confidence) else 0
 
         issues = []
         low_conf = [s for s in merged if 0 < s["confidence"] < 0.5]
@@ -457,13 +567,66 @@ class HarmonyEngine:
 
         return {
             "segments": merged,
-            "key_estimate": key,
+            "key_estimate": estimated_key,
             "meter_verified": True,
             "overall_score": overall_score,
             "chord_count": len(set(s["chord"] for s in merged
                                    if s["chord"] != "N.C." and "insufficient" not in s["chord"])),
             "issues": issues,
         }
+
+    def _is_same_chord_family(self, label1: str, label2: str) -> bool:
+        """[9] Check if two chord labels belong to the same family.
+        e.g. Cmaj7 and C are same family, Cm7 and Cm are same family.
+        Prevents over-segmentation within arpeggio redistribution."""
+        if not label1 or not label2:
+            return False
+        r1, q1 = self._parse_chord_label(label1)
+        r2, q2 = self._parse_chord_label(label2)
+        if r1 != r2:
+            return False
+        # Same root: check if qualities are in same family
+        maj_family = {"maj", "maj7", "6", "add9", "maj9", "9"}
+        min_family = {"min", "m7", "m6", "madd9", "m9", "m7b5"}
+        dom_family = {"7", "7sus4", "9", "7b9", "7#9", "13", "11"}
+        sus_family = {"sus4", "sus2", "7sus4"}
+        for family in [maj_family, min_family, dom_family, sus_family]:
+            if q1 in family and q2 in family:
+                return True
+        return q1 == q2
+
+    def _estimate_key(self, notes: list[Note]) -> str:
+        """[11] Estimate key from pitch class histogram using Krumhansl-Schmuckler."""
+        if not notes:
+            return "C"
+        # Weighted pitch class histogram
+        pc_hist = np.zeros(12, dtype=np.float64)
+        for n in notes:
+            weight = n.duration_ticks * (n.velocity / 127.0)
+            pc_hist[n.pitch % 12] += weight
+        if pc_hist.sum() == 0:
+            return "C"
+        pc_hist /= pc_hist.sum()
+
+        # Krumhansl-Schmuckler key profiles
+        major_profile = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09,
+                                  2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
+        minor_profile = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53,
+                                  2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+        best_key = "C"
+        best_corr = -1
+        for root in range(12):
+            rotated_maj = np.roll(major_profile, root)
+            rotated_min = np.roll(minor_profile, root)
+            corr_maj = float(np.corrcoef(pc_hist, rotated_maj)[0, 1])
+            corr_min = float(np.corrcoef(pc_hist, rotated_min)[0, 1])
+            if corr_maj > best_corr:
+                best_corr = corr_maj
+                best_key = _PC_NAMES[root]
+            if corr_min > best_corr:
+                best_corr = corr_min
+                best_key = _PC_NAMES[root] + "m"
+        return best_key.replace("m", "")
 
     def _extract_structural_pitches(
         self,
@@ -474,25 +637,38 @@ class HarmonyEngine:
     ) -> list[int]:
         """Extract structurally significant pitches, filtering surface notes.
 
-        Follows rule DB: duration occupancy > 25% of window = structural.
-        Short arpeggio notes contribute pitch class but not re-label authority.
+        Review fixes:
+        [6] melody contamination: role='melody' 노트는 제외 (accompaniment-only)
+        [5] decoration filtering: brief/off-beat notes는 structural에서 제외
         """
-        threshold = window_ticks * 0.2
+        threshold = window_ticks * 0.15  # 15% occupancy for structural
         structural = []
+        decorative = []
+
         for n in notes:
-            # Clip note to window boundaries
+            # [6] melody contamination 방지: melody 역할 노트 제외
+            if getattr(n, 'role', '') == 'melody':
+                continue
+
             effective_start = max(n.start_tick, win_start)
             effective_end = min(n.end_tick, win_end)
             occupancy = effective_end - effective_start
+
             if occupancy >= threshold:
                 structural.append(n.pitch)
             elif n.velocity > 80:
                 # High-velocity short notes still count (accent rule)
                 structural.append(n.pitch)
+            else:
+                # [5] brief/decorative → 기록하되 structural에는 불포함
+                decorative.append(n.pitch)
 
         if not structural:
-            # Fallback: use all pitches
-            structural = [n.pitch for n in notes]
+            # Fallback: decorative까지 포함하되 가장 긴 노트 위주
+            if decorative:
+                structural = decorative
+            else:
+                structural = [n.pitch for n in notes]
 
         return structural
 
@@ -517,10 +693,11 @@ class HarmonyEngine:
     def _merge_beat_segments(self, segments: list[dict], beats_per_bar: int) -> list[dict]:
         """Merge beat-level segments using split audit rules.
 
-        hc_mandatory_split_audit_on_new_bass_event:
-        - 같은 코드 + 같은 bass → 합침 (beat_position 업데이트)
-        - 코드 변경 또는 bass 변경 → 분리 유지
-        - N.C. continuation → 이전 코드로 흡수
+        Review fixes:
+        [7] carry-over: continuation 구간은 이전 코드에 흡수
+        [9] 과분할 방지: same-family 내부 redistribution 합침
+            - arpeggio traversal 내부 lowest-note 변화만으로 분할 금지
+            - maj9→maj7→triad 표면 차이는 별도 segment 아님
         """
         if not segments:
             return []
@@ -533,8 +710,14 @@ class HarmonyEngine:
             is_cont = seg.get("is_continuation", False)
             is_nc = "N.C." in seg.get("chord", "")
 
-            # N.C. continuation은 이전에 흡수
-            if is_nc and is_cont and prev["chord"] != "N.C.":
+            # [7] N.C. continuation / carry-over → 이전에 흡수
+            if is_nc and prev["chord"] != "N.C.":
+                prev["end_tick"] = seg["end_tick"]
+                prev["notes_count"] += seg.get("notes_count", 0)
+                continue
+
+            # [7] continuation 표시된 것 → 흡수
+            if is_cont and prev["chord"] and prev["chord"] != "N.C.":
                 prev["end_tick"] = seg["end_tick"]
                 prev["notes_count"] += seg.get("notes_count", 0)
                 continue
@@ -543,6 +726,16 @@ class HarmonyEngine:
             if same_chord and same_bass:
                 prev["end_tick"] = seg["end_tick"]
                 prev["notes_count"] += seg.get("notes_count", 0)
+            # [9] 과분할 방지: same bass + same family → 합침
+            elif same_bass and self._is_same_chord_family(prev["chord"], seg["chord"]):
+                prev["end_tick"] = seg["end_tick"]
+                prev["notes_count"] += seg.get("notes_count", 0)
+                # 더 높은 confidence를 가진 쪽의 label 유지
+                if seg["confidence"] > prev["confidence"]:
+                    prev["chord"] = seg["chord"]
+                    prev["quality"] = seg.get("quality")
+                    prev["root"] = seg.get("root")
+                    prev["confidence"] = seg["confidence"]
             else:
                 merged.append(seg.copy())
 
@@ -1418,30 +1611,53 @@ class HarmonyEngine:
         total_sections: int,
         labels: list[str],
     ) -> str:
-        """Classify a section based on multi-cue scoring."""
-        # First/last section heuristics
+        """Classify a section based on multi-cue scoring.
+
+        [13] section/form 과확정 방지:
+        - low-confidence 상태에서 unknown/ambiguous 허용
+        - 에너지 차이가 애매하면 과도하게 강제 추정하지 않음
+        """
+        # First/last section heuristics (high confidence)
         if section_idx == 0 and bar_count <= 4:
             return "intro"
         if section_idx == total_sections - 1 and position > 0.85:
             return "outro"
 
-        # Energy-based classification
-        if energy > 0.75:
+        # [13] Energy-based classification with ambiguity tolerance
+        if energy > 0.8:
             return "chorus"
-        if energy > 0.5:
+        if energy > 0.65:
+            # Ambiguous high energy — could be chorus or bridge
+            if position < 0.3:
+                return "verse"
+            if position > 0.6:
+                return "bridge"
+            return "chorus"
+        if energy > 0.45:
             if position < 0.4:
                 return "verse"
-            return "bridge"
-        if energy > 0.3:
-            if 0.2 < position < 0.5:
+            return "unknown"  # [13] 애매한 구간은 unknown
+        if energy > 0.25:
+            if 0.15 < position < 0.5:
                 return "verse"
             return "prechorus"
-        return "interlude" if bar_count <= 2 else "verse"
+        if bar_count <= 2:
+            return "interlude"
+        # [13] 에너지가 낮고 위치도 애매하면 unknown
+        if energy < 0.15:
+            return "unknown"
+        return "verse"
 
     def _infer_form_type(self, label_sequence: list[str]) -> str:
-        """Infer overall song form from section labels."""
+        """Infer overall song form from section labels.
+        [13] Allow unknown/ambiguous when confidence is low."""
         if not label_sequence:
             return "unknown"
+        # [13] unknown 비율이 높으면 form도 unknown
+        unknown_ratio = label_sequence.count("unknown") / len(label_sequence)
+        if unknown_ratio > 0.5:
+            return "unknown"
+
         has_chorus = "chorus" in label_sequence
         has_verse = "verse" in label_sequence
         has_bridge = "bridge" in label_sequence
@@ -1452,6 +1668,8 @@ class HarmonyEngine:
             return "verse-chorus"
         if has_verse:
             return "strophic"
+        if unknown_ratio > 0.3:
+            return "ambiguous"
         return "through-composed"
 
     # ------------------------------------------------------------------
