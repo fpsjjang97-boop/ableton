@@ -56,6 +56,86 @@ _CHORD_TEMPLATES: dict[str, list[int]] = {
     "13":      [0, 2, 4, 7, 9, 10],
 }
 
+# ---------------------------------------------------------------------------
+# Scoring constants (ported from midi_analyzer v2 pipeline)
+# ---------------------------------------------------------------------------
+
+# Template vectors for cosine similarity: 12-element chroma, root boosted +0.5
+_TEMPLATE_VECS: list[dict] = []  # populated in _build_all_template_vecs()
+
+def _build_all_template_vecs() -> list[dict]:
+    """Pre-build 216 template vectors (12 roots × 18 chord types)."""
+    vecs = []
+    for root in range(12):
+        for ctype, intervals in _CHORD_TEMPLATES.items():
+            pcs = frozenset((root + iv) % 12 for iv in intervals)
+            vec = np.zeros(12)
+            for pc in pcs:
+                vec[pc] = 1.0
+            vec[root] += 0.5  # root boost
+            norm = np.linalg.norm(vec)
+            if norm > 1e-9:
+                vec = vec / norm
+            vecs.append({
+                "root": root,
+                "chord_type": ctype,
+                "pitch_classes": pcs,
+                "template_vec": vec,
+            })
+    return vecs
+
+_TEMPLATE_VECS = _build_all_template_vecs()
+
+# Cosine similarity
+def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
+    na, nb = np.linalg.norm(a), np.linalg.norm(b)
+    if na < 1e-9 or nb < 1e-9:
+        return 0.0
+    return float(np.dot(a, b) / (na * nb))
+
+# Krumhansl-Schmuckler key profiles
+_KS_MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
+_KS_MINOR = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+
+def _estimate_key(chroma: np.ndarray) -> tuple[int, str, float]:
+    """Krumhansl-Schmuckler key estimation. Returns (root_pc, mode, correlation)."""
+    if chroma.sum() < 1e-9:
+        return 0, "major", 0.0
+    best_root, best_mode, best_corr = 0, "major", -1.0
+    for root in range(12):
+        rotated = np.roll(chroma, -root)
+        for mode, profile in [("major", _KS_MAJOR), ("minor", _KS_MINOR)]:
+            corr = float(np.corrcoef(rotated, profile)[0, 1])
+            if corr > best_corr:
+                best_root, best_mode, best_corr = root, mode, corr
+    return best_root, best_mode, best_corr
+
+# Circle-of-fifths progression bonus
+_CIRCLE_BONUS: dict[int, float] = {7: 0.06, 5: 0.06, 2: 0.03, 10: 0.03}
+
+# Dominant motion constants
+_DOM_TYPES = frozenset({"7", "7sus4", "7b9", "7#9", "9", "13"})
+_LEADING_TYPES = frozenset({"dim", "dim7", "m7b5"})
+_SUBDOM_TYPES = frozenset({"min", "m7", "m6", "m9", "madd9", "m7b5"})
+_TONIC_TRIAD_TYPES = frozenset({"maj", "min", "sus4", "sus2"})
+_TONIC_7TH_TYPES = frozenset({"maj7", "m7", "m9", "6", "m6", "add9", "madd9", "maj9"})
+
+# Extension intervals for evidence checking
+_EXT_INTERVALS: dict[str, int] = {
+    "7": 10, "maj7": 11, "m7": 10, "m7b5": 10, "dim7": 9,
+    "7sus4": 10, "7b9": 10, "7#9": 10, "9": 10, "m9": 10,
+    "maj9": 11, "6": 9, "m6": 9, "add9": 2, "madd9": 2,
+    "11": 10, "13": 10,
+}
+
+# Seventh chord underlying triad kind (for shell check)
+_SEVENTH_TRIAD_KIND: dict[str, str] = {
+    "7": "maj", "maj7": "maj", "m7": "min", "m9": "min",
+    "m7b5": "dim", "dim7": "dim", "7sus4": "sus4", "7b9": "maj", "7#9": "maj",
+    "6": "maj", "m6": "min", "add9": "maj", "madd9": "min",
+    "9": "maj", "maj9": "maj", "11": "sus4", "13": "maj",
+}
+
 _RULE_DB_FILENAME = "260327_최종본_v2.07_song_form_added.json"
 
 
@@ -125,15 +205,10 @@ class HarmonyEngine:
         self, pitches: list[int], bass_pitch: Optional[int] = None,
         bass_is_structural: bool = True,
     ) -> dict:
-        """Identify chord using v2.09 sequential pipeline (not scoring).
+        """Identify chord using full-candidate scoring (GPT method).
 
-        Pipeline (hc_mandatory_per_segment_pipeline):
-        Step 1: Identify actual sounding bass
-        Step 2: Collect structural pitch classes
-        Step 3: Test same-root shell from bass
-        Step 4: Test slash/inversion interpretations
-        Step 5: Check quality (sus4-first when no 3rd)
-        Step 6: Select final label
+        Scores ALL 12 roots × ALL qualities simultaneously.
+        score = matched*2 - missing*1.2 - extra*1.5 + bass_bonus
         """
         _nc = {"label": "N.C.", "root": None, "quality": None,
                "bass": None, "confidence": 0.0, "alternatives": [],
@@ -145,191 +220,630 @@ class HarmonyEngine:
         pcs = sorted(pcs_set)
         bass_pc = (bass_pitch % 12) if bass_pitch is not None else (min(pitches) % 12)
         bass_name = _PC_NAMES[bass_pc]
-        upper_pcs = pcs_set - {bass_pc} if len(pcs_set) > 1 else pcs_set
 
-        # Step 1: bass structural check
         if not bass_is_structural:
             return {**_nc, "bass": bass_name,
                     "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
                     "label": "N.C.(bass-insufficient)"}
 
-        alternatives: list[dict] = []
+        # Score ALL candidates: 12 roots × all qualities
+        candidates: list[tuple[float, int, str, bool]] = []  # (score, root, quality, is_slash)
+        observed = pcs_set
 
-        def _make_label(root_pc, quality, slash_bass_pc=None):
-            root_name = _PC_NAMES[root_pc]
-            lbl = f"{root_name}{quality}" if quality != "maj" else root_name
-            is_slash = slash_bass_pc is not None and slash_bass_pc != root_pc
-            if is_slash:
-                lbl = f"{lbl}/{_PC_NAMES[slash_bass_pc]}"
-            return lbl, root_name, is_slash
-
-        def _match(root_pc, quality):
-            """How well does this template match the observed pcs?"""
-            template = _CHORD_TEMPLATES.get(quality)
-            if template is None:
-                return 0, 0
-            expected = set((root_pc + iv) % 12 for iv in template)
-            matched = len(expected & pcs_set)
-            return matched, len(expected)
-
-        def _best_template(root_pc, exclude=None):
-            """Find best matching template for a given root."""
-            exclude = exclude or set()
-            best_q, best_match, best_total = None, 0, 0
+        for root in range(12):
             for quality, template in _CHORD_TEMPLATES.items():
-                if quality in exclude:
+                formula = set((root + iv) % 12 for iv in template)
+                inter = formula & observed
+                missing = formula - observed
+                extra = observed - formula
+
+                if len(extra) > 3:
                     continue
-                expected = set((root_pc + iv) % 12 for iv in template)
-                matched = len(expected & pcs_set)
-                total = len(expected)
-                if matched < max(2, total - 1):
-                    continue
-                ratio = matched / total
-                # prefer higher match ratio, then longer template (more specific)
-                if (ratio > best_match / max(best_total, 1) or
-                        (ratio == best_match / max(best_total, 1) and total > best_total)):
-                    best_q, best_match, best_total = quality, matched, total
-            return best_q, best_match, best_total
 
-        # ── Step 3: Test same-root shell from bass ──
-        root_pc = bass_pc
-        third_maj = (root_pc + 4) % 12
-        third_min = (root_pc + 3) % 12
-        fifth = (root_pc + 7) % 12
-        fourth = (root_pc + 5) % 12
-        has_maj3 = third_maj in pcs_set
-        has_min3 = third_min in pcs_set
-        has_5th = fifth in pcs_set
-        has_4th = fourth in pcs_set
+                score = len(inter) * 2.0 - len(missing) * 1.2 - len(extra) * 1.5
 
-        # ── Step 5 interleaved: sus4-first check (hc_sus4_branch_lock) ──
-        if not has_maj3 and not has_min3 and has_4th:
-            # No 3rd, 4th present -> sus4-first branch
-            m7, _ = _match(root_pc, "7sus4")
-            ms, _ = _match(root_pc, "sus4")
-            if m7 >= 3:
-                quality = "7sus4"
-            else:
-                quality = "sus4"
-            label, root_name, is_slash = _make_label(root_pc, quality)
-            # still collect alternatives
-            alt_q, am, at = _best_template(root_pc, exclude={"sus4", "7sus4"})
-            if alt_q:
-                al, _, _ = _make_label(root_pc, alt_q)
-                alternatives.append({"label": al, "confidence": round(am / max(at, 1), 3)})
-            return {
-                "label": label, "root": root_name, "quality": quality,
-                "bass": bass_name, "confidence": 1.0,
-                "alternatives": alternatives[:3],
-                "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
-                "is_slash": is_slash,
-            }
+                # Bass alignment (graduated)
+                is_slash = root != bass_pc
+                if root == bass_pc:
+                    score += 0.8    # bass = root: best
+                elif (bass_pc - root) % 12 in {iv % 12 for iv in template}:
+                    score += 0.4    # bass = chord tone: OK (inversion)
+                else:
+                    score -= 0.6    # bass = non-chord tone: penalty
 
-        # ── Step 3 continued: find best bass=root template ──
-        bass_root_q, bass_root_match, bass_root_total = _best_template(root_pc)
-        bass_root_conf = bass_root_match / max(bass_root_total, 1) if bass_root_q else 0
+                # hc_sus4_branch_lock: if 4th present + no 3rd, boost sus4
+                fourth = (root + 5) % 12
+                maj3 = (root + 4) % 12
+                min3 = (root + 3) % 12
+                if root == bass_pc and fourth in observed:
+                    if maj3 not in observed and min3 not in observed:
+                        if quality in ("sus4", "7sus4"):
+                            score += 0.5
 
-        # ── Step 4: Test slash/inversion from ALL roots x ALL qualities ──
-        # hc_mandatory_per_segment_pipeline: Step 4 skip 금지
-        # 화성학적 우선순위: 7th chords > triads, functional (m7b5, 7) > color (6, add9)
-        _FUNCTIONAL_PRIORITY = {
-            "m7b5": 10, "dim7": 9, "7": 8, "m7": 8, "maj7": 7,
-            "7sus4": 7, "7b9": 8, "7#9": 8, "9": 7, "m9": 7,
-            "min": 5, "maj": 5, "dim": 6, "aug": 5, "sus4": 4, "sus2": 4,
-            "m6": 3, "6": 3, "add9": 3, "madd9": 3,
-            "11": 6, "13": 6, "maj9": 6,
+                candidates.append((round(score, 3), root, quality, is_slash))
+
+        if not candidates:
+            return {**_nc, "bass": bass_name,
+                    "pitch_classes": [_PC_NAMES[pc] for pc in pcs]}
+
+        # Sort by score descending
+        candidates.sort(key=lambda c: -c[0])
+
+        # Build result from top candidate
+        top_score, top_root, top_quality, top_is_slash = candidates[0]
+        root_name = _PC_NAMES[top_root]
+
+        label = f"{root_name}{top_quality}" if top_quality != "maj" else root_name
+        if top_is_slash:
+            label = f"{label}/{bass_name}"
+
+        # Confidence: normalize score to 0-1 range
+        max_possible = len(pcs_set) * 2.0 + 0.8
+        confidence = round(max(0.0, min(1.0, top_score / max(max_possible, 1))), 3)
+
+        # Alternatives (top 2-4, deduplicated labels)
+        alternatives: list[dict] = []
+        seen_labels = {label}
+        for sc, rt, qt, sl in candidates[1:]:
+            alt_root = _PC_NAMES[rt]
+            alt_label = f"{alt_root}{qt}" if qt != "maj" else alt_root
+            if sl:
+                alt_label = f"{alt_label}/{bass_name}"
+            if alt_label not in seen_labels:
+                seen_labels.add(alt_label)
+                alt_conf = round(max(0.0, min(1.0, sc / max(max_possible, 1))), 3)
+                alternatives.append({"label": alt_label, "confidence": alt_conf})
+            if len(alternatives) >= 3:
+                break
+
+        return {
+            "label": label, "root": root_name, "quality": top_quality,
+            "bass": bass_name, "confidence": confidence,
+            "alternatives": alternatives,
+            "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
+            "is_slash": top_is_slash,
         }
-        slash_candidates = []
-        for alt_root in range(12):
-            if alt_root == bass_pc:
-                continue
-            # 모든 quality를 테스트 (best만이 아님)
-            for alt_q, alt_tmpl in _CHORD_TEMPLATES.items():
-                alt_expected = set((alt_root + iv) % 12 for iv in alt_tmpl)
-                am = len(alt_expected & pcs_set)
-                at = len(alt_expected)
-                if am < max(2, at - 1):
-                    continue
-                # bass가 이 코드의 chord tone인지 확인
-                if bass_pc not in alt_expected:
-                    continue
-                conf = am / max(at, 1)
-                priority = _FUNCTIONAL_PRIORITY.get(alt_q, 1)
-                slash_candidates.append((alt_root, alt_q, conf, am, at, priority))
-
-        best_slash = None
-        if slash_candidates:
-            # 정렬: 매칭 비율 > 기능적 우선순위 > match count
-            slash_candidates.sort(key=lambda x: (-x[2], -x[5], -x[3]))
-            best_slash = slash_candidates[0]
-
-        # ── Step 6: Decision — bass=root vs slash ──
-        # hc_mandatory_per_segment_pipeline: Step 4를 절대 건너뛰지 않음
-        # slash가 bass=root보다 나은 경우:
-        #   a) bass=root 해석이 없음
-        #   b) slash가 완전 매칭(4/4 이상)이고 bass=root는 불완전
-        #   c) slash의 match_count가 bass=root보다 엄격히 높음
-        use_slash = False
-        if bass_root_q is None and best_slash is not None:
-            use_slash = True
-        elif bass_root_q is not None and best_slash is not None:
-            slash_conf = best_slash[2]
-            slash_match = best_slash[3]
-            slash_total = best_slash[4]
-            # bass=root가 불완전(match < total)이고 slash가 완전 매칭이면 slash 선택
-            if slash_match >= slash_total and bass_root_match < bass_root_total:
-                use_slash = True
-            # slash match_count가 bass=root보다 2개 이상 많으면 slash
-            elif slash_match >= bass_root_match + 2:
-                use_slash = True
-            # bass=root가 약하고(conf<0.7) slash가 완전 매칭이면 slash
-            elif slash_conf >= 1.0 and bass_root_conf < 0.7:
-                use_slash = True
-
-        if use_slash and best_slash:
-            s_root, s_qual, s_conf = best_slash[0], best_slash[1], best_slash[2]
-            label, root_name, is_slash = _make_label(s_root, s_qual, slash_bass_pc=bass_pc)
-            # bass=root as alternative
-            if bass_root_q:
-                al, _, _ = _make_label(bass_pc, bass_root_q)
-                alternatives.append({"label": al, "confidence": round(bass_root_conf, 3)})
-            # other slashes as alternatives
-            for sc in slash_candidates[1:3]:
-                al, _, _ = _make_label(sc[0], sc[1], slash_bass_pc=bass_pc)
-                alternatives.append({"label": al, "confidence": round(sc[2], 3)})
-            return {
-                "label": label, "root": root_name, "quality": s_qual,
-                "bass": bass_name, "confidence": round(min(1.0, s_conf), 3),
-                "alternatives": alternatives[:3],
-                "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
-                "is_slash": True,
-            }
-
-        if bass_root_q:
-            label, root_name, is_slash = _make_label(bass_pc, bass_root_q)
-            # collect alternatives from slash candidates
-            for sc in slash_candidates[:2]:
-                al, _, _ = _make_label(sc[0], sc[1], slash_bass_pc=bass_pc)
-                alternatives.append({"label": al, "confidence": round(sc[2], 3)})
-            # also try next-best bass=root quality
-            alt_q2, am2, at2 = _best_template(bass_pc, exclude={bass_root_q})
-            if alt_q2:
-                al2, _, _ = _make_label(bass_pc, alt_q2)
-                alternatives.append({"label": al2, "confidence": round(am2 / max(at2, 1), 3)})
-            return {
-                "label": label, "root": root_name, "quality": bass_root_q,
-                "bass": bass_name, "confidence": round(min(1.0, bass_root_conf), 3),
-                "alternatives": sorted(alternatives, key=lambda x: -x["confidence"])[:3],
-                "pitch_classes": [_PC_NAMES[pc] for pc in pcs],
-                "is_slash": False,
-            }
-
-        # Fallback: no valid interpretation
-        return {**_nc, "bass": bass_name,
-                "pitch_classes": [_PC_NAMES[pc] for pc in pcs]}
 
     # ------------------------------------------------------------------
-    # 2. Track-level Harmony Analysis
+    # 1b. Chroma-based Scoring Engine (v2 pipeline)
+    # ------------------------------------------------------------------
+
+    def _compute_chroma(
+        self, notes: list[Note], win_start: int, win_end: int,
+        beat_per_bar: int,
+    ) -> tuple[np.ndarray, int, frozenset, dict, dict, frozenset]:
+        """Compute weighted chroma vector for a segment.
+
+        Returns: (chroma_12, bass_pc, pitch_classes, pc_durations, pc_velocities, pc_on_strong)
+        """
+        chroma = np.zeros(12)
+        if not notes:
+            return chroma, -1, frozenset(), {}, {}, frozenset()
+
+        window_ticks = win_end - win_start
+        pc_durations: dict[int, float] = {}
+        pc_velocities: dict[int, int] = {}
+        durations_raw: list[float] = []
+
+        # Compute per-note effective duration
+        note_data = []
+        for n in notes:
+            eff_start = max(n.start_tick, win_start)
+            eff_end = min(n.end_tick, win_end)
+            dur = max(0, eff_end - eff_start)
+            pc = n.pitch % 12
+            note_data.append((n, pc, dur))
+            durations_raw.append(dur)
+            pc_durations[pc] = pc_durations.get(pc, 0) + dur
+            pc_velocities[pc] = max(pc_velocities.get(pc, 0), n.velocity)
+
+        avg_dur = np.mean(durations_raw) if durations_raw else 1.0
+        bass_pitch = min(notes, key=lambda n: n.pitch).pitch
+        bass_pc = bass_pitch % 12
+
+        # Beat positions for strong-beat detection
+        beat_in_bar_start = ((win_start // _BEAT) % beat_per_bar) + 1
+        is_downbeat = beat_in_bar_start == 1
+        is_on_beat = True  # grid segments always start on beat
+
+        pc_on_strong: set[int] = set()
+
+        for n, pc, dur in note_data:
+            if dur <= 0:
+                continue
+            base_weight = dur * (n.velocity / 127.0)
+
+            # Strong beat boost
+            onset_in_win = max(n.start_tick, win_start)
+            onset_beat = ((onset_in_win // _BEAT) % beat_per_bar) + 1
+            if onset_beat == 1 or is_on_beat:
+                base_weight *= 1.2
+                pc_on_strong.add(pc)
+
+            # Bass note boost
+            if n.pitch == bass_pitch:
+                base_weight *= 1.4
+
+            # Long note boost
+            if avg_dur > 0 and dur > avg_dur * 1.5:
+                base_weight *= 1.25
+
+            # Short note attenuation
+            if avg_dur > 0 and dur < avg_dur * 0.3:
+                base_weight *= 0.65
+
+            chroma[pc] += base_weight
+
+        pitch_classes = frozenset(pc for pc in pc_durations if pc_durations[pc] > 0)
+        return chroma, bass_pc, pitch_classes, pc_durations, pc_velocities, frozenset(pc_on_strong)
+
+    @staticmethod
+    def _same_root_tier4_eligible(bass_pc: int, chord_type: str, pcs: frozenset) -> bool:
+        """Check if a same-root candidate qualifies for Tier 4 (full shell)."""
+        if chord_type in ("aug", "aug7", "dim", "dim7", "m7b5"):
+            return False
+        triad_kind = _SEVENTH_TRIAD_KIND.get(chord_type, chord_type)
+        if triad_kind == "maj":
+            return (bass_pc + 4) % 12 in pcs and (bass_pc + 7) % 12 in pcs
+        elif triad_kind == "min":
+            return (bass_pc + 3) % 12 in pcs and (bass_pc + 7) % 12 in pcs
+        elif triad_kind == "dim":
+            return (bass_pc + 3) % 12 in pcs and (bass_pc + 6) % 12 in pcs
+        elif triad_kind == "sus4":
+            return (bass_pc + 5) % 12 in pcs and (bass_pc + 7) % 12 in pcs
+        elif triad_kind == "sus2":
+            return (bass_pc + 2) % 12 in pcs and (bass_pc + 7) % 12 in pcs
+        elif triad_kind == "aug":
+            return (bass_pc + 4) % 12 in pcs and (bass_pc + 8) % 12 in pcs
+        return False
+
+    def _build_raw_candidates(
+        self, chroma: np.ndarray, bass_pc: int, pcs: frozenset,
+        prev_root: Optional[int],
+    ) -> list[dict]:
+        """Build chord candidates using 4-tier bass-first pipeline."""
+        if chroma.sum() < 1e-9 or bass_pc < 0:
+            return []
+
+        def _prog(tpl_root):
+            if prev_root is None:
+                return 0.0
+            return _CIRCLE_BONUS.get((tpl_root - prev_root) % 12, 0.0)
+
+        # Upper chroma for slash detection
+        upper_chroma = chroma.copy()
+        upper_chroma[bass_pc] *= 0.15
+
+        rows: list[dict] = []
+        seen: set[tuple] = set()
+
+        for tpl in _TEMPLATE_VECS:
+            root, ctype = tpl["root"], tpl["chord_type"]
+            tpl_pcs = tpl["pitch_classes"]
+            tpl_vec = tpl["template_vec"]
+            key = (root, ctype, bass_pc if root != bass_pc else -1)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            cos = _cosine_sim(chroma, tpl_vec)
+
+            if root == bass_pc:
+                # Tier 4 or 3: same-root
+                if self._same_root_tier4_eligible(bass_pc, ctype, pcs):
+                    tier, bonus = 4, 0.12
+                else:
+                    tier, bonus = 3, 0.05
+                rows.append({
+                    "root": root, "chord_type": ctype, "slash_bass": -1,
+                    "score": cos + bonus + _prog(root), "tier": tier,
+                    "tpl_pcs": tpl_pcs,
+                })
+            elif bass_pc in tpl_pcs:
+                # Tier 3a: inversion (bass is chord tone)
+                rows.append({
+                    "root": root, "chord_type": ctype, "slash_bass": bass_pc,
+                    "score": cos + 0.05 + _prog(root), "tier": 3,
+                    "tpl_pcs": tpl_pcs,
+                })
+            else:
+                # Try slash chord (upper structure)
+                upper_sim = _cosine_sim(upper_chroma, tpl_vec)
+                if upper_sim > 0.50:
+                    rows.append({
+                        "root": root, "chord_type": ctype, "slash_bass": bass_pc,
+                        "score": upper_sim + _prog(root), "tier": 2,
+                        "tpl_pcs": tpl_pcs,
+                    })
+                else:
+                    # Tier 1: fallback root position
+                    rows.append({
+                        "root": root, "chord_type": ctype, "slash_bass": -1,
+                        "score": cos - 0.04 + _prog(root), "tier": 1,
+                        "tpl_pcs": tpl_pcs,
+                    })
+
+        # Sort by tier desc, then score desc; keep top 48 → deduplicate to 12
+        rows.sort(key=lambda r: (-r["tier"], -r["score"]))
+        dedup: list[dict] = []
+        dedup_keys: set[tuple] = set()
+        for r in rows[:48]:
+            dk = (r["root"], r["chord_type"], r["slash_bass"])
+            if dk not in dedup_keys:
+                dedup_keys.add(dk)
+                dedup.append(r)
+            if len(dedup) >= 12:
+                break
+        return dedup
+
+    # ── Rule adjustment functions ──
+
+    def _adj_sus4(self, c: dict, bass_pc: int, pcs: frozenset,
+                  pc_durations: dict, window_dur: float) -> float:
+        root = c["root"]
+        if root != bass_pc and c["slash_bass"] < 0:
+            return 0.0
+        effective_root = bass_pc
+        fourth = (effective_root + 5) % 12
+        maj3 = (effective_root + 4) % 12
+        min3 = (effective_root + 3) % 12
+        has_4th = fourth in pcs
+        if not has_4th:
+            return 0.0
+        # Check if 3rd is structural
+        third_dur = pc_durations.get(maj3, 0) + pc_durations.get(min3, 0)
+        third_structural = (third_dur / max(window_dur, 1)) > 0.10 if window_dur > 0 else False
+
+        ctype = c["chord_type"]
+        if ctype in ("sus4", "7sus4"):
+            if third_structural:
+                return -0.22  # False sus4 — 3rd is actually present
+            return 0.15  # Confirmed sus4
+        else:
+            # Non-sus4 candidate but 4th is present
+            if not third_structural:
+                if ctype in ("min", "m7", "m7b5"):
+                    return -0.18  # Suppress minor when sus4 is more likely
+        return 0.0
+
+    def _adj_same_root_shell(self, c: dict, bass_pc: int, pcs: frozenset) -> float:
+        if c["slash_bass"] >= 0 or c["root"] != bass_pc:
+            return 0.0
+        root = c["root"]
+        # Shell definitions
+        shells = [
+            ({0, 4, 7, 10}, {"7", "6"}),
+            ({0, 3, 7, 10}, {"m7", "m6"}),
+            ({0, 4, 7, 11}, {"maj7"}),
+            ({0, 4, 7}, {"maj", "7", "maj7", "6", "add9"}),
+            ({0, 3, 7}, {"min", "m7", "m9", "m6", "madd9"}),
+            ({0, 4, 10}, {"7"}),
+            ({0, 3, 10}, {"m7", "m7b5"}),
+            ({0, 4, 11}, {"maj7"}),
+            ({0, 5, 7}, {"sus4", "7sus4"}),
+        ]
+        rel_pcs = frozenset((pc - root) % 12 for pc in pcs)
+        for shell_pcs, types in shells:
+            if c["chord_type"] in types and shell_pcs.issubset(rel_pcs):
+                return 0.08
+        # Partial shell: root + 3rd or root + 5th
+        if {0, 4}.issubset(rel_pcs) or {0, 3}.issubset(rel_pcs) or {0, 7}.issubset(rel_pcs):
+            return 0.04
+        return 0.0
+
+    def _adj_extension_evidence(
+        self, c: dict, chroma: np.ndarray, pc_durations: dict,
+        pc_on_strong: frozenset, window_dur: float,
+    ) -> float:
+        ext_iv = _EXT_INTERVALS.get(c["chord_type"])
+        if ext_iv is None:
+            return 0.0
+        ext_pc = (c["root"] + ext_iv) % 12
+        total_energy = chroma.sum()
+        evidence = 0.0
+        if total_energy > 0 and chroma[ext_pc] / total_energy >= 0.10:
+            evidence += 1.0
+        if window_dur > 0 and pc_durations.get(ext_pc, 0) / window_dur >= 0.15:
+            evidence += 1.0
+        if ext_pc in pc_on_strong:
+            evidence += 1.0
+        if evidence >= 2.0:
+            return 0.04
+        elif evidence >= 1.0:
+            return -0.07
+        return -0.12
+
+    def _adj_dominant_motion(
+        self, c: dict, prev_root: Optional[int], prev_type: Optional[str],
+        next_bass_pc: Optional[int], bass_pc: int, pcs: frozenset,
+    ) -> float:
+        delta = 0.0
+        root = c["root"]
+        ctype = c["chord_type"]
+
+        # Forward: this chord → next
+        if next_bass_pc is not None:
+            interval_to_next = (next_bass_pc - root) % 12
+            if ctype in _DOM_TYPES:
+                if interval_to_next == 5:  # V→I
+                    delta += 0.22
+                    if c["slash_bass"] >= 0:
+                        delta = min(delta + 0.08, 0.30)
+                elif interval_to_next == 9:  # V→vi (deceptive)
+                    delta += 0.08
+            elif ctype in ("maj",) and interval_to_next == 5:
+                b7 = (root + 10) % 12
+                delta += 0.06 if b7 in pcs else 0.04
+            elif ctype in _LEADING_TYPES and interval_to_next == 1:
+                delta += 0.08
+            elif ctype in _SUBDOM_TYPES and interval_to_next == 7:  # ii→V
+                delta += 0.05
+            elif ctype in ("min", "m7") and interval_to_next == 5:
+                delta += 0.03
+
+        # Backward: prev chord → this
+        if prev_root is not None and prev_type is not None:
+            interval_from_prev = (root - prev_root) % 12
+            if prev_type in _DOM_TYPES:
+                if interval_from_prev == 5:  # prev was V, this is I
+                    if ctype in _TONIC_TRIAD_TYPES:
+                        delta += 0.12
+                    elif ctype in _TONIC_7TH_TYPES:
+                        delta += 0.09
+                elif interval_from_prev == 9:  # prev was V, this is vi
+                    delta += 0.09
+            elif prev_type in _LEADING_TYPES and interval_from_prev == 1:
+                delta += 0.08
+            elif prev_type in _DOM_TYPES and ctype in _DOM_TYPES:
+                delta += 0.07  # Secondary dominant chain
+
+        return delta
+
+    def _adj_no_third_quality(self, c: dict, bass_pc: int, pcs: frozenset) -> float:
+        if c["root"] != bass_pc or c["slash_bass"] >= 0:
+            return 0.0
+        maj3 = (bass_pc + 4) % 12
+        min3 = (bass_pc + 3) % 12
+        if maj3 not in pcs and min3 not in pcs:
+            if c["chord_type"] in ("maj", "min", "7", "maj7", "m7", "m7b5", "6", "m6"):
+                return -0.06
+        return 0.0
+
+    def _adj_slash_bass_awareness(self, c: dict, bass_pc: int) -> float:
+        if c["root"] != bass_pc and c["slash_bass"] < 0:
+            return -0.06
+        return 0.0
+
+    def _adj_major_third_in_bass(self, c: dict, bass_pc: int, pcs: frozenset) -> float:
+        if c["chord_type"] != "maj" or c["slash_bass"] != bass_pc:
+            return 0.0
+        root = c["root"]
+        if (bass_pc - root) % 12 == 4:  # Bass is major 3rd
+            p5 = (root + 7) % 12
+            if root in pcs and bass_pc in pcs and p5 in pcs:
+                return 0.20
+        return 0.0
+
+    def _adj_unexplained_strong_pc(
+        self, c: dict, bass_pc: int, pc_durations: dict, window_dur: float,
+    ) -> float:
+        explained = set(c["tpl_pcs"])
+        if c["slash_bass"] >= 0:
+            explained.add(c["slash_bass"])
+        explained.add(bass_pc)
+        # add9 for major slash
+        if c["chord_type"] == "maj" and c["slash_bass"] >= 0:
+            explained.add((c["root"] + 2) % 12)
+        total_penalty = 0.0
+        for pc, dur in pc_durations.items():
+            ratio = dur / max(window_dur, 1)
+            if ratio >= 0.14 and pc not in explained:
+                total_penalty -= min(0.22, 0.10 + ratio * 0.22)
+        return max(total_penalty, -0.42)
+
+    def _adj_plain_triad_over_add9_slash(self, c: dict, bass_pc: int, pcs: frozenset) -> float:
+        if c["chord_type"] != "add9" or c["slash_bass"] < 0:
+            return 0.0
+        root = c["root"]
+        if (bass_pc - root) % 12 == 4:
+            p5 = (root + 7) % 12
+            if root in pcs and bass_pc in pcs and p5 in pcs:
+                return -0.24
+        return 0.0
+
+    def _apply_rule_adjustments(
+        self, candidates: list[dict], chroma: np.ndarray, bass_pc: int,
+        pcs: frozenset, pc_durations: dict, pc_velocities: dict,
+        pc_on_strong: frozenset, window_dur: float,
+        prev_root: Optional[int], prev_type: Optional[str],
+        next_bass_pc: Optional[int],
+    ) -> list[dict]:
+        """Apply all 9 rule adjustment functions to candidates."""
+        for c in candidates:
+            adj = 0.0
+            adj += self._adj_sus4(c, bass_pc, pcs, pc_durations, window_dur)
+            adj += self._adj_same_root_shell(c, bass_pc, pcs)
+            adj += self._adj_extension_evidence(c, chroma, pc_durations, pc_on_strong, window_dur)
+            adj += self._adj_dominant_motion(c, prev_root, prev_type, next_bass_pc, bass_pc, pcs)
+            adj += self._adj_no_third_quality(c, bass_pc, pcs)
+            adj += self._adj_slash_bass_awareness(c, bass_pc)
+            adj += self._adj_major_third_in_bass(c, bass_pc, pcs)
+            adj += self._adj_unexplained_strong_pc(c, bass_pc, pc_durations, window_dur)
+            adj += self._adj_plain_triad_over_add9_slash(c, bass_pc, pcs)
+            c["score"] = round(c["score"] + adj, 4)
+        candidates.sort(key=lambda c: -c["score"])
+        return candidates[:7]
+
+    def _score_segment(
+        self, chroma: np.ndarray, bass_pc: int, pcs: frozenset,
+        pc_durations: dict, pc_velocities: dict, pc_on_strong: frozenset,
+        window_dur: float,
+        prev_root: Optional[int], prev_type: Optional[str],
+        next_bass_pc: Optional[int],
+        ambiguity_threshold: float = 0.08,
+    ) -> dict:
+        """Score a single segment and return analysis result dict."""
+        _nc = {"chord": "N.C.", "root": None, "root_pc": None, "quality": None,
+               "bass": None, "confidence": 0.0, "alternatives": [],
+               "is_slash": False, "was_ambiguous": False}
+        if chroma.sum() < 1e-9:
+            return _nc
+
+        if bass_pc >= 0:
+            candidates = self._build_raw_candidates(chroma, bass_pc, pcs, prev_root)
+        else:
+            # No bass: cosine scan all templates
+            candidates = []
+            seen: set[tuple] = set()
+            for tpl in _TEMPLATE_VECS:
+                root, ctype = tpl["root"], tpl["chord_type"]
+                cos = _cosine_sim(chroma, tpl["template_vec"])
+                prog = _CIRCLE_BONUS.get((root - prev_root) % 12, 0.0) if prev_root is not None else 0.0
+                dk = (root, ctype, -1)
+                if dk not in seen:
+                    seen.add(dk)
+                    candidates.append({
+                        "root": root, "chord_type": ctype, "slash_bass": -1,
+                        "score": cos + prog, "tier": 1, "tpl_pcs": tpl["pitch_classes"],
+                    })
+            candidates.sort(key=lambda c: -c["score"])
+            candidates = candidates[:12]
+
+        if not candidates:
+            return _nc
+
+        # Apply rules
+        candidates = self._apply_rule_adjustments(
+            candidates, chroma, bass_pc, pcs, pc_durations,
+            pc_velocities, pc_on_strong, window_dur,
+            prev_root, prev_type, next_bass_pc,
+        )
+
+        if not candidates:
+            return _nc
+
+        # Build result
+        top = candidates[0]
+        root_name = _PC_NAMES[top["root"]]
+        bass_name = _PC_NAMES[bass_pc] if bass_pc >= 0 else None
+        is_slash = top["slash_bass"] >= 0 and top["slash_bass"] != top["root"]
+
+        ctype = top["chord_type"]
+        label = f"{root_name}{ctype}" if ctype != "maj" else root_name
+        if is_slash:
+            label = f"{label}/{_PC_NAMES[top['slash_bass']]}"
+
+        alternatives = []
+        for alt in candidates[1:4]:
+            alt_root = _PC_NAMES[alt["root"]]
+            alt_label = f"{alt_root}{alt['chord_type']}" if alt["chord_type"] != "maj" else alt_root
+            if alt["slash_bass"] >= 0 and alt["slash_bass"] != alt["root"]:
+                alt_label = f"{alt_label}/{_PC_NAMES[alt['slash_bass']]}"
+            alternatives.append({"label": alt_label, "confidence": round(alt["score"], 3)})
+
+        was_ambiguous = (len(candidates) >= 2 and
+                         (candidates[0]["score"] - candidates[1]["score"]) < ambiguity_threshold)
+
+        return {
+            "chord": label, "root": root_name, "root_pc": top["root"],
+            "quality": ctype, "bass": bass_name,
+            "confidence": round(max(0, min(1.0, top["score"])), 3),
+            "alternatives": alternatives, "is_slash": is_slash,
+            "was_ambiguous": was_ambiguous,
+        }
+
+    def _consolidate_by_measure(
+        self, raw_analyses: list[dict], seg_data: list[dict],
+        beat_per_bar: int, prev_root_init: Optional[int] = None,
+        prev_type_init: Optional[str] = None,
+        ambiguity_threshold: float = 0.08,
+    ) -> list[dict]:
+        """Re-score at half-bar level: sum chroma within each half-bar."""
+        from collections import defaultdict
+
+        # Group by (bar, half): half 0 = beat 1-2, half 1 = beat 3-4
+        half_bar_beats = max(2, beat_per_bar // 2)
+        half_groups: dict[tuple[int, int], list[int]] = defaultdict(list)
+        for i, sd in enumerate(seg_data):
+            bar = sd["bar"]
+            beat_in_bar = sd.get("beat_in_bar", 1)
+            half = 0 if beat_in_bar <= half_bar_beats else 1
+            half_groups[(bar, half)].append(i)
+
+        merged: list[dict] = []
+        prev_root = prev_root_init
+        prev_type = prev_type_init
+
+        for (bar_num, half_idx) in sorted(half_groups.keys()):
+            indices = half_groups[(bar_num, half_idx)]
+            if not indices:
+                continue
+            groups = [indices]
+
+            for grp in groups:
+                if not grp:
+                    continue
+                # Sum chroma and merge metadata
+                combined_chroma = np.zeros(12)
+                combined_pcs: set[int] = set()
+                combined_durations: dict[int, float] = {}
+                combined_velocities: dict[int, int] = {}
+                combined_on_strong: set[int] = set()
+                total_dur = 0.0
+                total_notes = 0
+
+                # Bass: prefer downbeat, then longest-sounding
+                group_bass_durs: dict[int, float] = defaultdict(float)
+                first_bass = seg_data[grp[0]].get("bass_pc", -1)
+
+                for i in grp:
+                    sd = seg_data[i]
+                    combined_chroma += sd["chroma"]
+                    combined_pcs |= sd.get("pcs", set())
+                    for pc, dur in sd.get("pc_durations", {}).items():
+                        combined_durations[pc] = combined_durations.get(pc, 0) + dur
+                    for pc, vel in sd.get("pc_velocities", {}).items():
+                        combined_velocities[pc] = max(combined_velocities.get(pc, 0), vel)
+                    combined_on_strong |= sd.get("pc_on_strong", set())
+                    total_dur += sd.get("window_dur", _BEAT)
+                    total_notes += sd.get("notes_count", 0)
+                    bp = sd.get("bass_pc", -1)
+                    if bp >= 0:
+                        group_bass_durs[bp] += sd.get("window_dur", _BEAT)
+
+                structural_bass = first_bass
+                if group_bass_durs:
+                    structural_bass = max(group_bass_durs, key=group_bass_durs.get)
+
+                # next_bass: look at next group or next bar
+                next_bass = None
+                grp_last = grp[-1]
+                if grp_last + 1 < len(seg_data):
+                    next_bass = seg_data[grp_last + 1].get("bass_pc")
+
+                result = self._score_segment(
+                    combined_chroma, structural_bass, frozenset(combined_pcs),
+                    combined_durations, combined_velocities, frozenset(combined_on_strong),
+                    total_dur, prev_root, prev_type, next_bass, ambiguity_threshold,
+                )
+
+                result["start_tick"] = seg_data[grp[0]]["start_tick"]
+                result["end_tick"] = seg_data[grp[-1]]["end_tick"]
+                result["bar"] = bar_num
+                result["beat_in_bar"] = seg_data[grp[0]].get("beat_in_bar", 1)
+                result["beat_position"] = str(seg_data[grp[0]].get("beat_in_bar", 1))
+                result["notes_count"] = total_notes
+                result["is_continuation"] = False
+
+                merged.append(result)
+                if result.get("root_pc") is not None:
+                    prev_root = result["root_pc"]
+                    prev_type = result.get("quality")
+
+        return merged
+
+    # ------------------------------------------------------------------
+    # 2. Track-level Harmony Analysis (v2 — chroma + cosine + rules)
     # ------------------------------------------------------------------
 
     def analyze_harmony(
@@ -339,115 +853,202 @@ class HarmonyEngine:
         scale: str = "minor",
         time_sig_num: int = 4,
         time_sig_den: int = 4,
+        **_kwargs,
     ) -> dict:
-        """Analyze a MIDI track and return per-segment chord labels.
+        """Analyze a MIDI track: auto chord-change detection + direct identify_chord.
 
-        Follows the analysis pipeline from the rule DB:
-        bass-first, structural vs surface separation, arpeggio awareness.
+        Segments are created where pitch_classes or bass actually change.
+        No fixed grid — the music's own harmonic rhythm determines boundaries.
         """
         if not track.notes:
             return {
-                "segments": [],
-                "key_estimate": key,
-                "meter_verified": True,
-                "overall_score": 0,
+                "segments": [], "key_estimate": key, "key_confidence": 0.0,
+                "meter_verified": True, "overall_score": 0, "num_segments": 0,
+                "ambiguity_count": 0, "chord_count": 0,
                 "issues": ["Track is empty"],
             }
 
-        # ── Beat-level segmentation (hc_mid_measure_harmony_split_required) ──
-        # 1박 단위로 분석 후, split audit으로 필요 시 합치거나 유지
-        beat_per_bar = time_sig_num
-        bar_ticks = _BEAT * beat_per_bar
+        bar_ticks = _BEAT * time_sig_num
 
-        total_ticks = max(n.end_tick for n in track.notes)
-        total_beats = max(1, int(math.ceil(total_ticks / _BEAT)))
+        # ── 1. Auto chord-change detection ──
+        notes = sorted(track.notes, key=lambda n: n.start_tick)
 
+        # Build micro-segments at every note boundary
+        boundaries = sorted(set(
+            [n.start_tick for n in notes] + [n.end_tick for n in notes]
+        ))
+        micros: list[dict] = []
+        for i in range(len(boundaries) - 1):
+            ts, te = boundaries[i], boundaries[i + 1]
+            if te <= ts:
+                continue
+            sounding = [n for n in notes if n.start_tick < te and n.end_tick > ts]
+            if not sounding:
+                continue
+            pcs = frozenset(n.pitch % 12 for n in sounding)
+            bass_pc = min(sounding, key=lambda n: n.pitch).pitch % 12
+            micros.append({"start": ts, "end": te, "pcs": pcs, "bass_pc": bass_pc})
+
+        if not micros:
+            return {
+                "segments": [], "key_estimate": key, "key_confidence": 0.0,
+                "meter_verified": True, "overall_score": 0, "num_segments": 0,
+                "ambiguity_count": 0, "chord_count": 0,
+                "issues": ["No segments (empty)"],
+            }
+
+        # Merge: same bass AND identical PCs only
+        merged_boundaries: list[dict] = [dict(micros[0])]
+        for m in micros[1:]:
+            p = merged_boundaries[-1]
+            if m["bass_pc"] == p["bass_pc"] and m["pcs"] == p["pcs"]:
+                p["end"] = m["end"]
+            else:
+                merged_boundaries.append(dict(m))
+
+        # Snap boundaries to beat grid and enforce minimum 1 beat
+        def _snap(tick: int) -> int:
+            return round(tick / _BEAT) * _BEAT
+
+        for mb in merged_boundaries:
+            mb["start"] = _snap(mb["start"])
+            mb["end"] = _snap(mb["end"])
+
+        # Remove zero-length after snap, merge consecutive same-snap
+        snapped: list[dict] = []
+        for mb in merged_boundaries:
+            if mb["end"] <= mb["start"]:
+                continue
+            if snapped and mb["start"] == snapped[-1]["end"] and mb["bass_pc"] == snapped[-1]["bass_pc"] and mb["pcs"] == snapped[-1]["pcs"]:
+                snapped[-1]["end"] = mb["end"]
+            else:
+                snapped.append(mb)
+
+        # Enforce minimum 1 beat: absorb short segments into previous
+        # Enforce maximum 4 beats: split long segments at beat grid
+        _MAX_DUR = _BEAT * 4
+        expanded: list[dict] = []
+        for mb in snapped:
+            dur = mb["end"] - mb["start"]
+            if dur > _MAX_DUR:
+                cursor = mb["start"]
+                while cursor < mb["end"]:
+                    chunk_end = min(cursor + _MAX_DUR, mb["end"])
+                    if chunk_end - cursor >= _BEAT:
+                        expanded.append({"start": cursor, "end": chunk_end,
+                                         "pcs": mb["pcs"], "bass_pc": mb["bass_pc"]})
+                    cursor = chunk_end
+            else:
+                expanded.append(mb)
+
+        final_bounds: list[dict] = [expanded[0]] if expanded else []
+        for m in expanded[1:]:
+            if m["end"] - m["start"] < _BEAT:
+                final_bounds[-1]["end"] = m["end"]
+            else:
+                final_bounds.append(m)
+
+        # ── 2. Build segments with raw notes + chord labels ──
         raw_segments: list[dict] = []
-        prev_label = ""
+        for fb in final_bounds:
+            h_start, h_end = fb["start"], fb["end"]
+            bar = h_start // bar_ticks + 1
+            beat_in_bar = (h_start % bar_ticks) // _BEAT + 1
 
-        for beat_idx in range(total_beats):
-            win_start = beat_idx * _BEAT
-            win_end = win_start + _BEAT
-            bar_num = beat_idx // beat_per_bar + 1
-            beat_in_bar = beat_idx % beat_per_bar + 1
-            notes_in_win = track.get_notes_in_range(win_start, win_end)
-
-            if not notes_in_win:
-                raw_segments.append({
-                    "start_tick": win_start,
-                    "end_tick": win_end,
-                    "bar": bar_num,
-                    "beat_in_bar": beat_in_bar,
-                    "beat_position": str(beat_in_bar),
-                    "chord": prev_label or "N.C.",
-                    "confidence": 0.0,
-                    "notes_count": 0,
-                    "bass": None,
-                    "root": None,
-                    "quality": None,
-                    "alternatives": [],
-                    "is_slash": False,
-                    "is_continuation": True,
-                })
+            notes_in = track.get_notes_in_range(h_start, h_end)
+            if not notes_in:
                 continue
 
-            # Step 1: bass identification
-            bass_candidates = sorted(notes_in_win, key=lambda n: (n.pitch, -n.duration_ticks))
-            bass_note = bass_candidates[0]
-
-            # bass structural check (relaxed threshold for beat-level)
-            bass_eff_start = max(bass_note.start_tick, win_start)
-            bass_eff_end = min(bass_note.end_tick, win_end)
-            bass_occ = bass_eff_end - bass_eff_start
-            bass_is_structural = (bass_occ >= (_BEAT * 0.08) or bass_note.velocity >= 60)
-
-            # Step 2: structural pitches
-            structural_pitches = self._extract_structural_pitches(
-                notes_in_win, win_start, win_end, _BEAT
+            window_ticks = h_end - h_start
+            structural = self._extract_structural_pitches(
+                notes_in, h_start, h_end, max(window_ticks, 1)
             )
 
-            # Step 3-6: chord identification
+            onset_notes = [n for n in notes_in if n.start_tick >= h_start]
+            if not onset_notes:
+                onset_notes = notes_in
+            bass_note = min(onset_notes, key=lambda n: (n.pitch, -n.duration_ticks))
+
+            bass_eff_start = max(bass_note.start_tick, h_start)
+            bass_eff_end = min(bass_note.end_tick, h_end)
+            bass_occ = bass_eff_end - bass_eff_start
+            bass_is_structural = (bass_occ >= (window_ticks * 0.08) or bass_note.velocity >= 60)
+
+            raw_notes = []
+            for n in sorted(notes_in, key=lambda n: (n.start_tick, n.pitch)):
+                eff_start = max(n.start_tick, h_start)
+                eff_end = min(n.end_tick, h_end)
+                raw_notes.append({
+                    "pitch": n.pitch,
+                    "name": _PC_NAMES[n.pitch % 12] + str(n.pitch // 12 - 1),
+                    "start_tick": n.start_tick,
+                    "duration_ticks": n.duration_ticks,
+                    "effective_duration": eff_end - eff_start,
+                    "velocity": n.velocity,
+                })
+
+            pcs_sorted = sorted(set(n.pitch % 12 for n in notes_in))
+            bass_info = {
+                "pitch": bass_note.pitch,
+                "name": _PC_NAMES[bass_note.pitch % 12] + str(bass_note.pitch // 12 - 1),
+                "pc": _PC_NAMES[bass_note.pitch % 12],
+            }
+
             chord_info = self.identify_chord(
-                structural_pitches, bass_note.pitch,
+                structural, bass_note.pitch,
                 bass_is_structural=bass_is_structural,
             )
 
-            prev_bass = raw_segments[-1].get("bass") if raw_segments else None
-            bass_changed = (prev_bass is not None and
-                            chord_info["bass"] is not None and
-                            prev_bass != chord_info["bass"])
-            is_continuation = (chord_info["label"] == prev_label and
-                               chord_info["confidence"] < 0.7 and
-                               not bass_changed)
-
+            dur_beats = round((h_end - h_start) / _BEAT, 2)
             raw_segments.append({
-                "start_tick": win_start,
-                "end_tick": win_end,
-                "bar": bar_num,
+                "start_tick": h_start,
+                "end_tick": h_end,
+                "bar": bar,
                 "beat_in_bar": beat_in_bar,
                 "beat_position": str(beat_in_bar),
+                "duration_beats": dur_beats,
+                "raw_notes": raw_notes,
+                "bass": bass_info,
+                "pitch_classes": [_PC_NAMES[pc] for pc in pcs_sorted],
+                "notes_count": len(notes_in),
                 "chord": chord_info["label"],
-                "confidence": chord_info["confidence"],
                 "root": chord_info["root"],
+                "root_pc": _PC_NAMES.index(chord_info["root"]) if chord_info["root"] in _PC_NAMES else None,
                 "quality": chord_info["quality"],
-                "bass": chord_info["bass"],
+                "confidence": chord_info["confidence"],
                 "alternatives": chord_info["alternatives"],
                 "is_slash": chord_info["is_slash"],
-                "notes_count": len(notes_in_win),
-                "is_continuation": is_continuation,
+                "was_ambiguous": False,
+                "is_continuation": False,
             })
-            prev_label = chord_info["label"]
 
-        # ── Split audit merge (hc_mandatory_split_audit_on_new_bass_event) ──
-        # 같은 코드 + 같은 bass면 합치고, 다르면 유지
-        merged = self._merge_beat_segments(raw_segments, beat_per_bar)
+        if not raw_segments:
+            return {
+                "segments": [], "key_estimate": key, "key_confidence": 0.0,
+                "meter_verified": True, "overall_score": 0, "num_segments": 0,
+                "ambiguity_count": 0, "chord_count": 0,
+                "issues": ["No segments (empty)"],
+            }
 
-        # Score
+        # ── 2. Estimate key via Krumhansl-Schmuckler ──
+        global_chroma = np.zeros(12)
+        for n in track.notes:
+            global_chroma[n.pitch % 12] += n.duration_ticks * (n.velocity / 127.0)
+        key_root_pc, key_mode, key_conf = _estimate_key(global_chroma)
+        estimated_key = _PC_NAMES[key_root_pc]
+        if key_conf > 0.5:
+            key = estimated_key
+
+        # ── 3. Merge consecutive identical chords ──
+        merged = self._merge_adjacent(raw_segments)
+
+        # ── 4. Final stats ──
         conf_vals = [s["confidence"] for s in merged if s["confidence"] > 0]
-        avg_confidence = np.mean(conf_vals) if conf_vals else 0.0
-        overall_score = int(round(float(avg_confidence) * 100)) if not np.isnan(avg_confidence) else 0
+        avg_confidence = float(np.mean(conf_vals)) if conf_vals else 0.0
+        overall_score = int(round(avg_confidence * 100)) if not np.isnan(avg_confidence) else 0
+        ambiguity_count = sum(1 for s in merged if s.get("was_ambiguous", False))
 
-        issues = []
+        issues: list[str] = []
         low_conf = [s for s in merged if 0 < s["confidence"] < 0.5]
         if low_conf:
             issues.append(f"{len(low_conf)} segment(s) with low confidence")
@@ -458,12 +1059,22 @@ class HarmonyEngine:
         return {
             "segments": merged,
             "key_estimate": key,
+            "key_confidence": round(key_conf, 3),
             "meter_verified": True,
             "overall_score": overall_score,
+            "num_segments": len(merged),
+            "ambiguity_count": ambiguity_count,
             "chord_count": len(set(s["chord"] for s in merged
-                                   if s["chord"] != "N.C." and "insufficient" not in s["chord"])),
+                                   if s["chord"] != "N.C." and "insufficient" not in s.get("chord", ""))),
             "issues": issues,
         }
+
+    def _merge_adjacent(self, analyses: list[dict]) -> list[dict]:
+        """No merging — keep every half-bar segment as-is.
+
+        Each half-bar has unique raw_notes, so merging would lose data.
+        """
+        return [seg.copy() for seg in analyses]
 
     def _extract_structural_pitches(
         self,
@@ -472,28 +1083,19 @@ class HarmonyEngine:
         win_end: int,
         window_ticks: int,
     ) -> list[int]:
-        """Extract structurally significant pitches, filtering surface notes.
-
-        Follows rule DB: duration occupancy > 25% of window = structural.
-        Short arpeggio notes contribute pitch class but not re-label authority.
-        """
+        """Extract structurally significant pitches, filtering surface notes."""
         threshold = window_ticks * 0.2
         structural = []
         for n in notes:
-            # Clip note to window boundaries
             effective_start = max(n.start_tick, win_start)
             effective_end = min(n.end_tick, win_end)
             occupancy = effective_end - effective_start
             if occupancy >= threshold:
                 structural.append(n.pitch)
             elif n.velocity > 80:
-                # High-velocity short notes still count (accent rule)
                 structural.append(n.pitch)
-
         if not structural:
-            # Fallback: use all pitches
             structural = [n.pitch for n in notes]
-
         return structural
 
     def _merge_segments(self, segments: list[dict]) -> list[dict]:
@@ -515,16 +1117,9 @@ class HarmonyEngine:
         return merged
 
     def _merge_beat_segments(self, segments: list[dict], beats_per_bar: int) -> list[dict]:
-        """Merge beat-level segments using split audit rules.
-
-        hc_mandatory_split_audit_on_new_bass_event:
-        - 같은 코드 + 같은 bass → 합침 (beat_position 업데이트)
-        - 코드 변경 또는 bass 변경 → 분리 유지
-        - N.C. continuation → 이전 코드로 흡수
-        """
+        """Merge beat-level segments using split audit rules."""
         if not segments:
             return []
-
         merged = [segments[0].copy()]
         for seg in segments[1:]:
             prev = merged[-1]
@@ -532,24 +1127,17 @@ class HarmonyEngine:
             same_bass = seg.get("bass") == prev.get("bass")
             is_cont = seg.get("is_continuation", False)
             is_nc = "N.C." in seg.get("chord", "")
-
-            # N.C. continuation은 이전에 흡수
             if is_nc and is_cont and prev["chord"] != "N.C.":
                 prev["end_tick"] = seg["end_tick"]
                 prev["notes_count"] += seg.get("notes_count", 0)
                 continue
-
-            # 같은 코드 + 같은 bass → 합침
             if same_chord and same_bass:
                 prev["end_tick"] = seg["end_tick"]
                 prev["notes_count"] += seg.get("notes_count", 0)
             else:
                 merged.append(seg.copy())
-
-        # beat_position을 bar 기준으로 정리
         for seg in merged:
             seg["beat_position"] = str(seg.get("beat_in_bar", 1))
-
         return merged
 
     # ------------------------------------------------------------------

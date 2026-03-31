@@ -40,7 +40,7 @@ else:
     sys.path.insert(0, str(APP_DIR))
 
 import mido
-from core.models import Note, Track, ProjectState, TICKS_PER_BEAT
+from core.models import Note, Track, CCEvent, ProjectState, TICKS_PER_BEAT
 from core.harmony_engine import HarmonyEngine
 
 ANALYZED_DIR = REPO_ROOT / "analyzed_chords"
@@ -54,13 +54,24 @@ INGEST_LOG_PATH = PATTERN_DIR / "ingest_log.json"
 def parse_midi_to_tracks(midi_path: str) -> tuple[list[Track], float, int]:
     """Parse a MIDI file into Track objects using mido.
 
+    Reads notes, CC events (sustain pedal etc.), program changes,
+    track names, and preserves empty tracks.
+
     Returns (tracks, bpm, ticks_per_beat).
+    The returned tracks carry a `_meta` dict on the list object with extra info:
+      tracks._meta = {"song_name": str, "time_sig": (num, den)}
     """
     mid = mido.MidiFile(midi_path)
     tpb = mid.ticks_per_beat or 480
     bpm = 120.0
+    song_name = ""
+    time_sig_num, time_sig_den = 4, 4
 
     track_notes: dict[int, list[Note]] = {}
+    track_ccs: dict[int, list[CCEvent]] = {}
+    track_names: dict[int, str] = {}
+    track_instruments: dict[int, int] = {}
+    track_channels: dict[int, int] = {}
 
     for i, midi_track in enumerate(mid.tracks):
         abs_tick = 0
@@ -72,8 +83,30 @@ def parse_midi_to_tracks(midi_path: str) -> tuple[list[Track], float, int]:
             if msg.type == "set_tempo":
                 bpm = round(mido.tempo2bpm(msg.tempo), 2)
 
+            elif msg.type == "time_signature":
+                time_sig_num = msg.numerator
+                time_sig_den = msg.denominator
+
+            elif msg.type == "track_name":
+                track_names[i] = msg.name
+                if i == 0 and not song_name:
+                    song_name = msg.name
+
+            elif msg.type == "program_change":
+                track_instruments[i] = msg.program
+                track_channels.setdefault(i, msg.channel)
+
+            elif msg.type == "control_change":
+                ch = msg.channel
+                track_channels.setdefault(i, ch)
+                track_ccs.setdefault(i, []).append(
+                    CCEvent(tick=abs_tick, control=msg.control,
+                            value=msg.value, channel=ch)
+                )
+
             elif msg.type == "note_on" and msg.velocity > 0:
                 ch = msg.channel
+                track_channels.setdefault(i, ch)
                 key = (ch, msg.note)
                 if key in active:
                     prev = active.pop(key)
@@ -101,17 +134,223 @@ def parse_midi_to_tracks(midi_path: str) -> tuple[list[Track], float, int]:
             if n.duration_ticks == 0:
                 n.duration_ticks = max(1, tpb)
 
+    # Build tracks — preserve ALL tracks including empty ones (except pure-meta track 0)
     tracks = []
-    for idx in sorted(track_notes.keys()):
-        notes = track_notes[idx]
-        if notes:
-            notes.sort(key=lambda n: n.start_tick)
-            ch = notes[0].channel
-            tracks.append(
-                Track(name=f"Track_{idx}_ch{ch}", channel=ch, notes=notes)
-            )
+    all_indices = sorted(
+        set(track_notes.keys()) | set(track_ccs.keys()) |
+        {k for k in track_names if k > 0}
+    )
 
-    return tracks, bpm, tpb
+    for idx in all_indices:
+        notes = track_notes.get(idx, [])
+        notes.sort(key=lambda n: n.start_tick)
+        ccs = track_ccs.get(idx, [])
+        ccs.sort(key=lambda cc: cc.tick)
+        ch = track_channels.get(idx, notes[0].channel if notes else 0)
+        name = track_names.get(idx, f"Track_{idx}_ch{ch}")
+        inst = track_instruments.get(idx, 0)
+        tracks.append(
+            Track(name=name, channel=ch, notes=notes,
+                  cc_events=ccs, instrument=inst)
+        )
+
+    # Attach metadata for lossless round-trip
+    class _TrackList(list):
+        _meta: dict = {}
+    result = _TrackList(tracks)
+    result._meta = {
+        "song_name": song_name,
+        "time_sig": (time_sig_num, time_sig_den),
+    }
+    return result, bpm, tpb
+
+
+def apply_sustain_pedal(tracks: list[Track]) -> list[Track]:
+    """Extend note durations to account for sustain pedal (CC64).
+
+    When pedal is ON (CC64 >= 64), notes ending before pedal OFF
+    should have their effective duration extended to the pedal OFF tick.
+    Returns new Track list with adjusted note durations (originals untouched).
+    """
+    result = []
+    for trk in tracks:
+        pedal_events = [(cc.tick, cc.value) for cc in trk.cc_events if cc.control == 64]
+        if not pedal_events or not trk.notes:
+            result.append(trk)
+            continue
+
+        pedal_events.sort(key=lambda x: x[0])
+
+        # Build pedal-on regions: [(on_tick, off_tick), ...]
+        regions: list[tuple[int, int]] = []
+        on_tick = None
+        for tick, val in pedal_events:
+            if val >= 64 and on_tick is None:
+                on_tick = tick
+            elif val < 64 and on_tick is not None:
+                regions.append((on_tick, tick))
+                on_tick = None
+        # Unclosed pedal: extend to end of track
+        if on_tick is not None:
+            last_tick = max(n.end_tick for n in trk.notes) if trk.notes else on_tick
+            regions.append((on_tick, last_tick))
+
+        if not regions:
+            result.append(trk)
+            continue
+
+        # Extend notes: if note ends inside a pedal region, stretch to region end
+        new_notes = []
+        for n in trk.notes:
+            extended = False
+            for ped_on, ped_off in regions:
+                # Note started before or during pedal, ends during pedal
+                if n.start_tick <= ped_off and n.end_tick > ped_on and n.end_tick < ped_off:
+                    new_dur = ped_off - n.start_tick
+                    new_notes.append(Note(
+                        pitch=n.pitch, velocity=n.velocity,
+                        start_tick=n.start_tick, duration_ticks=new_dur,
+                        channel=n.channel, articulation=n.articulation,
+                        role=n.role, transition=n.transition,
+                    ))
+                    extended = True
+                    break
+            if not extended:
+                new_notes.append(n.copy())
+
+        new_trk = trk.copy()
+        new_trk.notes = new_notes
+        result.append(new_trk)
+
+    return result
+
+
+def classify_tracks(
+    tracks: list[Track],
+) -> tuple[list[Track], list[Track]]:
+    """Classify tracks into melody vs accompaniment for chord analysis.
+
+    Returns (melody_tracks, accompaniment_tracks).
+
+    Detection priority:
+    1. Track name keywords (MELODY, PIANO, Vocals, Chords, Bass, etc.)
+    2. Pitch-range heuristic (narrow+high = melody, wide+low = accompaniment)
+    3. Single track → treat as accompaniment
+    """
+    note_tracks = [t for t in tracks if t.notes]
+    if not note_tracks:
+        return [], []
+    if len(note_tracks) == 1:
+        return [], note_tracks  # single track = accompaniment
+
+    _MEL_KEYWORDS = {"melody", "vocal", "vocals", "voice", "lead", "sing"}
+    _ACC_KEYWORDS = {"piano", "chord", "chords", "accomp", "bass", "harmony",
+                     "block", "pad", "string", "guitar", "organ", "midi"}
+
+    melody: list[Track] = []
+    accompaniment: list[Track] = []
+    unclassified: list[Track] = []
+
+    for t in note_tracks:
+        name_lower = t.name.lower().strip()
+        if any(kw in name_lower for kw in _MEL_KEYWORDS):
+            melody.append(t)
+        elif any(kw in name_lower for kw in _ACC_KEYWORDS):
+            accompaniment.append(t)
+        else:
+            unclassified.append(t)
+
+    # If nothing classified by name, use heuristic
+    if not melody and not accompaniment and len(unclassified) >= 2:
+        # Sort by note count ascending (melody usually has fewer notes)
+        unclassified.sort(key=lambda t: len(t.notes))
+        for t in unclassified:
+            pitches = [n.pitch for n in t.notes]
+            min_p, max_p = min(pitches), max(pitches)
+            has_cc = len(t.cc_events) > 0
+            pitch_range = max_p - min_p
+            # Melody: fewer notes, narrow range, higher register, no CC
+            # Accompaniment: more notes, wide range, low bass, has CC
+            if pitch_range <= 18 and min_p >= 52 and not has_cc and len(t.notes) < 80:
+                melody.append(t)
+            else:
+                accompaniment.append(t)
+    elif unclassified:
+        # Some already classified by name — still check unclassified by heuristic
+        for t in unclassified:
+            pitches = [n.pitch for n in t.notes]
+            min_p, max_p = min(pitches), max(pitches)
+            has_cc = len(t.cc_events) > 0
+            pitch_range = max_p - min_p
+            if pitch_range <= 18 and min_p >= 52 and not has_cc and len(t.notes) < 80:
+                melody.append(t)
+            else:
+                accompaniment.append(t)
+
+    # Fallback: if still no accompaniment, treat all as accompaniment
+    if not accompaniment:
+        accompaniment = melody + accompaniment
+        melody = []
+
+    return melody, accompaniment
+
+
+def save_tracks_to_midi(
+    path: str,
+    tracks: list[Track],
+    bpm: float = 120.0,
+    tpb: int = 480,
+) -> None:
+    """Write Track objects back to a Standard MIDI File (lossless round-trip).
+
+    Preserves notes, CC events, program changes, track names, and meta info.
+    """
+    meta = getattr(tracks, "_meta", {})
+    song_name = meta.get("song_name", "")
+    tsig = meta.get("time_sig", (4, 4))
+
+    mid = mido.MidiFile(ticks_per_beat=tpb)
+
+    # Meta track
+    meta_track = mido.MidiTrack()
+    mid.tracks.append(meta_track)
+    if song_name:
+        meta_track.append(mido.MetaMessage("track_name", name=song_name, time=0))
+    meta_track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(bpm), time=0))
+    meta_track.append(mido.MetaMessage(
+        "time_signature", numerator=tsig[0], denominator=tsig[1], time=0))
+    meta_track.append(mido.MetaMessage("end_of_track", time=0))
+
+    # Data tracks
+    for trk in tracks:
+        mt = mido.MidiTrack()
+        mid.tracks.append(mt)
+        mt.append(mido.MetaMessage("track_name", name=trk.name, time=0))
+        if trk.instrument > 0:
+            mt.append(mido.Message(
+                "program_change", program=trk.instrument,
+                channel=trk.channel, time=0))
+
+        events: list[tuple[int, mido.Message]] = []
+        for n in trk.notes:
+            events.append((n.start_tick, mido.Message(
+                "note_on", note=n.pitch, velocity=n.velocity, channel=n.channel)))
+            events.append((n.end_tick, mido.Message(
+                "note_off", note=n.pitch, velocity=0, channel=n.channel)))
+        for cc in trk.cc_events:
+            events.append((cc.tick, mido.Message(
+                "control_change", control=cc.control,
+                value=cc.value, channel=cc.channel)))
+
+        events.sort(key=lambda e: e[0])
+        last_tick = 0
+        for abs_tick, msg in events:
+            msg.time = max(0, abs_tick - last_tick)
+            mt.append(msg)
+            last_tick = abs_tick
+        mt.append(mido.MetaMessage("end_of_track", time=0))
+
+    mid.save(path)
 
 
 # ── Difficulty heuristic ─────────────────────────────────────────────────

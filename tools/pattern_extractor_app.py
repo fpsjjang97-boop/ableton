@@ -460,11 +460,14 @@ class PreviewDialog(QDialog):
         left_lay.setSpacing(6)
 
         # Basic info card
+        pedal_label = "Yes" if data.get("sustain_pedal_applied") else "No"
         left_lay.addWidget(self._card("기본 정보", [
             ("파일", data.get("file", "")),
             ("BPM", str(data.get("bpm", ""))),
             ("트랙 수", str(data.get("num_tracks", ""))),
             ("총 노트", f"{data.get('total_notes', 0):,}"),
+            ("CC 이벤트", f"{data.get('total_cc_events', 0):,}"),
+            ("페달 반영", pedal_label),
             ("Schema", data.get("schema_version", "")),
         ]))
 
@@ -473,8 +476,9 @@ class PreviewDialog(QDialog):
         left_lay.addWidget(self._card("화성 분석", [
             ("전체 점수", f"{h.get('overall_score', 0)}/100"),
             ("코드 수", str(h.get("chord_count", 0))),
-            ("추정 키", h.get("key_estimate", "?")),
+            ("추정 키", f"{h.get('key_estimate', '?')} (conf {h.get('key_confidence', 0):.2f})"),
             ("세그먼트", str(h.get("num_segments", 0))),
+            ("모호 구간", str(h.get("ambiguity_count", 0))),
         ]))
 
         # Song form card
@@ -521,7 +525,85 @@ class PreviewDialog(QDialog):
 
         left_lay.addStretch()
 
-        # ── Right: JSON Tree ──
+        # ── Right: Tabs (Review + JSON Tree) ──
+        from PyQt6.QtWidgets import QTabWidget, QLineEdit, QScrollArea
+
+        right_tabs = QTabWidget()
+
+        # --- Tab 1: Chord Review ---
+        review_widget = QWidget()
+        review_lay = QVBoxLayout(review_widget)
+        review_lay.setContentsMargins(4, 4, 4, 4)
+        review_lay.setSpacing(2)
+
+        review_scroll = QScrollArea()
+        review_scroll.setWidgetResizable(True)
+        review_inner = QWidget()
+        review_inner_lay = QVBoxLayout(review_inner)
+        review_inner_lay.setContentsMargins(4, 4, 4, 4)
+        review_inner_lay.setSpacing(4)
+
+        self._review_edits: list[tuple[QLineEdit, QCheckBox, dict]] = []
+        segments = data.get("harmony", {}).get("segments", [])
+        for seg in segments:
+            bar = seg.get("bar", "?")
+            bp = seg.get("beat_position", "?")
+            pcs = seg.get("pitch_classes", [])
+            bass = seg.get("bass", {})
+            bass_name = bass.get("pc", "?") if isinstance(bass, dict) else str(bass)
+            chord = seg.get("chord", "")
+            alts = seg.get("alternatives", [])
+            conf = seg.get("confidence", 0)
+
+            frame = QGroupBox(f"Bar {bar} beat {bp}")
+            frame.setStyleSheet(f"QGroupBox {{ font-size: 11px; color: {C['text']}; padding-top: 12px; }}")
+            frame_lay = QVBoxLayout(frame)
+            frame_lay.setContentsMargins(8, 4, 8, 4)
+            frame_lay.setSpacing(2)
+
+            info = QLabel(f"PCs: {', '.join(pcs)}  |  Bass: {bass_name}  |  Notes: {seg.get('notes_count', 0)}")
+            info.setStyleSheet(f"color: {C['text_sec']}; font-size: 10px;")
+            frame_lay.addWidget(info)
+
+            edit_row = QHBoxLayout()
+            edit_row.addWidget(QLabel("코드:"))
+            le = QLineEdit(chord)
+            le.setFixedWidth(120)
+            le.setStyleSheet("font-size: 13px; font-weight: bold;")
+            edit_row.addWidget(le)
+
+            # Alternative buttons
+            for alt in alts[:3]:
+                alt_btn = QPushButton(alt.get("label", ""))
+                alt_btn.setFixedHeight(22)
+                alt_btn.setStyleSheet("font-size: 10px; padding: 1px 6px;")
+                alt_btn.clicked.connect(lambda checked, l=alt.get("label", ""), e=le: e.setText(l))
+                edit_row.addWidget(alt_btn)
+
+            chk = QCheckBox("검수")
+            reviewed = seg.get("reviewed", False)
+            chk.setChecked(reviewed)
+            edit_row.addWidget(chk)
+            edit_row.addStretch()
+            frame_lay.addLayout(edit_row)
+
+            review_inner_lay.addWidget(frame)
+            self._review_edits.append((le, chk, seg))
+
+        review_inner_lay.addStretch()
+        review_scroll.setWidget(review_inner)
+        review_lay.addWidget(review_scroll)
+
+        # Save button
+        btn_save_review = QPushButton("검수 결과 저장")
+        btn_save_review.setProperty("cssClass", "primary")
+        btn_save_review.setFixedHeight(36)
+        btn_save_review.clicked.connect(lambda: self._save_review(data, filename))
+        review_lay.addWidget(btn_save_review)
+
+        right_tabs.addTab(review_widget, "코드 리뷰")
+
+        # --- Tab 2: JSON Tree ---
         right = QWidget()
         right_lay = QVBoxLayout(right)
         right_lay.setContentsMargins(0, 0, 0, 0)
@@ -548,8 +630,10 @@ class PreviewDialog(QDialog):
         self._tree.expandToDepth(1)
         right_lay.addWidget(self._tree)
 
+        right_tabs.addTab(right, "JSON 구조")
+
         splitter.addWidget(left)
-        splitter.addWidget(right)
+        splitter.addWidget(right_tabs)
         splitter.setSizes([340, 660])
         root.addWidget(splitter, 1)
 
@@ -561,6 +645,48 @@ class PreviewDialog(QDialog):
         btn_close.clicked.connect(self.close)
         btn_row.addWidget(btn_close)
         root.addLayout(btn_row)
+
+    def _save_review(self, data: dict, filename: str):
+        """Save reviewed chord labels back to the JSON file."""
+        from datetime import datetime
+
+        segments = data.get("harmony", {}).get("segments", [])
+        reviewed_count = 0
+        for le, chk, seg in self._review_edits:
+            new_label = le.text().strip()
+            is_reviewed = chk.isChecked()
+            if new_label and new_label != seg.get("chord", ""):
+                seg["reviewed_label"] = new_label
+            elif is_reviewed:
+                seg["reviewed_label"] = seg.get("chord", "")
+            seg["reviewed"] = is_reviewed
+            if is_reviewed:
+                seg["reviewed_at"] = datetime.now().isoformat(timespec="seconds")
+                reviewed_count += 1
+
+        # Also update harmonic_events in db_storage
+        events = data.get("db_storage", {}).get("harmonic_events", [])
+        for i, ev in enumerate(events):
+            if i < len(segments):
+                seg = segments[i]
+                if seg.get("reviewed_label"):
+                    ev["reviewed_label"] = seg["reviewed_label"]
+                ev["reviewed"] = seg.get("reviewed", False)
+
+        # Save to file
+        safe_name = filename.replace(".mid", "").replace(" ", "_")
+        out_dir = data.get("_output_dir", "")
+        if not out_dir:
+            out_dir = str(Path(REPO_ROOT) / "output" / "extracted_patterns")
+
+        out_path = Path(out_dir) / f"{safe_name}.json"
+        try:
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+            QMessageBox.information(self, "저장 완료",
+                                   f"검수 {reviewed_count}개 세그먼트 저장됨\n{out_path}")
+        except Exception as e:
+            QMessageBox.warning(self, "저장 실패", str(e))
 
     def _card(self, title: str, items: list[tuple[str, str]]) -> QGroupBox:
         grp = QGroupBox(title)
@@ -739,8 +865,37 @@ class ExtractionWorker(QThread):
             "elapsed_sec": elapsed,
         })
 
+    @staticmethod
+    def _build_lead_sheet(segments, bpm, key):
+        """Build musician-readable lead sheet from segments."""
+        bars: dict[int, list] = {}
+        for s in segments:
+            bars.setdefault(s["bar"], []).append({
+                "beat": int(s.get("beat_position", 1)),
+                "duration": int(s.get("duration_beats", 2)),
+                "chord": s.get("chord", "N.C."),
+            })
+
+        lead = {
+            "bpm": bpm,
+            "key": key,
+            "time_signature": "4/4",
+            "bars": [],
+        }
+        for bar_num in sorted(bars):
+            bar_chords = bars[bar_num]
+            chords_str = " | ".join(c["chord"] for c in bar_chords)
+            lead["bars"].append({
+                "bar": bar_num,
+                "chords": [c["chord"] for c in bar_chords],
+                "beats": [{"beat": c["beat"], "duration": c["duration"],
+                           "chord": c["chord"]} for c in bar_chords],
+                "display": f"|{bar_num:>3}| {chords_str}",
+            })
+        return lead
+
     def _process_one(self, engine, midi_path: str) -> dict:
-        from auto_ingest import parse_midi_to_tracks
+        from auto_ingest import parse_midi_to_tracks, apply_sustain_pedal, classify_tracks
 
         path = Path(midi_path)
 
@@ -749,17 +904,39 @@ class ExtractionWorker(QThread):
         if not tracks:
             raise ValueError("노트 데이터 없음")
 
-        all_notes: list[Note] = []
+        # Classify melody vs accompaniment
+        melody_tracks, acc_tracks = classify_tracks(tracks)
+        mel_names = [t.name for t in melody_tracks] if melody_tracks else ["(none)"]
+        acc_names = [t.name for t in acc_tracks] if acc_tracks else ["(all)"]
+        self.log.emit(f"  트랙 분류: MELODY={mel_names}, ACC={acc_names}")
+
+        # Sustain pedal: extend note durations on accompaniment tracks
+        total_cc = sum(len(t.cc_events) for t in tracks)
+        pedal_count = sum(1 for t in acc_tracks for cc in t.cc_events if cc.control == 64)
+        if pedal_count > 0:
+            self.log.emit(f"  서스테인 페달 적용 중 ({pedal_count} events)...")
+            acc_for_analysis = apply_sustain_pedal(acc_tracks)
+        else:
+            acc_for_analysis = acc_tracks
+
+        # Harmony analysis: accompaniment only (melody excluded)
+        acc_notes: list[Note] = []
+        for t in acc_for_analysis:
+            acc_notes.extend(t.notes)
+        acc_notes.sort(key=lambda n: n.start_tick)
+        acc_combined = Track(name="Accompaniment", channel=0, notes=acc_notes)
+
+        # Original all notes (for stats)
+        all_notes_raw: list[Note] = []
         for t in tracks:
-            all_notes.extend(t.notes)
-        all_notes.sort(key=lambda n: n.start_tick)
-        combined = Track(name="Combined", channel=0, notes=all_notes)
+            all_notes_raw.extend(t.notes)
+        all_notes = all_notes_raw  # for playability etc.
 
         key = self.key_override or "C"
         scale = self.scale_override or "minor"
 
-        self.log.emit("  화성 분석 중...")
-        harmony = engine.analyze_harmony(combined, key=key, scale=scale)
+        self.log.emit(f"  화성 분석 중 (반주 {len(acc_notes)}개 노트, 자동 코드변화 감지)...")
+        harmony = engine.analyze_harmony(acc_combined, key=key, scale=scale)
 
         self.log.emit("  곡 구조 분석 중...")
         project = ProjectState(
@@ -790,13 +967,18 @@ class ExtractionWorker(QThread):
                 "event_id": f"{midi_id}_he_{idx}",
                 "source_midi_id": midi_id,
                 "bar_index": seg.get("bar", 0),
+                "beat_position": seg.get("beat_position", "1"),
                 "tick_start": seg.get("start_tick", 0),
                 "tick_end": seg.get("end_tick", 0),
-                "absolute_chord_label": seg.get("chord", "N.C."),
-                "bass_pitch": seg.get("bass", ""),
+                "raw_notes": seg.get("raw_notes", []),
+                "bass": seg.get("bass", {}),
+                "pitch_classes": seg.get("pitch_classes", []),
+                "notes_count": seg.get("notes_count", 0),
+                "chord_label": seg.get("chord", "N.C."),
                 "root": seg.get("root", ""),
                 "quality": seg.get("quality", ""),
                 "confidence": seg.get("confidence", 0),
+                "alternatives": seg.get("alternatives", []),
                 "is_slash": seg.get("is_slash", False),
             })
 
@@ -814,20 +996,83 @@ class ExtractionWorker(QThread):
             "voicing_type": tags.get("voicing_type", ""),
         }
 
+        # Track metadata & CC events
+        track_info = []
+        for ti, t in enumerate(tracks):
+            cc_summary = {}
+            for cc in t.cc_events:
+                cc_summary.setdefault(cc.control, {"count": 0, "name": ""})
+                cc_summary[cc.control]["count"] += 1
+            cc_names = {
+                1: "Modulation", 7: "Volume", 10: "Pan", 11: "Expression",
+                64: "Sustain Pedal", 91: "Reverb", 93: "Chorus",
+            }
+            for ctrl in cc_summary:
+                cc_summary[ctrl]["name"] = cc_names.get(ctrl, f"CC{ctrl}")
+
+            t_info: dict = {
+                "index": ti,
+                "name": t.name,
+                "channel": t.channel,
+                "instrument": t.instrument,
+                "note_count": len(t.notes),
+                "cc_event_count": len(t.cc_events),
+                "cc_summary": {str(k): v for k, v in cc_summary.items()},
+            }
+            if t.cc_events:
+                t_info["cc_events"] = [
+                    {"tick": cc.tick, "control": cc.control,
+                     "value": cc.value, "channel": cc.channel}
+                    for cc in t.cc_events
+                ]
+            track_info.append(t_info)
+
+        # Melody metadata (separate from harmony analysis)
+        melody_info = {}
+        if melody_tracks:
+            mel_notes_all: list[Note] = []
+            for t in melody_tracks:
+                mel_notes_all.extend(t.notes)
+            mel_notes_all.sort(key=lambda n: n.start_tick)
+            mel_pitches = [n.pitch for n in mel_notes_all]
+            melody_info = {
+                "track_names": [t.name for t in melody_tracks],
+                "note_count": len(mel_notes_all),
+                "pitch_range": [min(mel_pitches), max(mel_pitches)] if mel_pitches else [],
+                "notes": [
+                    {"pitch": n.pitch, "start_tick": n.start_tick,
+                     "duration_ticks": n.duration_ticks, "velocity": n.velocity}
+                    for n in mel_notes_all
+                ],
+            }
+
         result = {
             "file": path.name,
             "midi_id": midi_id,
-            "schema_version": "2.09",
+            "schema_version": "2.11",
             "extracted_at": datetime.now().isoformat(timespec="seconds"),
             "bpm": bpm,
             "ticks_per_beat": tpb,
             "num_tracks": len(tracks),
-            "total_notes": len(all_notes),
+            "total_notes": len(all_notes_raw),
+            "total_cc_events": total_cc,
+            "sustain_pedal_applied": pedal_count > 0,
+            "analysis_scope": {
+                "melody_tracks": [t.name for t in melody_tracks],
+                "accompaniment_tracks": [t.name for t in acc_tracks],
+                "melody_excluded_from_harmony": len(melody_tracks) > 0,
+            },
+            "tracks": track_info,
+            "melody": melody_info,
             "harmony": {
                 "overall_score": harmony.get("overall_score", 0),
                 "chord_count": harmony.get("chord_count", 0),
                 "key_estimate": harmony.get("key_estimate", "C"),
+                "key_confidence": harmony.get("key_confidence", 0.0),
+                "ambiguity_count": harmony.get("ambiguity_count", 0),
                 "num_segments": len(segments),
+                "lead_sheet": self._build_lead_sheet(segments, bpm,
+                                                     harmony.get("key_estimate", "C")),
                 "segments": segments,
             },
             "song_form": {

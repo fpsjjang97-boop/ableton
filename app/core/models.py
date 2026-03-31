@@ -137,11 +137,24 @@ class Note:
 
 
 @dataclass
+class CCEvent:
+    """A MIDI Control Change event."""
+    tick: int = 0
+    control: int = 0      # CC number (0-127, e.g. 64=sustain pedal)
+    value: int = 0         # CC value (0-127)
+    channel: int = 0
+
+    def copy(self) -> CCEvent:
+        return copy.copy(self)
+
+
+@dataclass
 class Track:
     """A MIDI track containing notes and metadata."""
     name: str = "Track 1"
     channel: int = 0
     notes: list[Note] = field(default_factory=list)
+    cc_events: list[CCEvent] = field(default_factory=list)
     muted: bool = False
     solo: bool = False
     volume: int = 100
@@ -152,6 +165,7 @@ class Track:
     def copy(self) -> Track:
         t = copy.copy(self)
         t.notes = [n.copy() for n in self.notes]
+        t.cc_events = [cc.copy() for cc in self.cc_events]
         return t
 
     def get_notes_in_range(self, start_tick: int, end_tick: int) -> list[Note]:
@@ -218,18 +232,6 @@ STRING_CC_MAP = {
     "vibrato_depth": 77,  # CC77
     "sustain_pedal": 64,  # CC64
 }
-
-
-@dataclass
-class CCEvent:
-    """CC 컨트롤 이벤트 — 스트링/단음악기 표현 레이어."""
-    cc_number: int = 11        # CC 번호
-    value: int = 64            # 0-127
-    tick: int = 0              # 절대 tick 위치
-    channel: int = 0
-
-    def copy(self) -> CCEvent:
-        return copy.copy(self)
 
 
 @dataclass

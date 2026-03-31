@@ -478,6 +478,13 @@ class MidiEngine(QObject):
                     mido.Message("note_off", note=note.pitch, velocity=0, channel=note.channel),
                 ))
 
+            # CC events (sustain pedal, modulation, etc.)
+            for cc in getattr(trk, "cc_events", []):
+                events.append((
+                    cc.tick,
+                    mido.Message("control_change", control=cc.control, value=cc.value, channel=cc.channel),
+                ))
+
             events.sort(key=lambda e: e[0])
 
             # Convert absolute ticks to delta times.
