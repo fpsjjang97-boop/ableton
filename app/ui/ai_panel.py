@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QGridLayout, QLineEdit, QFileDialog,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
-from PyQt6.QtGui import QFont, QColor, QPainter, QPaintEvent
+from PyQt6.QtGui import QFont, QColor, QPainter, QPaintEvent, QPen
 
 from config import COLORS, AI_VARIATION_TYPES, AI_STYLES
 

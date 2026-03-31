@@ -16,6 +16,10 @@ from config import COLORS
 from ui.piano_roll import PianoRollWidget
 from ui.ai_panel import AIPanel
 from ui.review_panel import ReviewPanel
+from ui.synth_panel import SynthPanel
+from ui.effects_panel import EffectsChainPanel
+from ui.step_sequencer import StepSequencerPanel
+from ui.score_view import ScoreViewPanel
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +92,10 @@ _TABS = [
     ("ai_generate",  "AI Generate"),
     ("ai_variation", "AI Variation"),
     ("analysis",     "Analysis"),
+    ("synth",        "Synth"),
+    ("effects",      "Effects"),
+    ("drum_seq",     "Step Seq"),
+    ("score",        "Score"),
 ]
 
 
@@ -204,6 +212,22 @@ class DetailView(QWidget):
 
         # Analysis tab — review panel
         self._tab_widgets["analysis"] = self._review_panel
+
+        # Synth tab — synthesizer controls
+        self._synth_panel = SynthPanel()
+        self._tab_widgets["synth"] = self._synth_panel
+
+        # Effects tab — insert/send chain editor
+        self._effects_panel = EffectsChainPanel()
+        self._tab_widgets["effects"] = self._effects_panel
+
+        # Step Sequencer tab — drum grid
+        self._step_seq_panel = StepSequencerPanel()
+        self._tab_widgets["drum_seq"] = self._step_seq_panel
+
+        # Score tab — notation view
+        self._score_panel = ScoreViewPanel()
+        self._tab_widgets["score"] = self._score_panel
 
         # Add all tab widgets to content layout
         for widget in self._tab_widgets.values():

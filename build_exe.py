@@ -30,7 +30,7 @@ def build_main_app():
         "--windowed",
         "--noconfirm",
         # Add data files
-        "--add-data", f"{REPO_ROOT}/260327_최종본_v2.07_song_form_added.json;.",
+        "--add-data", f"{REPO_ROOT}/260329_최종본_v2.09_analysis_no_unobserved_7th_guardrail.json;.",
         "--add-data", f"{REPO_ROOT}/settings.json;.",
         "--add-data", f"{REPO_ROOT}/pattern_library;pattern_library",
         "--add-data", f"{REPO_ROOT}/embeddings;embeddings",
@@ -65,7 +65,7 @@ def build_ingest_tool():
         "--console",
         "--noconfirm",
         # Add data files
-        "--add-data", f"{REPO_ROOT}/260327_최종본_v2.07_song_form_added.json;.",
+        "--add-data", f"{REPO_ROOT}/260329_최종본_v2.09_analysis_no_unobserved_7th_guardrail.json;.",
         "--add-data", f"{REPO_ROOT}/pattern_library;pattern_library",
         "--add-data", f"{REPO_ROOT}/analyzed_chords;analyzed_chords",
         # Hidden imports
@@ -98,8 +98,6 @@ def build_pattern_extractor():
         "--noconfirm",
         # Add data files — v2.09 Rule DB
         "--add-data", f"{REPO_ROOT}/{rule_db_v209};.",
-        # Also include v2.07 for HarmonyEngine fallback
-        "--add-data", f"{REPO_ROOT}/260327_최종본_v2.07_song_form_added.json;.",
         "--add-data", f"{REPO_ROOT}/pattern_library;pattern_library",
         "--add-data", f"{REPO_ROOT}/analyzed_chords;analyzed_chords",
         # Hidden imports

@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 import os
 import traceback
+from pathlib import Path
 
 # PyInstaller --windowed sets sys.stderr/stdout to None
 if sys.stderr is None:
@@ -84,6 +85,13 @@ def main() -> int:
 
     from core.midi_engine import MidiEngine
     from core.audio_engine import AudioEngine
+    from core.synth_engine import SynthEngine, PolySynth, SUBTRACTIVE_PRESETS, FM_PRESETS
+    from core.effects_engine import Mixer, EffectsChain, EFFECT_PRESETS
+    from core.automation import AutomationManager
+    from core.arrangement import ArrangementManager
+    from core.midi_io import MIDIInputManager, MIDIMonitor
+    from core.audio_io import RecordingManager, AudioPlaybackEngine, AudioSettings
+    from core.groove_engine import GROOVE_PRESETS, apply_groove, StepSequencer
     from core.project import ProjectManager
     from core.ai_engine import AIEngine
     from core.models import (
@@ -117,6 +125,17 @@ def main() -> int:
             pass
     project_mgr = ProjectManager(w)
     ai_engine = AIEngine()
+    synth_engine = SynthEngine()
+    synth_engine.assign_synth(0, PolySynth.SUBTRACTIVE)
+    mixer = Mixer()
+    automation_mgr = AutomationManager()
+    arrangement_mgr = ArrangementManager()
+    midi_input = MIDIInputManager()
+    midi_monitor = MIDIMonitor()
+    midi_input.add_listener(midi_monitor.on_message)
+    recording_mgr = RecordingManager()
+    audio_playback = AudioPlaybackEngine()
+    audio_settings = AudioSettings()
     undo_mgr = UndoManager()
     selected_track = [0]
 
@@ -130,10 +149,26 @@ def main() -> int:
     _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     file_browser = FileBrowser(root_path=_repo_root)
 
+    from ui.arrangement_view import ArrangementPanel
+    arrangement_view = ArrangementPanel()
+
     # --- Layout ---
+    # Top area: session view + arrangement view (tabbed)
+    from PyQt6.QtWidgets import QTabWidget
+    top_tabs = QTabWidget()
+    top_tabs.setTabPosition(QTabWidget.TabPosition.South)
+    top_tabs.addTab(session_view, "Session")
+    top_tabs.addTab(arrangement_view, "Arrangement")
+    top_tabs.setStyleSheet(f"""
+        QTabWidget::pane {{ border: none; }}
+        QTabBar::tab {{ background: {COLORS['bg_mid']}; color: {COLORS['text_secondary']};
+                       padding: 4px 12px; border: 1px solid {COLORS['border']}; border-top: none; }}
+        QTabBar::tab:selected {{ background: {COLORS['bg_darkest']}; color: {COLORS['text_primary']}; }}
+    """)
+
     splitter = QSplitter(Qt.Orientation.Vertical)
     splitter.setHandleWidth(3)
-    splitter.addWidget(session_view)
+    splitter.addWidget(top_tabs)
     splitter.addWidget(detail_view)
     splitter.setStretchFactor(0, 3)
     splitter.setStretchFactor(1, 1)
@@ -281,6 +316,11 @@ def main() -> int:
     ai_menu.addSeparator()
     act_gen_from_settings = ai_menu.addAction("Generate from &Settings")
 
+    # Edit menu additions
+    edit_menu = menubar.addMenu("&Preferences")
+    act_settings = edit_menu.addAction("&Settings...")
+    act_settings.setShortcut("Ctrl+,")
+
     # Help menu
     help_menu = menubar.addMenu("&Help")
     act_about = help_menu.addAction("&About")
@@ -295,6 +335,7 @@ def main() -> int:
             w, "Open Project", "", "MAW Projects (*.maw);;MIDI Files (*.mid *.midi);;All (*)"
         )
         if path:
+            path = str(Path(path).resolve())
             if path.endswith(".maw"):
                 project_mgr.load_project(path)
             else:
@@ -306,6 +347,7 @@ def main() -> int:
             w, "Import MIDI", "", "MIDI Files (*.mid *.midi);;All (*)"
         )
         if path:
+            path = str(Path(path).resolve())
             project_mgr.import_midi(path)
             apply_project(project_mgr.state)
 
@@ -321,6 +363,7 @@ def main() -> int:
             w, "Save Project", "", "MAW Projects (*.maw);;All (*)"
         )
         if path:
+            path = str(Path(path).resolve())
             if not path.endswith(".maw"):
                 path += ".maw"
             project_mgr.save_project(path)
@@ -331,6 +374,7 @@ def main() -> int:
             w, "Export MIDI", "", "MIDI Files (*.mid);;All (*)"
         )
         if path:
+            path = str(Path(path).resolve())
             midi_engine.save_midi_file(path)
 
     def do_undo():
@@ -553,6 +597,13 @@ def main() -> int:
     act_gen_from_settings.triggered.connect(generate_from_settings)
     act_about.triggered.connect(about)
 
+    def open_settings():
+        from ui.settings_dialog import SettingsDialog
+        dlg = SettingsDialog(w)
+        dlg.settings_changed.connect(lambda s: sb.showMessage(f"Settings applied", 2000))
+        dlg.exec()
+    act_settings.triggered.connect(open_settings)
+
     # --- Widget signal connections ---
     # Transport
     transport.play_clicked.connect(midi_engine.toggle_playback)
@@ -653,6 +704,7 @@ def main() -> int:
     def on_ingest(path):
         try:
             import subprocess
+            path = str(Path(path).resolve())
             ingest_script = os.path.join(_repo_root, "tools", "auto_ingest.py")
             python_exe = sys.executable
             subprocess.Popen(
@@ -666,6 +718,35 @@ def main() -> int:
 
     if hasattr(detail_view, '_ai_panel') and hasattr(detail_view._ai_panel, 'ingest_requested'):
         detail_view._ai_panel.ingest_requested.connect(on_ingest)
+
+    # Synth panel signals
+    if hasattr(detail_view, '_synth_panel'):
+        def on_synth_type_changed(stype):
+            type_map = {
+                "subtractive": PolySynth.SUBTRACTIVE,
+                "fm": PolySynth.FM,
+                "wavetable": PolySynth.WAVETABLE,
+                "granular": PolySynth.GRANULAR,
+                "sampler": PolySynth.SAMPLER,
+            }
+            ch = selected_track[0]
+            st = type_map.get(stype, PolySynth.SUBTRACTIVE)
+            synth_engine.assign_synth(ch, st)
+            sb.showMessage(f"Synth: {stype} assigned to channel {ch}", 2000)
+
+        def on_synth_preset_changed(preset_name):
+            ch = selected_track[0]
+            synth_engine.load_preset(ch, preset_name)
+            sb.showMessage(f"Preset: {preset_name}", 2000)
+
+        def on_synth_pad_hit(note, velocity):
+            synth_engine.note_on(synth_engine.drum_channel, note, velocity)
+            # Also play via FluidSynth for audio
+            audio_engine.note_on(9, note, velocity)
+
+        detail_view._synth_panel.synth_type_changed.connect(on_synth_type_changed)
+        detail_view._synth_panel.preset_changed.connect(on_synth_preset_changed)
+        detail_view._synth_panel.pad_triggered.connect(on_synth_pad_hit)
 
     # Scale snap
     def on_scale_snap(key, scale):
@@ -766,7 +847,7 @@ def main() -> int:
     # --- Auto-load latest MIDI or CLI argument ---
     _auto_midi = None
     if len(sys.argv) > 1 and os.path.isfile(sys.argv[1]):
-        _auto_midi = sys.argv[1]
+        _auto_midi = str(Path(sys.argv[1]).resolve())
     else:
         _out_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output")
         if os.path.isdir(_out_dir):

@@ -897,7 +897,7 @@ class ExtractionWorker(QThread):
     def _process_one(self, engine, midi_path: str) -> dict:
         from auto_ingest import parse_midi_to_tracks, apply_sustain_pedal, classify_tracks
 
-        path = Path(midi_path)
+        path = Path(midi_path).resolve()
 
         self.log.emit("  MIDI 파싱 중...")
         tracks, bpm, tpb = parse_midi_to_tracks(str(path))

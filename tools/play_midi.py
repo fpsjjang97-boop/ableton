@@ -7,6 +7,7 @@ import sys
 import os
 import time
 import glob
+from pathlib import Path
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
@@ -72,7 +73,7 @@ def play(midi_path):
 
 def main():
     if len(sys.argv) > 1:
-        midi_path = sys.argv[1]
+        midi_path = str(Path(sys.argv[1]).resolve())
     else:
         midi_path = find_latest_midi()
 
