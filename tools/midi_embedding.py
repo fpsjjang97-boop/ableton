@@ -237,6 +237,358 @@ def analyze_composer_tags(all_notes, midi):
     }
 
 
+TRACK_EMBED_DIM = 128  # 트랙별 임베딩 차원
+
+# MIDI program → track type 매핑
+_PROGRAM_TO_TRACK = {
+    # Piano (0-7)
+    range(0, 8): "keys",
+    # Chromatic Percussion (8-15)
+    range(8, 16): "keys",
+    # Organ (16-23)
+    range(16, 24): "keys",
+    # Guitar (24-31)
+    range(24, 32): "guitar",
+    # Bass (32-39)
+    range(32, 40): "bass",
+    # Strings (40-47)
+    range(40, 48): "strings",
+    # Ensemble (48-55)
+    range(48, 56): "strings",
+    # Brass (56-63)
+    range(56, 64): "brass",
+    # Reed (64-71)
+    range(64, 72): "woodwind",
+    # Pipe (72-79)
+    range(72, 80): "woodwind",
+    # Synth Lead (80-87)
+    range(80, 88): "synth_lead",
+    # Synth Pad (88-95)
+    range(88, 96): "synth_pad",
+    # Synth Effects (96-103)
+    range(96, 104): "synth_fx",
+    # Ethnic (104-111)
+    range(104, 112): "ethnic",
+    # Percussive (112-119)
+    range(112, 120): "percussion",
+    # Sound Effects (120-127)
+    range(120, 128): "sfx",
+}
+
+
+def _classify_instrument(inst):
+    """Classify a pretty_midi Instrument into a track type."""
+    if inst.is_drum:
+        return "drums"
+
+    # Name-based detection
+    name = (inst.name or "").lower()
+    if "bass" in name:
+        return "bass"
+    if "drum" in name or "perc" in name:
+        return "drums"
+    if "string" in name or "violin" in name or "cello" in name or "viola" in name:
+        return "strings"
+    if "brass" in name or "trumpet" in name or "trombone" in name or "horn" in name:
+        return "brass"
+    if "flute" in name or "oboe" in name or "clarinet" in name or "sax" in name:
+        return "woodwind"
+    if "guitar" in name:
+        return "guitar"
+    if "pad" in name or "synth" in name:
+        return "synth_pad"
+
+    # Program-based detection
+    for prog_range, track_type in _PROGRAM_TO_TRACK.items():
+        if inst.program in prog_range:
+            return track_type
+
+    # Register-based fallback
+    if inst.notes:
+        avg_pitch = sum(n.pitch for n in inst.notes) / len(inst.notes)
+        if avg_pitch < 48:
+            return "bass"
+
+    return "keys"
+
+
+def _compute_track_embedding(notes_list):
+    """Compute a 128-dim embedding for a list of note dicts.
+
+    Same structure as global embedding but for a single track.
+    """
+    emb = np.zeros(TRACK_EMBED_DIM)
+    if not notes_list:
+        return emb.tolist()
+
+    pitches = [n['pitch'] for n in notes_list]
+    velocities = [n['velocity'] for n in notes_list]
+    durations = [n['duration'] for n in notes_list]
+
+    # [0:12] Pitch class histogram
+    pc_hist = np.zeros(12)
+    for p in pitches:
+        pc_hist[p % 12] += 1
+    if pc_hist.sum() > 0:
+        pc_hist /= pc_hist.sum()
+    emb[0:12] = pc_hist
+
+    # [12:37] Interval histogram
+    intervals = [pitches[i+1] - pitches[i] for i in range(len(pitches)-1)]
+    iv_hist = np.zeros(25)
+    for iv in intervals:
+        idx = max(0, min(24, iv + 12))
+        iv_hist[idx] += 1
+    if iv_hist.sum() > 0:
+        iv_hist /= iv_hist.sum()
+    emb[12:37] = iv_hist
+
+    # [37:45] Velocity histogram (8 bins)
+    vel_hist = np.zeros(8)
+    for v in velocities:
+        vel_hist[min(7, v // 16)] += 1
+    if vel_hist.sum() > 0:
+        vel_hist /= vel_hist.sum()
+    emb[37:45] = vel_hist
+
+    # [45:55] Duration histogram (10 bins)
+    dur_bins = [0, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, float('inf')]
+    dur_hist = np.zeros(10)
+    for d in durations:
+        for i in range(10):
+            if dur_bins[i] <= d < dur_bins[i+1]:
+                dur_hist[i] += 1
+                break
+    if dur_hist.sum() > 0:
+        dur_hist /= dur_hist.sum()
+    emb[45:55] = dur_hist
+
+    # [55:63] Summary stats
+    emb[55] = np.mean(pitches) / 127.0
+    emb[56] = np.std(pitches) / 40.0
+    emb[57] = np.mean(velocities) / 127.0
+    emb[58] = np.std(velocities) / 40.0
+    emb[59] = np.mean(durations) / 10.0
+    emb[60] = np.std(durations) / 10.0
+    emb[61] = len(notes_list) / 10000.0                # note count (normalized)
+    total_dur = max(n['end'] for n in notes_list) - min(n['start'] for n in notes_list)
+    emb[62] = total_dur / 600.0
+
+    # [63:128] Top 65 pitch distribution
+    pitch_hist = np.zeros(128)
+    for p in pitches:
+        pitch_hist[p] += 1
+    if pitch_hist.sum() > 0:
+        pitch_hist /= pitch_hist.sum()
+    sorted_p = np.argsort(pitch_hist)[::-1][:65]
+    for i, p in enumerate(sorted_p):
+        emb[63 + i] = pitch_hist[p]
+
+    return emb.tolist()
+
+
+def _compute_drum_embedding(notes_list):
+    """Compute a 128-dim embedding for drum tracks.
+
+    Drums use GM pitch mapping, not melodic pitch.
+    Focus on rhythm patterns and kit distribution.
+    """
+    emb = np.zeros(TRACK_EMBED_DIM)
+    if not notes_list:
+        return emb.tolist()
+
+    pitches = [n['pitch'] for n in notes_list]
+    velocities = [n['velocity'] for n in notes_list]
+    durations = [n['duration'] for n in notes_list]
+    starts = [n['start'] for n in notes_list]
+
+    # [0:12] GM drum kit distribution (grouped)
+    # 35-36:Kick, 38-40:Snare, 42-46:HiHat, 47-50:Tom, 49-57:Cymbal, other
+    drum_groups = np.zeros(12)
+    for p in pitches:
+        if p in (35, 36):
+            drum_groups[0] += 1   # kick
+        elif p in (38, 39, 40):
+            drum_groups[1] += 1   # snare
+        elif p in (42, 44, 46):
+            drum_groups[2] += 1   # hi-hat closed
+        elif p == 46:
+            drum_groups[3] += 1   # hi-hat open
+        elif p in (47, 48, 50):
+            drum_groups[4] += 1   # tom high
+        elif p in (41, 43, 45):
+            drum_groups[5] += 1   # tom low
+        elif p in (49, 57):
+            drum_groups[6] += 1   # crash
+        elif p in (51, 53, 59):
+            drum_groups[7] += 1   # ride
+        elif p in (54, 56):
+            drum_groups[8] += 1   # tambourine/cowbell
+        elif p in (60, 61, 62, 63, 64):
+            drum_groups[9] += 1   # bongo/conga
+        elif p in (65, 66, 67, 68):
+            drum_groups[10] += 1  # timbale/agogo
+        else:
+            drum_groups[11] += 1  # other
+    if drum_groups.sum() > 0:
+        drum_groups /= drum_groups.sum()
+    emb[0:12] = drum_groups
+
+    # [12:37] IOI (inter-onset interval) histogram — rhythm pattern
+    ioi_hist = np.zeros(25)
+    if len(starts) > 1:
+        iois = [starts[i+1] - starts[i] for i in range(len(starts)-1) if starts[i+1] > starts[i]]
+        # Quantize IOIs to 25 bins (0-2 seconds, 0.08s per bin)
+        for ioi in iois:
+            idx = min(24, int(ioi / 0.08))
+            ioi_hist[idx] += 1
+        if ioi_hist.sum() > 0:
+            ioi_hist /= ioi_hist.sum()
+    emb[12:37] = ioi_hist
+
+    # [37:45] Velocity histogram
+    vel_hist = np.zeros(8)
+    for v in velocities:
+        vel_hist[min(7, v // 16)] += 1
+    if vel_hist.sum() > 0:
+        vel_hist /= vel_hist.sum()
+    emb[37:45] = vel_hist
+
+    # [45:55] Beat position histogram (10 bins within a beat)
+    # Estimate beat positions from note starts
+    beat_pos_hist = np.zeros(10)
+    avg_ioi = np.mean([starts[i+1] - starts[i] for i in range(len(starts)-1)
+                       if starts[i+1] - starts[i] > 0.01]) if len(starts) > 1 else 0.5
+    est_beat = max(0.1, avg_ioi * 2)  # rough beat estimate
+    for s in starts:
+        phase = (s % est_beat) / est_beat
+        idx = min(9, int(phase * 10))
+        beat_pos_hist[idx] += 1
+    if beat_pos_hist.sum() > 0:
+        beat_pos_hist /= beat_pos_hist.sum()
+    emb[45:55] = beat_pos_hist
+
+    # [55:63] Summary stats
+    emb[55] = len(notes_list) / 10000.0
+    total_dur = max(n['end'] for n in notes_list) - min(n['start'] for n in notes_list)
+    emb[56] = total_dur / 600.0
+    emb[57] = np.mean(velocities) / 127.0
+    emb[58] = np.std(velocities) / 40.0
+    # Note density (hits per second)
+    emb[59] = min(1.0, (len(notes_list) / max(total_dur, 0.1)) / 20.0)
+    # Unique pitches used (kit variety)
+    emb[60] = len(set(pitches)) / 47.0  # GM has ~47 drum sounds
+    # Kick/Snare ratio
+    kicks = sum(1 for p in pitches if p in (35, 36))
+    snares = sum(1 for p in pitches if p in (38, 39, 40))
+    emb[61] = kicks / max(kicks + snares, 1)
+    emb[62] = snares / max(kicks + snares, 1)
+
+    # [63:128] — pad with zeros for drums (no melodic pitch distribution)
+
+    return emb.tolist()
+
+
+def analyze_tracks_separated(midi):
+    """Analyze MIDI with per-track-type separated embeddings.
+
+    Returns dict: {
+        "track_types": ["keys", "bass", "drums", ...],
+        "tracks": {
+            "keys": {"embedding": [...], "stats": {...}, "note_count": N},
+            "bass": {...},
+            ...
+        },
+        "interaction": {"density_ratio": {...}, "register_overlap": {...}}
+    }
+    """
+    # Group notes by track type
+    track_notes = {}  # track_type → list of note dicts
+
+    for inst in midi.instruments:
+        track_type = _classify_instrument(inst)
+        if track_type not in track_notes:
+            track_notes[track_type] = []
+
+        for note in inst.notes:
+            track_notes[track_type].append({
+                'pitch': note.pitch,
+                'start': round(note.start, 4),
+                'end': round(note.end, 4),
+                'duration': round(note.end - note.start, 4),
+                'velocity': note.velocity,
+            })
+
+    # Sort each track's notes by time
+    for track_type in track_notes:
+        track_notes[track_type].sort(key=lambda n: (n['start'], n['pitch']))
+
+    # Compute per-track embeddings
+    tracks_result = {}
+    for track_type, notes in track_notes.items():
+        if not notes:
+            continue
+
+        # Use drum-specific embedding for drums
+        if track_type == "drums":
+            emb = _compute_drum_embedding(notes)
+        else:
+            emb = _compute_track_embedding(notes)
+
+        pitches = [n['pitch'] for n in notes]
+        velocities = [n['velocity'] for n in notes]
+        durations = [n['duration'] for n in notes]
+
+        tracks_result[track_type] = {
+            'embedding': emb,
+            'note_count': len(notes),
+            'stats': {
+                'pitch_range': [int(min(pitches)), int(max(pitches))],
+                'pitch_mean': round(float(np.mean(pitches)), 1),
+                'velocity_mean': round(float(np.mean(velocities)), 1),
+                'duration_mean': round(float(np.mean(durations)), 4),
+                'total_duration': round(float(notes[-1]['end'] - notes[0]['start']), 2),
+            },
+        }
+
+    # Interaction analysis (how tracks relate to each other)
+    interaction = {}
+    track_types_list = list(tracks_result.keys())
+
+    if len(track_types_list) >= 2:
+        # Density ratio: note count ratio between tracks
+        total_notes = sum(t['note_count'] for t in tracks_result.values())
+        interaction['density_ratio'] = {
+            tt: round(tracks_result[tt]['note_count'] / max(total_notes, 1), 3)
+            for tt in track_types_list
+        }
+
+        # Register overlap between melodic tracks
+        melodic_tracks = {tt: tracks_result[tt] for tt in track_types_list
+                          if tt not in ('drums', 'percussion', 'sfx')}
+        if len(melodic_tracks) >= 2:
+            overlap = {}
+            mt_list = list(melodic_tracks.keys())
+            for i in range(len(mt_list)):
+                for j in range(i+1, len(mt_list)):
+                    t1, t2 = mt_list[i], mt_list[j]
+                    r1 = melodic_tracks[t1]['stats']['pitch_range']
+                    r2 = melodic_tracks[t2]['stats']['pitch_range']
+                    # Overlap = intersection / union of pitch ranges
+                    lo = max(r1[0], r2[0])
+                    hi = min(r1[1], r2[1])
+                    union = max(r1[1], r2[1]) - min(r1[0], r2[0])
+                    ov = max(0, hi - lo) / max(union, 1)
+                    overlap[f"{t1}_x_{t2}"] = round(ov, 3)
+            interaction['register_overlap'] = overlap
+
+    return {
+        'track_types': track_types_list,
+        'tracks': tracks_result,
+        'interaction': interaction,
+    }
+
+
 def analyze_midi(filepath):
     """단일 MIDI 파일 분석 — 모든 노트 데이터 보존 + 작곡가 태그"""
     midi = pretty_midi.PrettyMIDI(filepath)
@@ -369,11 +721,15 @@ def analyze_midi(filepath):
     # 작곡가 관점 태그 추출
     composer_tags = analyze_composer_tags(all_notes, midi)
 
+    # ── 트랙별 분리 임베딩 ──
+    track_embeddings = analyze_tracks_separated(midi)
+
     return {
         'stats': stats,
         'composer_tags': composer_tags,
         'notes': all_notes,
         'embedding': embedding.tolist(),
+        'track_embeddings': track_embeddings,
         'pitch_histogram': pitch_hist.tolist(),
         'pitch_class_histogram': pitch_class_hist.tolist(),
         'interval_histogram': interval_hist.tolist(),

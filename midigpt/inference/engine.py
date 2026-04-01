@@ -62,7 +62,7 @@ class MidiGPTInference:
         if preference == "auto":
             if torch.cuda.is_available():
                 gpu_name = torch.cuda.get_device_name(0)
-                vram_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
+                vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
                 print(f"MidiGPT: Using GPU — {gpu_name} ({vram_gb:.1f}GB)")
                 return torch.device("cuda")
             else:
@@ -258,5 +258,5 @@ class MidiGPTInference:
             status["model_params"] = f"{self.model_config.num_params / 1e6:.1f}M"
         if self.device.type == "cuda":
             status["gpu"] = torch.cuda.get_device_name(0)
-            status["vram_gb"] = round(torch.cuda.get_device_properties(0).total_mem / 1e9, 1)
+            status["vram_gb"] = round(torch.cuda.get_device_properties(0).total_memory / 1e9, 1)
         return status
