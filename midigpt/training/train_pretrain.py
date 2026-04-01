@@ -49,13 +49,9 @@ def train(args):
         print(f"GPU: {torch.cuda.get_device_name()}")
         print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
-    # Model config
+    # Model config — uses MidiGPTConfig defaults (50M: n_embd=576, n_inner=2304)
     config = MidiGPTConfig(
         vocab_size=VOCAB.size,
-        n_layer=12,
-        n_head=12,
-        n_embd=768,
-        n_inner=3072,
         block_size=args.block_size,
         dropout=args.dropout,
     )
