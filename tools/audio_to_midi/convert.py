@@ -297,6 +297,29 @@ def convert_stems_to_midi(
         },
     }
 
+    # Split 'other' into strings/brass before conversion
+    if "other" in stem_paths:
+        print(f"\n  [추가] 'other' 트랙 → 현악/관악 분리...")
+        sub_stems = split_other_by_register(stem_paths["other"], midi_dir.parent / "stems_split")
+        del stem_paths["other"]
+        stem_paths.update(sub_stems)
+
+    # Add params for new instrument types
+    track_params["strings"] = {
+        "onset_threshold": 0.55,
+        "frame_threshold": 0.4,
+        "minimum_note_length": 200.0,   # 현악기: 긴 음 위주
+        "minimum_frequency": 65.0,      # C2
+        "maximum_frequency": 2000.0,    # B6
+    }
+    track_params["brass"] = {
+        "onset_threshold": 0.6,
+        "frame_threshold": 0.45,
+        "minimum_note_length": 150.0,
+        "minimum_frequency": 130.0,     # C3
+        "maximum_frequency": 3500.0,    # A7
+    }
+
     for stem_type, wav_path in stem_paths.items():
         if stem_type == "vocals" and not keep_vocals:
             print(f"  -> vocals: 건너뜀 (보컬 제거)")
@@ -305,11 +328,9 @@ def convert_stems_to_midi(
         out_path = midi_dir / f"{wav_path.stem}.mid"
 
         if stem_type == "drums":
-            # 드럼 전용 변환 (onset detection + GM 매핑)
             result = drums_to_midi(wav_path, out_path)
         else:
-            # 멜로디/화성 악기: Basic Pitch
-            params = track_params.get(stem_type, {})
+            params = track_params.get(stem_type, track_params.get("other", {}))
             result = audio_to_midi(
                 wav_path=wav_path,
                 output_path=out_path,
@@ -329,13 +350,66 @@ def convert_stems_to_midi(
 
 # GM Program number mapping for each stem type
 STEM_PROGRAM: dict[str, int] = {
-    "drums": 0,     # drums use channel 10, program irrelevant
-    "bass": 33,     # Electric Bass (finger)
-    "guitar": 25,   # Acoustic Guitar (steel)
-    "piano": 0,     # Acoustic Grand Piano
-    "other": 48,    # String Ensemble 1
-    "vocals": 73,   # Flute (as melody placeholder)
+    "drums": 0,      # drums use channel 10, program irrelevant
+    "bass": 33,      # Electric Bass (finger)
+    "guitar": 25,    # Acoustic Guitar (steel)
+    "piano": 0,      # Acoustic Grand Piano
+    "strings": 48,   # String Ensemble 1
+    "brass": 61,     # Brass Section
+    "woodwind": 73,  # Flute
+    "other": 48,     # String Ensemble 1 (fallback)
+    "vocals": 73,    # Flute (as melody placeholder)
 }
+
+
+def split_other_by_register(
+    wav_path: Path,
+    output_dir: Path,
+) -> dict[str, Path]:
+    """'other' 트랙을 음역대 기반으로 현악/관악으로 분리.
+
+    - 저~중역 (50~800Hz): strings (현악기)
+    - 고역 (800Hz+): brass/woodwind (관악기)
+    """
+    try:
+        import librosa
+        import soundfile as sf
+
+        y, sr = librosa.load(str(wav_path), sr=44100, mono=False)
+        if y.ndim == 1:
+            y = np.array([y, y])  # mono to stereo
+
+        results = {}
+        splits = {
+            "strings":  {"fmin": 50,  "fmax": 800},
+            "brass":    {"fmin": 800, "fmax": 12000},
+        }
+
+        for name, band in splits.items():
+            # Apply bandpass filter
+            y_mono = y.mean(axis=0) if y.ndim > 1 else y
+            S = librosa.stft(y_mono)
+            freqs = librosa.fft_frequencies(sr=sr)
+            mask = (freqs >= band["fmin"]) & (freqs <= band["fmax"])
+            S_filtered = S.copy()
+            S_filtered[~mask, :] = 0
+            y_filtered = librosa.istft(S_filtered)
+
+            # Check if there's actual content (RMS > threshold)
+            rms = np.sqrt(np.mean(y_filtered ** 2))
+            if rms < 0.005:
+                continue
+
+            out_path = output_dir / f"{name}.wav"
+            sf.write(str(out_path), y_filtered, sr)
+            results[name] = out_path
+            print(f"  → {name}: {out_path.name} (RMS={rms:.4f})")
+
+        return results
+
+    except Exception as e:
+        print(f"  → other 분리 실패: {e}, 원본 유지")
+        return {"other": wav_path}
 
 
 def merge_midi_tracks(
