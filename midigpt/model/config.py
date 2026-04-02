@@ -3,7 +3,7 @@ MidiGPT Model Configuration — 50M Decoder-Only Transformer.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -14,7 +14,7 @@ class MidiGPTConfig:
     Parameters:   ~50M
     """
     # Vocabulary
-    vocab_size: int = 560          # ~550 tokens + padding
+    vocab_size: int = 448          # ~420 tokens + padding (after chord compression)
 
     # Transformer dimensions (tuned for ~50M parameters)
     n_layer: int = 12              # number of transformer blocks
@@ -33,6 +33,15 @@ class MidiGPTConfig:
     # Training
     bias: bool = False             # use bias in linear layers (False = slightly better)
     weight_tying: bool = True      # tie input embedding and output projection weights
+
+    # LoRA defaults
+    lora_rank: int = 32            # low-rank adaptation rank
+    lora_target_modules: list[str] = field(
+        default_factory=lambda: [
+            "q_proj", "k_proj", "v_proj", "o_proj",   # attention projections
+            "gate_proj", "up_proj", "down_proj",       # FFN (SwiGLU) projections
+        ]
+    )
 
     @property
     def num_params(self) -> int:

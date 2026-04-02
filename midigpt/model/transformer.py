@@ -12,7 +12,7 @@ Architecture:
 from __future__ import annotations
 
 import math
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -91,14 +91,33 @@ class Attention(nn.Module):
         x: torch.Tensor,
         freqs: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
+        past_kv: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        """Forward pass with optional KV cache.
+
+        Args:
+            x: Input tensor, shape (B, T, C).  When using KV cache for
+               incremental decoding, T == 1 (only the new token).
+            freqs: RoPE frequencies.  Must cover positions for the *new*
+                   tokens.  When past_kv is provided the caller should
+                   pass ``freqs[seq_len-T : seq_len]`` so that positions
+                   are correct.
+            mask: Optional attention mask.
+            past_kv: Cached (K, V) from previous steps, each shaped
+                     (B, n_head, T_past, head_dim).
+
+        Returns:
+            (output, present_kv) where present_kv is the full (K, V) cache
+            including the newly computed keys/values.
+        """
         B, T, C = x.shape
 
         q = self.q_proj(x).view(B, T, self.n_head, self.head_dim)
         k = self.k_proj(x).view(B, T, self.n_head, self.head_dim)
         v = self.v_proj(x).view(B, T, self.n_head, self.head_dim)
 
-        # Apply RoPE to Q and K
+        # Apply RoPE — freqs should already be sliced to cover only the
+        # new positions (length T).
         q, k = apply_rope(q, k, freqs[:T])
 
         # Transpose for attention: (B, n_head, T, head_dim)
@@ -106,20 +125,39 @@ class Attention(nn.Module):
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
+        # Concatenate with cached K, V if available
+        if past_kv is not None:
+            past_k, past_v = past_kv
+            k = torch.cat([past_k, k], dim=2)  # (B, n_head, T_past + T, head_dim)
+            v = torch.cat([past_v, v], dim=2)
+
+        # Store present KV for the cache (full history)
+        present_kv = (k, v)
+
+        # Total key/value sequence length (may differ from T when using cache)
+        S = k.size(2)
+
         # Scaled dot-product attention (PyTorch 2.0+ flash attention)
         if hasattr(F, 'scaled_dot_product_attention'):
+            # When using KV cache for single-token decode (T==1, S>1),
+            # is_causal must be False because Q has 1 row — the causal
+            # mask is trivially satisfied.  For the prefill (T==S) we
+            # can keep is_causal=True when no explicit mask is given.
+            use_causal = (mask is None) and (T == S)
             y = F.scaled_dot_product_attention(
                 q, k, v,
                 attn_mask=mask,
                 dropout_p=self.attn_dropout.p if self.training else 0.0,
-                is_causal=mask is None,
+                is_causal=use_causal,
             )
         else:
             # Manual attention for older PyTorch
             scale = 1.0 / math.sqrt(self.head_dim)
             attn = torch.matmul(q, k.transpose(-2, -1)) * scale
             if mask is None:
-                causal = torch.triu(torch.ones(T, T, device=x.device), diagonal=1).bool()
+                causal = torch.triu(
+                    torch.ones(T, S, device=x.device), diagonal=S - T + 1
+                ).bool()
                 attn.masked_fill_(causal, float('-inf'))
             else:
                 attn = attn + mask
@@ -130,7 +168,7 @@ class Attention(nn.Module):
         # Reshape and project
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         y = self.resid_dropout(self.o_proj(y))
-        return y
+        return y, present_kv
 
 
 # ---------------------------------------------------------------------------
@@ -172,11 +210,13 @@ class TransformerBlock(nn.Module):
         x: torch.Tensor,
         freqs: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
+        past_kv: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         # Pre-norm residual
-        x = x + self.attn(self.attn_norm(x), freqs, mask)
+        attn_out, present_kv = self.attn(self.attn_norm(x), freqs, mask, past_kv=past_kv)
+        x = x + attn_out
         x = x + self.ffn(self.ffn_norm(x))
-        return x
+        return x, present_kv
 
 
 # ---------------------------------------------------------------------------
@@ -233,29 +273,46 @@ class MidiGPT(nn.Module):
         self,
         idx: torch.Tensor,
         targets: Optional[torch.Tensor] = None,
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
-        """Forward pass.
+        past_kv_list: Optional[list[Tuple[torch.Tensor, torch.Tensor]]] = None,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], list[Tuple[torch.Tensor, torch.Tensor]]]:
+        """Forward pass with optional KV cache.
 
         Args:
-            idx: Input token IDs, shape (B, T)
-            targets: Target token IDs for loss computation, shape (B, T)
+            idx: Input token IDs, shape (B, T).  During cached generation
+                 T == 1 (only the newly generated token).
+            targets: Target token IDs for loss computation, shape (B, T).
+            past_kv_list: Per-layer KV cache from a previous forward call.
+                          Length must equal ``n_layer``.
 
         Returns:
-            (logits, loss) — loss is None if targets not provided
+            (logits, loss, present_kv_list)
+            *present_kv_list* contains per-layer (K, V) caches that can
+            be passed back as *past_kv_list* on the next call.
         """
         B, T = idx.shape
-        assert T <= self.config.block_size, \
-            f"Sequence length {T} exceeds block_size {self.config.block_size}"
+
+        # When using KV cache, the effective sequence length seen by RoPE
+        # is the past length + T.
+        past_len = 0
+        if past_kv_list is not None:
+            past_len = past_kv_list[0][0].size(2)  # T_past from first layer
+
+        total_len = past_len + T
+        assert total_len <= self.config.block_size, \
+            f"Sequence length {total_len} exceeds block_size {self.config.block_size}"
 
         # Token embeddings (RoPE replaces position embeddings)
         x = self.tok_emb(idx)
 
-        # Get RoPE frequencies for this sequence length
-        freqs = self.rope_freqs[:T]
+        # Get RoPE frequencies only for the *new* positions
+        freqs = self.rope_freqs[past_len:total_len]
 
         # Transformer blocks
-        for block in self.blocks:
-            x = block(x, freqs)
+        present_kv_list: list[Tuple[torch.Tensor, torch.Tensor]] = []
+        for i, block in enumerate(self.blocks):
+            layer_past = past_kv_list[i] if past_kv_list is not None else None
+            x, present_kv = block(x, freqs, past_kv=layer_past)
+            present_kv_list.append(present_kv)
 
         # Final norm
         x = self.norm_f(x)
@@ -273,7 +330,7 @@ class MidiGPT(nn.Module):
             logits = self.lm_head(x[:, -1:, :])
             loss = None
 
-        return logits, loss
+        return logits, loss, present_kv_list
 
     @torch.no_grad()
     def generate(
@@ -284,8 +341,18 @@ class MidiGPT(nn.Module):
         top_k: int = 50,
         top_p: float = 0.95,
         eos_id: int = 2,
+        use_kv_cache: bool = True,
     ) -> torch.Tensor:
-        """Autoregressive generation.
+        """Autoregressive generation with KV cache.
+
+        On the first step the full prompt is processed and the KV cache is
+        initialised.  On every subsequent step only the last generated
+        token is fed through the model while the cached K/V tensors are
+        reused, giving O(1) per-token cost instead of O(T).
+
+        If the sequence would exceed ``block_size`` the cache is
+        invalidated and the context is re-processed from the last
+        ``block_size`` tokens (graceful degradation).
 
         Args:
             idx: Starting token IDs, shape (B, T)
@@ -294,19 +361,43 @@ class MidiGPT(nn.Module):
             top_k: Keep only top K candidates
             top_p: Nucleus sampling threshold
             eos_id: Token ID for <EOS> to stop generation
+            use_kv_cache: Whether to use KV caching (default True).
+                          Set to False to fall back to the original
+                          recompute-everything behaviour.
 
         Returns:
             Generated token IDs, shape (B, T + generated)
         """
         self.eval()
 
-        for _ in range(max_new_tokens):
-            # Crop to block_size if needed
-            idx_cond = idx if idx.size(1) <= self.config.block_size \
-                else idx[:, -self.config.block_size:]
+        past_kv_list: Optional[list[Tuple[torch.Tensor, torch.Tensor]]] = None
 
-            # Forward pass
-            logits, _ = self(idx_cond)
+        for step in range(max_new_tokens):
+            if use_kv_cache:
+                if past_kv_list is None:
+                    # First step — prefill: process the full prompt
+                    idx_input = idx if idx.size(1) <= self.config.block_size \
+                        else idx[:, -self.config.block_size:]
+                    logits, _, past_kv_list = self(idx_input, past_kv_list=None)
+                else:
+                    # Incremental decode: only feed the last token
+                    cur_len = past_kv_list[0][0].size(2) + 1  # past + new
+                    if cur_len > self.config.block_size:
+                        # Cache would exceed block_size — re-prefill from
+                        # the tail of the sequence.
+                        past_kv_list = None
+                        idx_input = idx[:, -self.config.block_size:]
+                        logits, _, past_kv_list = self(idx_input, past_kv_list=None)
+                    else:
+                        logits, _, past_kv_list = self(
+                            idx[:, -1:], past_kv_list=past_kv_list,
+                        )
+            else:
+                # Legacy path: recompute full attention every step
+                idx_cond = idx if idx.size(1) <= self.config.block_size \
+                    else idx[:, -self.config.block_size:]
+                logits, _, _ = self(idx_cond)
+
             logits = logits[:, -1, :] / temperature
 
             # Top-K filtering

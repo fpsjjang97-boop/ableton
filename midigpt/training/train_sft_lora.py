@@ -103,7 +103,7 @@ def train_sft(args):
             labels = batch["labels"].to(device)
 
             with torch.amp.autocast(device_type=device.type, dtype=torch.float16, enabled=device.type == "cuda"):
-                _, loss = model(input_ids, targets=labels)
+                _, loss, _ = model(input_ids, targets=labels)
 
             loss.backward()
 

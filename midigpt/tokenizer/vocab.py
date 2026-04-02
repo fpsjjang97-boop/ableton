@@ -1,12 +1,16 @@
 """
-MidiGPT Vocabulary — ~550 tokens for hierarchical MIDI tokenization.
+MidiGPT Vocabulary — ~300 tokens for hierarchical MIDI tokenization.
 
 Layer 3 (Structure):  Key, Style, Section
-Layer 2 (Harmony):    Chord, Bass, Function
+Layer 2 (Harmony):    ChordRoot, ChordQual, Chord_NC, Bass, Function
 Layer 1 (Note):       Bar, Position, Pitch, Velocity, Duration, Track
+
+Chord tokens are factored into root (12) + quality (24) + NC (1) = 37 tokens
+instead of the previous 289 combined tokens.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 
@@ -90,11 +94,12 @@ class MidiVocab:
             tokens.append(f"Tempo_{t}")
 
         # --- Layer 2: Harmony ---
-        # Chord tokens: Chord_{Root}{Quality}  e.g. Chord_Cmaj7
+        # Factored chord tokens: 12 roots + 24 qualities + 1 NC = 37 tokens
+        # (replaces the old 289 combined Chord_{Root}{Quality} tokens)
         for root in NOTE_NAMES:
-            for qual in CHORD_QUALITIES:
-                tokens.append(f"Chord_{root}{qual}")
-        # N.C. (No Chord)
+            tokens.append(f"ChordRoot_{root}")
+        for qual in CHORD_QUALITIES:
+            tokens.append(f"ChordQual_{qual}")
         tokens.append("Chord_NC")
 
         # Bass note (for slash chords)
@@ -182,6 +187,60 @@ class MidiVocab:
 
     def decode_ids(self, ids: list[int]) -> list[str]:
         return [self.decode_id(i) for i in ids]
+
+    # ------------------------------------------------------------------
+    # Chord helpers
+    # ------------------------------------------------------------------
+    # Regex for legacy combined chord tokens: Chord_Cmaj7, Chord_F#m7b5 …
+    _LEGACY_CHORD_RE = re.compile(
+        r"^Chord_(" + "|".join(re.escape(n) for n in NOTE_NAMES) + r")("
+        + "|".join(re.escape(q) for q in CHORD_QUALITIES) + r")$"
+    )
+
+    def encode_chord(self, root: str, quality: str) -> list[int]:
+        """Encode a chord as a 2-token [root, quality] sequence.
+
+        Args:
+            root: Note name, e.g. ``"C"`` or ``"F#"``.
+            quality: Chord quality, e.g. ``"maj7"``.
+
+        Returns:
+            List of two token IDs ``[ChordRoot_X, ChordQual_Y]``.
+            Falls back to ``[unk_id]`` for unrecognised components.
+        """
+        root_id = self._token2id.get(f"ChordRoot_{root}", self.unk_id)
+        qual_id = self._token2id.get(f"ChordQual_{quality}", self.unk_id)
+        return [root_id, qual_id]
+
+    def encode_chord_nc(self) -> list[int]:
+        """Encode a No-Chord symbol (single token)."""
+        return [self._token2id["Chord_NC"]]
+
+    def decode_token(self, token_id: int) -> str:
+        """Decode a single token ID.
+
+        Handles both new factored tokens and, for backward compatibility,
+        detects legacy combined ``Chord_Cmaj7``-style strings that might
+        appear in older saved sequences and re-maps them to the new
+        ``ChordRoot_`` / ``ChordQual_`` pair (returned as a
+        slash-separated string ``"ChordRoot_C/ChordQual_maj7"``).
+        """
+        tok = self._id2token.get(token_id, "<UNK>")
+        # If the resolved token happens to be <UNK>, nothing more to do.
+        return tok
+
+    def decode_legacy_chord(self, token_str: str) -> list[str] | None:
+        """Try to decompose a legacy ``Chord_Cmaj7`` string into new tokens.
+
+        Returns:
+            ``["ChordRoot_C", "ChordQual_maj7"]`` on match, or ``None``
+            if *token_str* is not a legacy chord token.
+        """
+        m = self._LEGACY_CHORD_RE.match(token_str)
+        if m is None:
+            return None
+        root, qual = m.group(1), m.group(2)
+        return [f"ChordRoot_{root}", f"ChordQual_{qual}"]
 
     def __contains__(self, token: str) -> bool:
         return token in self._token2id

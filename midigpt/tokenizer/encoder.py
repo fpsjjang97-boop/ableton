@@ -168,22 +168,25 @@ class MidiEncoder:
             # Chord for this bar (if changed)
             if bar_idx in chord_map:
                 chord = chord_map[bar_idx]
-                chord_token = f"Chord_{chord.root}{chord.quality}"
-                if chord_token in self.vocab:
-                    if chord_token != current_chord:
-                        tokens.append(chord_token)
-                        current_chord = chord_token
+                chord_key = (chord.root, chord.quality)
+                if chord_key != current_chord:
+                    root_token = f"ChordRoot_{chord.root}"
+                    qual_token = f"ChordQual_{chord.quality}"
+                    if root_token in self.vocab and qual_token in self.vocab:
+                        tokens.append(root_token)
+                        tokens.append(qual_token)
+                        current_chord = chord_key
 
-                    # Slash bass
-                    if chord.bass and chord.bass != chord.root:
-                        bass_token = f"Bass_{chord.bass}"
-                        if bass_token in self.vocab:
-                            tokens.append(bass_token)
+                        # Slash bass
+                        if chord.bass and chord.bass != chord.root:
+                            bass_token = f"Bass_{chord.bass}"
+                            if bass_token in self.vocab:
+                                tokens.append(bass_token)
 
-                    # Harmonic function
-                    func_token = f"Func_{chord.function}"
-                    if func_token in self.vocab:
-                        tokens.append(func_token)
+                        # Harmonic function
+                        func_token = f"Func_{chord.function}"
+                        if func_token in self.vocab:
+                            tokens.append(func_token)
 
             # Encode notes within bar
             for note in bar_notes:
@@ -284,14 +287,18 @@ class MidiEncoder:
 
             if bar_idx in chord_map:
                 chord = chord_map[bar_idx]
-                chord_token = f"Chord_{chord.root}{chord.quality}"
-                if chord_token in self.vocab and chord_token != current_chord:
-                    tokens.append(chord_token)
-                    current_chord = chord_token
-                    if chord.bass and chord.bass != chord.root:
-                        bass_token = f"Bass_{chord.bass}"
-                        if bass_token in self.vocab:
-                            tokens.append(bass_token)
+                chord_key = (chord.root, chord.quality)
+                if chord_key != current_chord:
+                    root_token = f"ChordRoot_{chord.root}"
+                    qual_token = f"ChordQual_{chord.quality}"
+                    if root_token in self.vocab and qual_token in self.vocab:
+                        tokens.append(root_token)
+                        tokens.append(qual_token)
+                        current_chord = chord_key
+                        if chord.bass and chord.bass != chord.root:
+                            bass_token = f"Bass_{chord.bass}"
+                            if bass_token in self.vocab:
+                                tokens.append(bass_token)
 
             for note in bar_notes:
                 if note.track_type != current_track:

@@ -339,6 +339,73 @@ def review_all_pending():
         review_midi(fp)
 
 
+# ─── DPO 연동 ───
+
+def export_for_dpo():
+    """리뷰 결과를 읽어 DPO 학습 페어(chosen/rejected)를 자동 생성한다.
+
+    1. reviews/ 디렉토리의 모든 리뷰 JSON 로드
+    2. avg_score 기준으로 chosen(>=80) / rejected(<60) 분류
+    3. midigpt.build_dpo_pairs 호출로 페어링 + 토크나이징 + 저장
+    4. 생성된 페어 수 반환
+
+    Returns:
+        int: 생성된 DPO 페어 수 (오류 시 0)
+    """
+    try:
+        sys.path.insert(0, PROJECT_DIR)
+        from midigpt.build_dpo_pairs import collect_reviews, build_pairs, save_dpo_pairs, print_summary
+    except ImportError as exc:
+        print(f"[ERR] DPO 모듈 임포트 실패: {exc}")
+        print("      midigpt/build_dpo_pairs.py 가 프로젝트 루트에 있는지 확인하세요.")
+        return 0
+
+    print(f"\n{'='*60}")
+    print("📦 DPO 페어 생성 (export_for_dpo)")
+    print(f"{'='*60}")
+
+    # Step 1: 리뷰 수집
+    print("\n[1/3] 리뷰 수집 중...")
+    items = collect_reviews()
+    if not items:
+        print("  리뷰 데이터 없음. 먼저 MIDI 리뷰를 실행하세요.")
+        return 0
+
+    chosen = [r for r in items if r.category == "chosen"]
+    rejected = [r for r in items if r.category == "rejected"]
+    neutral = [r for r in items if r.category == "neutral"]
+
+    print(f"  총 리뷰: {len(items)}건")
+    print(f"    Chosen  (score >= 80): {len(chosen)}건")
+    print(f"    Rejected (score < 60): {len(rejected)}건")
+    print(f"    Neutral (60~79):       {len(neutral)}건")
+
+    if not chosen or not rejected:
+        lack = "chosen (우수)" if not chosen else "rejected (저평가)"
+        print(f"\n  ⚠ {lack} 샘플이 없어 DPO 페어를 만들 수 없습니다.")
+        print("    더 많은 MIDI를 생성/리뷰하여 양쪽 분포를 확보하세요.")
+        return 0
+
+    # Step 2: 페어링
+    print("\n[2/3] 페어 매칭 중...")
+    pairs = build_pairs(items)
+    if not pairs:
+        print("  매칭된 페어가 없습니다 (키/템포 조건 불일치 또는 MIDI 파일 누락).")
+        return 0
+
+    print(f"  매칭 완료: {len(pairs)}쌍")
+
+    # Step 3: 토크나이징 + 저장
+    print("\n[3/3] 토크나이징 & 저장 중...")
+    saved = save_dpo_pairs(pairs, dry_run=False)
+
+    # 요약
+    print_summary(items, pairs, saved)
+
+    print(f"\n✅ DPO 페어 {saved}쌍 생성 완료!")
+    return saved
+
+
 # ─── CLI ───
 
 if __name__ == '__main__':
@@ -350,8 +417,10 @@ if __name__ == '__main__':
             list_pending()
         elif cmd == 'all':
             review_all_pending()
+        elif cmd == 'dpo':
+            export_for_dpo()
         else:
-            print("사용법: python reviewer.py [review <file>|pending|all]")
+            print("사용법: python reviewer.py [review <file>|pending|all|dpo]")
     else:
         print("="*50)
         print("🔍 리뷰어 에이전트 (Reviewer)")
@@ -360,6 +429,7 @@ if __name__ == '__main__':
         print("  review <file> - MIDI 파일 리뷰")
         print("  pending       - 대기 목록 확인")
         print("  all           - 대기 파일 전부 리뷰")
+        print("  dpo           - DPO 학습 페어 생성")
         print("  quit          - 종료")
         print()
 
@@ -382,6 +452,8 @@ if __name__ == '__main__':
                     list_pending()
                 elif cmd == 'all':
                     review_all_pending()
+                elif cmd == 'dpo':
+                    export_for_dpo()
                 else:
                     print(f"알 수 없는 명령: {cmd}")
             except (EOFError, KeyboardInterrupt):

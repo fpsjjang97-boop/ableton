@@ -20,7 +20,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 
 # Add repo root to path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -62,11 +62,17 @@ def train(args):
     params = model.count_parameters()
     print(f"Trainable parameters: {params:,} ({params/1e6:.1f}M)")
 
-    # Dataset
-    dataset = MidiDataset(args.data_dir, mode="pretrain", block_size=args.block_size)
+    # Dataset — 90/10 train/val split
+    full_dataset = MidiDataset(args.data_dir, mode="pretrain", block_size=args.block_size)
     collator = MidiCollator()
+    val_size = max(1, int(len(full_dataset) * 0.1))
+    train_size = len(full_dataset) - val_size
+    train_dataset, val_dataset = random_split(
+        full_dataset, [train_size, val_size],
+        generator=torch.Generator().manual_seed(42),
+    )
     loader = DataLoader(
-        dataset,
+        train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
@@ -74,7 +80,17 @@ def train(args):
         pin_memory=True,
         drop_last=True,
     )
-    print(f"Dataset: {len(dataset)} chunks, {len(loader)} batches/epoch")
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        collate_fn=collator,
+        pin_memory=True,
+        drop_last=False,
+    )
+    print(f"Dataset: {len(full_dataset)} chunks — {train_size} train, {val_size} val")
+    print(f"Batches/epoch: {len(loader)} train, {len(val_loader)} val")
 
     # Optimizer
     # Separate weight decay for different parameter groups
@@ -120,7 +136,8 @@ def train(args):
     print("=" * 60)
 
     global_step = 0
-    best_loss = float("inf")
+    best_val_loss = float("inf")
+    patience_counter = 0
     start_time = time.time()
 
     for epoch in range(args.epochs):
@@ -139,7 +156,7 @@ def train(args):
 
             # Forward pass with mixed precision
             with torch.amp.autocast(device_type=device.type, dtype=autocast_dtype, enabled=use_amp):
-                logits, loss = model(input_ids, targets=labels)
+                logits, loss, _ = model(input_ids, targets=labels)
                 loss = loss / args.grad_accum
 
             # Backward
@@ -184,9 +201,38 @@ def train(args):
                 with open(log_path, "a") as f:
                     f.write(json.dumps(log_entry) + "\n")
 
-        # Epoch summary
-        avg_loss = epoch_loss / len(loader) if len(loader) > 0 else 0
-        print(f"\n--- Epoch {epoch+1} complete | Avg Loss: {avg_loss:.4f} ---\n")
+        # Epoch summary (training)
+        avg_train_loss = epoch_loss / len(loader) if len(loader) > 0 else 0
+
+        # --- Validation ---
+        model.eval()
+        val_loss_sum = 0.0
+        val_batches = 0
+        with torch.no_grad():
+            for val_batch in val_loader:
+                val_input_ids = val_batch["input_ids"].to(device)
+                val_labels = val_batch["labels"].to(device)
+                with torch.amp.autocast(device_type=device.type, dtype=autocast_dtype, enabled=use_amp):
+                    _, v_loss, _ = model(val_input_ids, targets=val_labels)
+                val_loss_sum += v_loss.item()
+                val_batches += 1
+        avg_val_loss = val_loss_sum / val_batches if val_batches > 0 else 0
+
+        print(
+            f"\n--- Epoch {epoch+1} complete | "
+            f"Train Loss: {avg_train_loss:.4f} | "
+            f"Val Loss: {avg_val_loss:.4f} ---\n"
+        )
+
+        # Log epoch-level validation metrics
+        val_log_entry = {
+            "step": global_step,
+            "epoch": epoch + 1,
+            "train_loss": round(avg_train_loss, 4),
+            "val_loss": round(avg_val_loss, 4),
+        }
+        with open(log_path, "a") as f:
+            f.write(json.dumps(val_log_entry) + "\n")
 
         # Save checkpoint
         checkpoint = {
@@ -195,17 +241,27 @@ def train(args):
             "config": config.__dict__,
             "epoch": epoch + 1,
             "global_step": global_step,
-            "loss": avg_loss,
+            "train_loss": avg_train_loss,
+            "val_loss": avg_val_loss,
         }
 
         # Save latest
         torch.save(checkpoint, checkpoint_dir / "midigpt_latest.pt")
 
-        # Save best
-        if avg_loss < best_loss:
-            best_loss = avg_loss
+        # Save best based on validation loss
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            patience_counter = 0
             torch.save(checkpoint, checkpoint_dir / "midigpt_best.pt")
-            print(f"  New best model saved (loss: {best_loss:.4f})")
+            print(f"  New best model saved (val_loss: {best_val_loss:.4f})")
+        else:
+            patience_counter += 1
+            print(f"  No improvement (patience: {patience_counter}/{args.early_stop_patience})")
+
+        # Early stopping
+        if args.early_stop_patience > 0 and patience_counter >= args.early_stop_patience:
+            print(f"\nEarly stopping triggered after {patience_counter} epochs without improvement.")
+            break
 
         # Periodic checkpoint
         if (epoch + 1) % args.save_every == 0:
@@ -216,7 +272,7 @@ def train(args):
     print("=" * 60)
     print(f"Training complete!")
     print(f"Total time: {total_time/3600:.1f} hours")
-    print(f"Best loss: {best_loss:.4f}")
+    print(f"Best val loss: {best_val_loss:.4f}")
     print(f"Final model: {checkpoint_dir / 'midigpt_best.pt'}")
 
     # Save final model weights only (smaller file for deployment)
@@ -242,6 +298,8 @@ def main():
     parser.add_argument("--num_workers", type=int, default=2)
     parser.add_argument("--log_interval", type=int, default=10)
     parser.add_argument("--save_every", type=int, default=2, help="Save checkpoint every N epochs")
+    parser.add_argument("--early_stop_patience", type=int, default=5,
+                        help="Stop training after N epochs without val loss improvement (0=disable)")
 
     args = parser.parse_args()
     train(args)

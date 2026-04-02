@@ -35,7 +35,7 @@ from midigpt.training.lora import apply_lora, LoRAConfig, save_lora, load_lora
 
 def compute_logprobs(model, input_ids, prompt_len):
     """Compute per-token log probabilities for the response portion."""
-    logits, _ = model(input_ids)
+    logits, _, _ = model(input_ids)
     # Shift: predict token t from tokens 0..t-1
     shift_logits = logits[:, :-1, :]
     shift_labels = input_ids[:, 1:]

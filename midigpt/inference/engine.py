@@ -6,6 +6,7 @@ Features:
   - PyTorch or ONNX Runtime backend
   - LoRA hot-swap at runtime
   - Quantized model support (FP16/INT8)
+  - Harmonic constraint: masks off-scale pitches during generation
 """
 from __future__ import annotations
 
@@ -16,12 +17,134 @@ from pathlib import Path
 from typing import Optional
 
 import torch
+import torch.nn.functional as F
 
 from ..model import MidiGPTConfig, MidiGPT
 from ..tokenizer import MidiVocab, MidiEncoder, MidiDecoder
-from ..tokenizer.vocab import VOCAB
+from ..tokenizer.vocab import VOCAB, NOTE_NAMES, PITCH_MIN, PITCH_MAX
 from ..tokenizer.encoder import SongMeta, ChordEvent
 from ..training.lora import LoRAConfig, apply_lora, load_lora, merge_lora
+
+
+# ---------------------------------------------------------------------------
+# Harmonic constraint tables
+# ---------------------------------------------------------------------------
+# Semitone intervals from root for each chord quality → associated scale
+# Each maps to a set of pitch classes (0-11) relative to root.
+_SCALE_INTERVALS: dict[str, list[int]] = {
+    # Major family → major scale (Ionian)
+    "maj":    [0, 2, 4, 5, 7, 9, 11],
+    "maj7":   [0, 2, 4, 5, 7, 9, 11],
+    "maj9":   [0, 2, 4, 5, 7, 9, 11],
+    "add9":   [0, 2, 4, 5, 7, 9, 11],
+    "6":      [0, 2, 4, 5, 7, 9, 11],
+    # Minor family → natural minor scale (Aeolian)
+    "min":    [0, 2, 3, 5, 7, 8, 10],
+    "m7":     [0, 2, 3, 5, 7, 8, 10],
+    "m9":     [0, 2, 3, 5, 7, 8, 10],
+    "madd9":  [0, 2, 3, 5, 7, 8, 10],
+    "m6":     [0, 2, 3, 5, 7, 8, 10],
+    # Dominant 7th family → Mixolydian
+    "7":      [0, 2, 4, 5, 7, 9, 10],
+    "9":      [0, 2, 4, 5, 7, 9, 10],
+    "13":     [0, 2, 4, 5, 7, 9, 10],
+    "7sus4":  [0, 2, 4, 5, 7, 9, 10],
+    # Altered dominant
+    "7b9":    [0, 1, 3, 4, 6, 7, 9, 10],  # half-whole diminished
+    "7#9":    [0, 2, 3, 4, 7, 9, 10],      # dominant with #9 (blues-adjacent)
+    # Diminished → diminished scale (half-whole)
+    "dim":    [0, 1, 3, 4, 6, 7, 9, 10],
+    "dim7":   [0, 1, 3, 4, 6, 7, 9, 10],
+    "m7b5":   [0, 1, 3, 5, 6, 8, 10],      # Locrian
+    # Augmented → whole tone scale
+    "aug":    [0, 2, 4, 6, 8, 10],
+    # Suspended — use parent major/mixolydian scale
+    "sus2":   [0, 2, 4, 5, 7, 9, 11],
+    "sus4":   [0, 2, 4, 5, 7, 9, 11],
+    # 11th chord → Mixolydian
+    "11":     [0, 2, 4, 5, 7, 9, 10],
+    # Power chord — no 3rd, allow all chromatic (no constraint)
+    "5":      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+}
+
+# Root name → pitch class (C=0)
+_ROOT_PC: dict[str, int] = {name: i for i, name in enumerate(NOTE_NAMES)}
+
+
+def _build_pitch_token_ids(vocab: MidiVocab) -> dict[int, int]:
+    """Map token IDs of Pitch_N tokens to their MIDI pitch number."""
+    mapping: dict[int, int] = {}
+    for midi_pitch in range(PITCH_MIN, PITCH_MAX + 1):
+        tok = f"Pitch_{midi_pitch}"
+        tid = vocab.encode_token(tok)
+        if tid != vocab.unk_id:
+            mapping[tid] = midi_pitch
+    return mapping
+
+
+def _parse_chord_token(token: str) -> tuple[int, str] | None:
+    """Parse a Chord token string into (root_pitch_class, quality).
+
+    Returns None for non-chord tokens or Chord_NC.
+    Handles both new ``ChordRoot_X`` tokens and legacy ``Chord_Cmaj7``
+    combined tokens.
+
+    Note: For the new factored vocabulary, call ``_parse_chord_from_context``
+    instead, which looks for the ``ChordRoot_`` / ``ChordQual_`` pair.
+    """
+    # New factored tokens are handled in _parse_chord_from_context.
+    # Legacy combined tokens:
+    if not token.startswith("Chord_") or token == "Chord_NC":
+        return None
+    body = token[len("Chord_"):]  # e.g. "C#maj7"
+    # Try two-char root first (e.g. C#, D#), then one-char
+    for rlen in (2, 1):
+        root_name = body[:rlen]
+        if root_name in _ROOT_PC:
+            quality = body[rlen:]
+            if quality in _SCALE_INTERVALS:
+                return _ROOT_PC[root_name], quality
+    return None
+
+
+def _parse_chord_from_context(tokens_reversed: list[str]) -> tuple[int, str] | None:
+    """Scan decoded tokens (in reverse order) for the newest chord.
+
+    Recognises both the new factored ``ChordRoot_`` + ``ChordQual_``
+    token pair and legacy ``Chord_Cmaj7`` combined tokens.
+
+    Args:
+        tokens_reversed: Token strings in *reverse* order (newest first).
+
+    Returns:
+        ``(root_pitch_class, quality)`` or ``None``.
+    """
+    # New format: look for ChordQual_ followed (earlier in time, later in
+    # reversed list) by ChordRoot_.
+    found_qual: str | None = None
+    for tok in tokens_reversed:
+        if tok.startswith("ChordQual_") and found_qual is None:
+            found_qual = tok[len("ChordQual_"):]
+        elif tok.startswith("ChordRoot_") and found_qual is not None:
+            root_name = tok[len("ChordRoot_"):]
+            if root_name in _ROOT_PC and found_qual in _SCALE_INTERVALS:
+                return _ROOT_PC[root_name], found_qual
+            # Reset and keep searching
+            found_qual = None
+        # Legacy combined token
+        parsed = _parse_chord_token(tok)
+        if parsed is not None:
+            return parsed
+
+    return None
+
+
+def _allowed_pitch_classes(root_pc: int, quality: str) -> set[int]:
+    """Return the set of absolute pitch classes (0-11) allowed by this chord."""
+    intervals = _SCALE_INTERVALS.get(quality)
+    if intervals is None:
+        return set(range(12))  # unknown quality — allow everything
+    return {(root_pc + iv) % 12 for iv in intervals}
 
 
 @dataclass
@@ -42,6 +165,9 @@ class MidiGPTInference:
         self.vocab = VOCAB
         self.encoder = MidiEncoder(self.vocab)
         self.decoder = MidiDecoder(self.vocab)
+
+        # Pre-compute pitch token ID → MIDI pitch mapping (for harmonic constraint)
+        self._pitch_token_ids = _build_pitch_token_ids(self.vocab)
 
         # Detect device
         self.device = self._detect_device(config.device)
@@ -118,6 +244,107 @@ class MidiGPTInference:
         print(f"MidiGPT: LoRA '{name}' loaded")
 
     # ------------------------------------------------------------------
+    # Harmonic constraint helpers
+    # ------------------------------------------------------------------
+    def _find_active_chord(self, token_ids: list[int]) -> tuple[int, str] | None:
+        """Scan token_ids backwards to find the most recent Chord.
+
+        Handles both new factored ``ChordRoot_``/``ChordQual_`` pairs
+        and legacy combined ``Chord_Cmaj7`` tokens.
+
+        Returns (root_pitch_class, quality) or None.
+        """
+        tokens_reversed = [self.vocab.decode_id(tid) for tid in reversed(token_ids)]
+        return _parse_chord_from_context(tokens_reversed)
+
+    def _apply_harmonic_mask(
+        self, logits: torch.Tensor, context_ids: list[int]
+    ) -> torch.Tensor:
+        """Mask pitch tokens that fall outside the active chord's scale.
+
+        Args:
+            logits: Raw logits for the next token, shape (vocab_size,)
+            context_ids: All token IDs generated so far (used to find active chord)
+
+        Returns:
+            logits with disallowed Pitch tokens set to -inf.
+        """
+        chord_info = self._find_active_chord(context_ids)
+        if chord_info is None:
+            return logits  # no chord context — no constraint
+
+        root_pc, quality = chord_info
+        allowed_pcs = _allowed_pitch_classes(root_pc, quality)
+
+        for token_id, midi_pitch in self._pitch_token_ids.items():
+            pc = midi_pitch % 12
+            if pc not in allowed_pcs:
+                logits[token_id] = float("-inf")
+
+        return logits
+
+    def _generate_with_harmony(
+        self,
+        idx: torch.Tensor,
+        max_new_tokens: int = 512,
+        temperature: float = 0.9,
+        top_k: int = 50,
+        top_p: float = 0.95,
+        eos_id: int = 2,
+    ) -> torch.Tensor:
+        """Autoregressive generation with harmonic constraint.
+
+        Mirrors model.generate() but applies a scale-aware mask on pitch tokens
+        before sampling, preventing notes outside the current chord's scale.
+        """
+        assert self.model is not None
+        self.model.eval()
+        block_size = self.model.config.block_size
+
+        for _ in range(max_new_tokens):
+            # Crop to block_size
+            idx_cond = idx if idx.size(1) <= block_size else idx[:, -block_size:]
+
+            # Forward pass
+            logits, _, _ = self.model(idx_cond)
+            logits = logits[:, -1, :] / temperature  # (B, V)
+
+            # --- Harmonic constraint (per batch element) ---
+            for b in range(logits.size(0)):
+                context = idx[b].tolist()
+                logits[b] = self._apply_harmonic_mask(logits[b], context)
+
+            # Top-K filtering
+            if top_k > 0:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float("-inf")
+
+            # Top-P (nucleus) filtering
+            if top_p < 1.0:
+                sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+                cumulative_probs = torch.cumsum(
+                    F.softmax(sorted_logits, dim=-1), dim=-1
+                )
+                sorted_mask = (
+                    cumulative_probs - F.softmax(sorted_logits, dim=-1) > top_p
+                )
+                sorted_logits[sorted_mask] = float("-inf")
+                logits = sorted_logits.scatter(1, sorted_indices, sorted_logits)
+
+            # Sample
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            # Append
+            idx = torch.cat([idx, next_token], dim=1)
+
+            # Stop on EOS
+            if (next_token == eos_id).all():
+                break
+
+        return idx
+
+    # ------------------------------------------------------------------
     # Generation API
     # ------------------------------------------------------------------
     def generate_variation(
@@ -164,12 +391,12 @@ class MidiGPTInference:
         # Add SEP token to signal "now generate variation"
         input_ids.append(self.vocab.sep_id)
 
-        # Generate
+        # Generate with harmonic constraint
         start_time = time.time()
         input_tensor = torch.tensor([input_ids], dtype=torch.long, device=self.device)
 
         with torch.no_grad():
-            output = self.model.generate(
+            output = self._generate_with_harmony(
                 input_tensor,
                 max_new_tokens=max_tokens,
                 temperature=temperature,
@@ -223,7 +450,7 @@ class MidiGPTInference:
         input_tensor = torch.tensor([input_ids], dtype=torch.long, device=self.device)
 
         with torch.no_grad():
-            output = self.model.generate(
+            output = self._generate_with_harmony(
                 input_tensor,
                 max_new_tokens=max_tokens,
                 temperature=temperature,

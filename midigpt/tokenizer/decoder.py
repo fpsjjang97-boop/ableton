@@ -15,7 +15,7 @@ except ImportError:
     mido = None
 
 from .vocab import (
-    MidiVocab, VOCAB, NOTE_NAMES,
+    MidiVocab, VOCAB, NOTE_NAMES, CHORD_QUALITIES,
     NUM_POSITIONS, PITCH_MIN, PITCH_MAX, NUM_VELOCITIES,
 )
 
@@ -79,10 +79,43 @@ class MidiDecoder:
         return output_path
 
     # ------------------------------------------------------------------
+    # Legacy backward compatibility
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _expand_legacy_tokens(tokens: list[str]) -> list[str]:
+        """Expand legacy combined chord tokens into factored pairs.
+
+        Old format: ``Chord_Cmaj7`` (single token)
+        New format: ``ChordRoot_C  ChordQual_maj7`` (two tokens)
+
+        ``Chord_NC`` is kept as-is since it still exists in the new vocab.
+        Tokens that are already in the new format are passed through
+        unchanged.
+        """
+        expanded: list[str] = []
+        for tok in tokens:
+            if tok == "Chord_NC":
+                expanded.append(tok)
+                continue
+            decomposed = VOCAB.decode_legacy_chord(tok)
+            if decomposed is not None:
+                expanded.extend(decomposed)
+            else:
+                expanded.append(tok)
+        return expanded
+
+    # ------------------------------------------------------------------
     # Token parsing
     # ------------------------------------------------------------------
     def _tokens_to_notes(self, tokens: list[str]) -> list[DecodedNote]:
-        """Parse token strings into note events."""
+        """Parse token strings into note events.
+
+        Handles both old combined ``Chord_Cmaj7`` tokens and new factored
+        ``ChordRoot_`` / ``ChordQual_`` tokens transparently.
+        """
+        # Expand any legacy chord tokens before parsing
+        tokens = self._expand_legacy_tokens(tokens)
+
         notes: list[DecodedNote] = []
 
         current_bar = 0
@@ -100,6 +133,7 @@ class MidiDecoder:
             if tok.startswith("<") or tok.startswith("Key_") or \
                tok.startswith("Style_") or tok.startswith("Sec_") or \
                tok.startswith("Tempo_") or tok.startswith("Chord_") or \
+               tok.startswith("ChordRoot_") or tok.startswith("ChordQual_") or \
                tok.startswith("Bass_") or tok.startswith("Func_") or \
                tok.startswith("Dyn_") or tok.startswith("Art_"):
                 i += 1
