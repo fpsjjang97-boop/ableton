@@ -84,9 +84,9 @@ class AudioToMidiApp:
         ttk.Checkbutton(opt_frame, text="트랙 개별 MIDI 유지", variable=self.no_merge_var).pack(side="left", padx=(0, 15))
 
         ttk.Label(opt_frame, text="Demucs 모델:").pack(side="left")
-        self.model_var = tk.StringVar(value="htdemucs")
+        self.model_var = tk.StringVar(value="htdemucs_6s")
         model_combo = ttk.Combobox(opt_frame, textvariable=self.model_var, width=15, state="readonly",
-                                   values=["htdemucs", "htdemucs_ft", "mdx_extra"])
+                                   values=["htdemucs_6s", "htdemucs", "htdemucs_ft", "mdx_extra"])
         model_combo.pack(side="left", padx=5)
 
         # ── Run button ──

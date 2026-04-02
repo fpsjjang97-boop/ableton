@@ -11,9 +11,9 @@ Usage:
     python convert.py "노래.mp3" --no_merge           # 트랙별 개별 MIDI 유지
 
 Pipeline:
-    [1] Demucs — 보컬 제거 + 악기 분리 (vocals/drums/bass/other)
-    [2] Basic Pitch — 각 악기 트랙을 MIDI로 변환
-    [3] merge_tracks — 분리된 MIDI를 Type 1 MIDI로 합치기
+    [1] Demucs -보컬 제거 + 악기 분리 (vocals/drums/bass/other)
+    [2] Basic Pitch -각 악기 트랙을 MIDI로 변환
+    [3] merge_tracks -분리된 MIDI를 Type 1 MIDI로 합치기
 
 필요 라이브러리:
     pip install demucs basic-pitch pretty_midi mido numpy
@@ -105,7 +105,8 @@ def separate_audio(
                 break
 
     stem_paths: dict[str, Path] = {}
-    expected_stems = ["vocals", "drums", "bass", "other"]
+    # htdemucs_6s: drums/bass/other/vocals/guitar/piano
+    expected_stems = ["vocals", "drums", "bass", "guitar", "piano", "other"]
 
     for stem_type in expected_stems:
         wav_path = demucs_out / f"{stem_type}.wav"
@@ -187,6 +188,20 @@ def convert_stems_to_midi(
             "minimum_frequency": 30.0,    # E1 근처
             "maximum_frequency": 300.0,   # D4 근처
         },
+        "guitar": {
+            "onset_threshold": 0.5,
+            "frame_threshold": 0.3,
+            "minimum_note_length": 80.0,
+            "minimum_frequency": 80.0,    # E2
+            "maximum_frequency": 1200.0,  # E6
+        },
+        "piano": {
+            "onset_threshold": 0.45,
+            "frame_threshold": 0.25,
+            "minimum_note_length": 100.0,
+            "minimum_frequency": 27.5,    # A0
+            "maximum_frequency": 4200.0,  # C8
+        },
         "other": {
             "onset_threshold": 0.45,
             "frame_threshold": 0.25,
@@ -230,7 +245,9 @@ def convert_stems_to_midi(
 STEM_PROGRAM: dict[str, int] = {
     "drums": 0,     # drums use channel 10, program irrelevant
     "bass": 33,     # Electric Bass (finger)
-    "other": 0,     # Acoustic Grand Piano
+    "guitar": 25,   # Acoustic Guitar (steel)
+    "piano": 0,     # Acoustic Grand Piano
+    "other": 48,    # String Ensemble 1
     "vocals": 73,   # Flute (as melody placeholder)
 }
 
@@ -313,7 +330,7 @@ def convert_single(
 
     if no_merge:
         elapsed = time.time() - start
-        print(f"\n완료! ({elapsed:.1f}s) — 트랙별 개별 MIDI: {song_output / 'midi_tracks'}")
+        print(f"\n완료! ({elapsed:.1f}s) -트랙별 개별 MIDI: {song_output / 'midi_tracks'}")
         return song_output / "midi_tracks"
 
     # Step 3: Merge
@@ -403,9 +420,9 @@ def main():
                         help="보컬 트랙도 MIDI로 변환")
     parser.add_argument("--no_merge", action="store_true",
                         help="트랙별 개별 MIDI 유지 (합치지 않음)")
-    parser.add_argument("--demucs_model", type=str, default="htdemucs",
-                        choices=["htdemucs", "htdemucs_ft", "mdx_extra"],
-                        help="Demucs 모델 (htdemucs_ft가 가장 정확, 느림)")
+    parser.add_argument("--demucs_model", type=str, default="htdemucs_6s",
+                        choices=["htdemucs", "htdemucs_ft", "htdemucs_6s", "mdx_extra"],
+                        help="Demucs 모델 (htdemucs_6s: 6트랙 분리, htdemucs_ft: 4트랙 고정밀)")
 
     args = parser.parse_args()
 

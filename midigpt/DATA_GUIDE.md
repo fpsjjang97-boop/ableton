@@ -183,6 +183,70 @@ MIDI 파일 내보내기 전 확인사항:
 ☑ CC 데이터 (서스테인, 익스프레션 등) 포함
 ☑ 트랙별 채널 분리 (전부 Channel 1에 합치지 않기)
 ☑ 악기군은 하나의 파일에 통합 (개별 파일 분리 ✗)
+☑ 주법별로 트랙 분리 (아래 Q7~Q9 참고)
+```
+
+### Q7. 스트링 주법(레가토/스타카토 등)은 어떻게 넣나요?
+
+**트랙을 주법별로 나눠서 넣어주세요.** 키스위치는 가상악기마다 달라서 학습에 쓸 수 없습니다.
+
+```
+좋은 방식:
+  Track: VIOLIN_LEGATO    (레가토 프레이즈)
+  Track: VIOLIN_STACCATO  (스타카토 프레이즈)
+  Track: VIOLIN_PIZZ      (피치카토)
+  Track: VIOLIN_TREMOLO   (트레몰로)
+
+안 좋은 방식:
+  Track: VIOLIN (키스위치 C0=legato, D0=staccato...)
+```
+
+주법 차이는 노트의 Duration과 Velocity 패턴으로 자연스럽게 학습됩니다:
+- 레가토: 노트 겹침(overlap), 긴 Duration
+- 스타카토: 노트 사이 갭, 짧은 Duration
+- 피치카토: 매우 짧은 Duration, 높은 Velocity
+
+### Q8. 베이스 핑거/슬랩 주법 구분은?
+
+**역시 트랙을 나눠주세요.**
+
+```
+Track: BASS_FINGER   (핑거링 연주)
+Track: BASS_SLAP     (슬랩 연주)
+Track: BASS_PICK     (피크 연주)
+```
+
+MIDI 노트상 같은 음이라도 모델이 패턴 차이를 학습합니다:
+- 슬랩: 높은 Velocity (강한 타격), 짧은 Duration
+- 핑거: 중간 Velocity, 보통 Duration
+
+### Q9. 베이스 슬라이드는 어떻게 표현하나요?
+
+슬라이드는 "음이 없는" 주법이라 가장 까다롭습니다. 두 가지 방법이 있습니다:
+
+**방법 A: 트랙 분리 + 짧은 노트 연결 (현재 바로 학습 가능)**
+```
+Track: BASS_SLIDE
+  Note: E2 (짧은 Duration, 낮은 Velocity)  -> 경과음
+  Note: F2 (짧은 Duration, 낮은 Velocity)  -> 경과음
+  Note: F#2 (짧은 Duration, 낮은 Velocity) -> 경과음
+  Note: G2 (긴 Duration, 높은 Velocity)    -> 도착음
+```
+
+**방법 B: Pitch Bend CC 데이터 포함 (Phase 3에서 학습 반영)**
+```
+Track: BASS_SLIDE
+  Note: E2 + Pitch Bend 0 -> +4096 (점진적 상승)
+```
+
+권장: 방법 A + B 둘 다 포함. 현재는 A로 학습하고, 나중에 CC 데이터까지 반영합니다.
+
+**트랙 네이밍 규칙 요약:**
+```
+Strings:  VIOLIN_LEGATO, VIOLIN_STACCATO, VIOLIN_PIZZ, CELLO_LEGATO ...
+Bass:     BASS_FINGER, BASS_SLAP, BASS_SLIDE, BASS_PICK
+Brass:    TRUMPET_SUSTAIN, TRUMPET_STACCATO, TRUMPET_MUTE
+Guitar:   GUITAR_CLEAN, GUITAR_MUTE, GUITAR_STRUM
 ```
 
 ### Q6. 하나의 곡에서 트랙 빼기 / 키 변환으로 데이터를 늘릴 수 있나요?
