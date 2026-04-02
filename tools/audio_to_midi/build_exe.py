@@ -34,7 +34,7 @@ def build():
         # ── Hidden imports (PyInstaller가 자동 감지 못하는 것들) ──
         # Demucs
         "--hidden-import", "demucs",
-        "--hidden-import", "demucs.api",
+        "--hidden-import", "demucs.separate",
         "--hidden-import", "demucs.apply",
         "--hidden-import", "demucs.hdemucs",
         "--hidden-import", "demucs.htdemucs",

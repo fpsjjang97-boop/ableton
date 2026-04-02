@@ -24,7 +24,6 @@ import argparse
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -34,13 +33,12 @@ from pathlib import Path
 MISSING: list[str] = []
 
 try:
-    import demucs.api
+    import demucs.separate
 except ImportError:
     MISSING.append("demucs")
 
 try:
     from basic_pitch.inference import predict as bp_predict
-    from basic_pitch import ICASSP_2022_MODEL_PATH
 except ImportError:
     MISSING.append("basic-pitch")
 
@@ -73,7 +71,7 @@ def check_deps():
 
 
 # ---------------------------------------------------------------------------
-# Step 1: Source separation with Demucs
+# Step 1: Source separation with Demucs (CLI-based, works with all versions)
 # ---------------------------------------------------------------------------
 def separate_audio(
     audio_path: Path,
@@ -84,22 +82,46 @@ def separate_audio(
     print(f"\n[1/3] 음원 분리 (Demucs {model_name})...")
     print(f"  입력: {audio_path.name}")
 
-    separator = demucs.api.Separator(model=model_name)
-    _, separated = separator.separate_audio_file(str(audio_path))
-
     stem_dir = output_dir / "stems"
     stem_dir.mkdir(parents=True, exist_ok=True)
 
-    stem_paths: dict[str, Path] = {}
-    stem_name = audio_path.stem
+    # Demucs CLI 방식 (모든 버전 호환)
+    cmd_args = [
+        "-n", model_name,
+        "-o", str(stem_dir),
+        str(audio_path),
+    ]
+    demucs.separate.main(cmd_args)
 
-    for stem_type, waveform in separated.items():
-        out_path = stem_dir / f"{stem_name}_{stem_type}.wav"
-        # Demucs API returns tensor, save via torchaudio
-        import torchaudio
-        torchaudio.save(str(out_path), waveform.cpu(), sample_rate=44100)
-        stem_paths[stem_type] = out_path
-        print(f"  → {stem_type}: {out_path.name}")
+    # Demucs 출력 구조: stems/{model_name}/{song_name}/{vocals,drums,bass,other}.wav
+    song_name = audio_path.stem
+    demucs_out = stem_dir / model_name / song_name
+
+    if not demucs_out.exists():
+        # 일부 버전은 다른 구조 사용
+        for candidate in stem_dir.rglob("*.wav"):
+            if song_name in str(candidate.parent):
+                demucs_out = candidate.parent
+                break
+
+    stem_paths: dict[str, Path] = {}
+    expected_stems = ["vocals", "drums", "bass", "other"]
+
+    for stem_type in expected_stems:
+        wav_path = demucs_out / f"{stem_type}.wav"
+        if wav_path.exists():
+            stem_paths[stem_type] = wav_path
+            size_mb = wav_path.stat().st_size / (1024 * 1024)
+            print(f"  → {stem_type}: {wav_path.name} ({size_mb:.1f}MB)")
+        else:
+            print(f"  → {stem_type}: 파일 없음 (건너뜀)")
+
+    if not stem_paths:
+        # two-stems 모드일 수 있음 (vocals + no_vocals)
+        for wav_file in demucs_out.glob("*.wav"):
+            name = wav_file.stem.lower()
+            stem_paths[name] = wav_file
+            print(f"  → {name}: {wav_file.name}")
 
     return stem_paths
 
@@ -113,9 +135,9 @@ def audio_to_midi(
     track_name: str = "track",
     onset_threshold: float = 0.5,
     frame_threshold: float = 0.3,
-    min_note_length: float = 58.0,
-    min_freq: float | None = None,
-    max_freq: float | None = None,
+    minimum_note_length: float = 127.7,
+    minimum_frequency: float | None = None,
+    maximum_frequency: float | None = None,
 ) -> Path | None:
     """Basic Pitch로 WAV → MIDI 변환."""
     try:
@@ -123,9 +145,9 @@ def audio_to_midi(
             str(wav_path),
             onset_threshold=onset_threshold,
             frame_threshold=frame_threshold,
-            minimum_note_length=min_note_length,
-            minimum_frequency=min_freq,
-            maximum_frequency=max_freq,
+            minimum_note_length=minimum_note_length,
+            minimum_frequency=minimum_frequency,
+            maximum_frequency=maximum_frequency,
         )
 
         midi_data.write(str(output_path))
@@ -156,27 +178,26 @@ def convert_stems_to_midi(
         "drums": {
             "onset_threshold": 0.6,
             "frame_threshold": 0.4,
-            "min_note_length": 30.0,
-            # 드럼은 주파수 제한 없음 (GM 매핑이라 피치가 악기)
+            "minimum_note_length": 50.0,
         },
         "bass": {
             "onset_threshold": 0.5,
             "frame_threshold": 0.3,
-            "min_note_length": 58.0,
-            "min_freq": 30.0,    # E1 근처
-            "max_freq": 300.0,   # D4 근처
+            "minimum_note_length": 100.0,
+            "minimum_frequency": 30.0,    # E1 근처
+            "maximum_frequency": 300.0,   # D4 근처
         },
         "other": {
             "onset_threshold": 0.45,
             "frame_threshold": 0.25,
-            "min_note_length": 58.0,
+            "minimum_note_length": 100.0,
         },
         "vocals": {
             "onset_threshold": 0.5,
             "frame_threshold": 0.3,
-            "min_note_length": 80.0,
-            "min_freq": 80.0,    # E2
-            "max_freq": 1200.0,  # D6
+            "minimum_note_length": 127.7,
+            "minimum_frequency": 80.0,    # E2
+            "maximum_frequency": 1200.0,  # D6
         },
     }
 
@@ -211,13 +232,6 @@ STEM_PROGRAM: dict[str, int] = {
     "bass": 33,     # Electric Bass (finger)
     "other": 0,     # Acoustic Grand Piano
     "vocals": 73,   # Flute (as melody placeholder)
-}
-
-STEM_CHANNEL: dict[str, int] = {
-    "drums": 9,     # GM standard: channel 10 (0-indexed = 9)
-    "bass": 1,
-    "other": 0,
-    "vocals": 2,
 }
 
 
