@@ -128,7 +128,7 @@ def separate_audio(
 
 
 # ---------------------------------------------------------------------------
-# Step 2: Audio → MIDI with Basic Pitch
+# Step 2: Audio → MIDI conversion
 # ---------------------------------------------------------------------------
 def audio_to_midi(
     wav_path: Path,
@@ -140,7 +140,7 @@ def audio_to_midi(
     minimum_frequency: float | None = None,
     maximum_frequency: float | None = None,
 ) -> Path | None:
-    """Basic Pitch로 WAV → MIDI 변환."""
+    """Basic Pitch로 WAV → MIDI 변환 (멜로디/화성 악기용)."""
     try:
         model_output, midi_data, note_events = bp_predict(
             str(wav_path),
@@ -151,13 +151,97 @@ def audio_to_midi(
             maximum_frequency=maximum_frequency,
         )
 
+        # 유령 노트 필터링: velocity가 너무 낮은 노트 제거
+        for inst in midi_data.instruments:
+            inst.notes = [n for n in inst.notes if n.velocity >= 30]
+
         midi_data.write(str(output_path))
         note_count = sum(len(inst.notes) for inst in midi_data.instruments)
-        print(f"  → {track_name}: {note_count} notes → {output_path.name}")
+        print(f"  -> {track_name}: {note_count} notes -> {output_path.name}")
         return output_path
 
     except Exception as e:
-        print(f"  → {track_name}: 변환 실패 ({e})")
+        print(f"  -> {track_name}: 변환 실패 ({e})")
+        return None
+
+
+def drums_to_midi(
+    wav_path: Path,
+    output_path: Path,
+) -> Path | None:
+    """드럼 전용 변환: onset detection + GM 드럼 매핑.
+
+    Basic Pitch는 드럼에 적합하지 않음 (피치 기반이라 타악기 인식 불가).
+    대신 librosa onset detection으로 타격 시점을 잡고,
+    주파수 대역별로 GM 드럼 노트에 매핑.
+    """
+    try:
+        import librosa
+
+        y, sr = librosa.load(str(wav_path), sr=44100, mono=True)
+
+        # ── 주파수 대역별 분리 ──
+        # 저역 (킥): ~150Hz
+        # 중역 (스네어/탐): 150~5000Hz
+        # 고역 (하이햇/심벌): 5000Hz+
+
+        bands = {
+            "kick":   {"fmin": 20,   "fmax": 150,  "midi": 36, "vel": 100},
+            "snare":  {"fmin": 150,  "fmax": 5000, "midi": 38, "vel": 90},
+            "hihat":  {"fmin": 5000, "fmax": 20000, "midi": 42, "vel": 70},
+        }
+
+        midi_obj = pretty_midi.PrettyMIDI(initial_tempo=120.0)
+        drum_inst = pretty_midi.Instrument(program=0, is_drum=True, name="drums")
+
+        for band_name, band in bands.items():
+            # 해당 대역만 필터링
+            S = librosa.stft(y)
+            freqs = librosa.fft_frequencies(sr=sr)
+            mask = (freqs >= band["fmin"]) & (freqs <= band["fmax"])
+            S_filtered = S.copy()
+            S_filtered[~mask, :] = 0
+            y_band = librosa.istft(S_filtered)
+
+            # Onset detection
+            onset_env = librosa.onset.onset_strength(y=y_band, sr=sr)
+            onsets = librosa.onset.onset_detect(
+                y=y_band, sr=sr, onset_envelope=onset_env,
+                backtrack=False, delta=0.3,
+            )
+            onset_times = librosa.frames_to_time(onsets, sr=sr)
+
+            # 너무 가까운 onset 제거 (50ms 이내)
+            filtered_times = []
+            for t in onset_times:
+                if not filtered_times or (t - filtered_times[-1]) > 0.05:
+                    filtered_times.append(t)
+
+            for t in filtered_times:
+                # onset strength로 velocity 조절
+                frame_idx = min(int(t * sr / 512), len(onset_env) - 1)
+                strength = onset_env[frame_idx] if frame_idx < len(onset_env) else 0.5
+                vel = min(127, max(40, int(band["vel"] * min(strength / max(onset_env.max(), 1e-6) * 2, 1.5))))
+
+                drum_inst.notes.append(pretty_midi.Note(
+                    velocity=vel,
+                    pitch=band["midi"],
+                    start=t,
+                    end=t + 0.05,  # 드럼은 짧은 duration
+                ))
+
+        drum_inst.notes.sort(key=lambda n: n.start)
+        midi_obj.instruments.append(drum_inst)
+
+        midi_obj.write(str(output_path))
+        print(f"  -> drums: {len(drum_inst.notes)} notes -> {output_path.name}")
+        print(f"     kick={sum(1 for n in drum_inst.notes if n.pitch==36)}, "
+              f"snare={sum(1 for n in drum_inst.notes if n.pitch==38)}, "
+              f"hihat={sum(1 for n in drum_inst.notes if n.pitch==42)}")
+        return output_path
+
+    except Exception as e:
+        print(f"  -> drums: 변환 실패 ({e})")
         return None
 
 
@@ -167,69 +251,71 @@ def convert_stems_to_midi(
     keep_vocals: bool = False,
 ) -> dict[str, Path]:
     """분리된 악기 트랙들을 각각 MIDI로 변환."""
-    print(f"\n[2/3] MIDI 변환 (Basic Pitch)...")
+    print(f"\n[2/3] MIDI 변환...")
 
     midi_dir = output_dir / "midi_tracks"
     midi_dir.mkdir(parents=True, exist_ok=True)
 
     midi_paths: dict[str, Path] = {}
 
-    # 트랙별 최적화된 파라미터
+    # 멜로디/화성 악기: Basic Pitch (threshold 높여서 유령 노트 억제)
     track_params: dict[str, dict] = {
-        "drums": {
-            "onset_threshold": 0.6,
-            "frame_threshold": 0.4,
-            "minimum_note_length": 50.0,
-        },
         "bass": {
-            "onset_threshold": 0.5,
-            "frame_threshold": 0.3,
-            "minimum_note_length": 100.0,
-            "minimum_frequency": 30.0,    # E1 근처
-            "maximum_frequency": 300.0,   # D4 근처
+            "onset_threshold": 0.6,       # 높임: 확실한 음만
+            "frame_threshold": 0.45,      # 높임: 노이즈 제거
+            "minimum_note_length": 150.0,  # 길게: 짧은 유령음 제거
+            "minimum_frequency": 30.0,    # E1
+            "maximum_frequency": 260.0,   # C4 (베이스 음역만)
         },
         "guitar": {
-            "onset_threshold": 0.5,
-            "frame_threshold": 0.3,
-            "minimum_note_length": 80.0,
+            "onset_threshold": 0.55,
+            "frame_threshold": 0.4,
+            "minimum_note_length": 120.0,
             "minimum_frequency": 80.0,    # E2
-            "maximum_frequency": 1200.0,  # E6
+            "maximum_frequency": 1200.0,  # D6
         },
         "piano": {
-            "onset_threshold": 0.45,
-            "frame_threshold": 0.25,
-            "minimum_note_length": 100.0,
+            "onset_threshold": 0.5,
+            "frame_threshold": 0.35,
+            "minimum_note_length": 120.0,
             "minimum_frequency": 27.5,    # A0
             "maximum_frequency": 4200.0,  # C8
         },
         "other": {
-            "onset_threshold": 0.45,
-            "frame_threshold": 0.25,
-            "minimum_note_length": 100.0,
+            "onset_threshold": 0.55,
+            "frame_threshold": 0.4,       # 높임: 확실한 것만
+            "minimum_note_length": 150.0,
+            "minimum_frequency": 50.0,
+            "maximum_frequency": 4000.0,
         },
         "vocals": {
-            "onset_threshold": 0.5,
-            "frame_threshold": 0.3,
-            "minimum_note_length": 127.7,
-            "minimum_frequency": 80.0,    # E2
-            "maximum_frequency": 1200.0,  # D6
+            "onset_threshold": 0.55,
+            "frame_threshold": 0.4,
+            "minimum_note_length": 200.0,  # 보컬은 긴 음만
+            "minimum_frequency": 80.0,
+            "maximum_frequency": 1200.0,
         },
     }
 
     for stem_type, wav_path in stem_paths.items():
         if stem_type == "vocals" and not keep_vocals:
-            print(f"  → vocals: 건너뜀 (보컬 제거)")
+            print(f"  -> vocals: 건너뜀 (보컬 제거)")
             continue
 
         out_path = midi_dir / f"{wav_path.stem}.mid"
-        params = track_params.get(stem_type, {})
 
-        result = audio_to_midi(
-            wav_path=wav_path,
-            output_path=out_path,
-            track_name=stem_type,
-            **params,
-        )
+        if stem_type == "drums":
+            # 드럼 전용 변환 (onset detection + GM 매핑)
+            result = drums_to_midi(wav_path, out_path)
+        else:
+            # 멜로디/화성 악기: Basic Pitch
+            params = track_params.get(stem_type, {})
+            result = audio_to_midi(
+                wav_path=wav_path,
+                output_path=out_path,
+                track_name=stem_type,
+                **params,
+            )
 
         if result is not None:
             midi_paths[stem_type] = result
