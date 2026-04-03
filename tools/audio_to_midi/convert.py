@@ -58,6 +58,76 @@ except ImportError:
     MISSING.append("numpy")
 
 
+# ---------------------------------------------------------------------------
+# BPM detection (from agents/audio2midi.py)
+# ---------------------------------------------------------------------------
+def detect_bpm(audio_path: Path) -> float:
+    """librosa를 사용하여 BPM 자동 감지."""
+    try:
+        import librosa
+        y, sr = librosa.load(str(audio_path), sr=22050, mono=True, duration=60)
+        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+        bpm = float(tempo) if not hasattr(tempo, '__len__') else float(tempo[0])
+        print(f"  BPM 감지: {bpm:.1f}")
+        return bpm
+    except Exception as e:
+        print(f"  BPM 감지 실패: {e}, 기본값 120 사용")
+        return 120.0
+
+
+# ---------------------------------------------------------------------------
+# Post-processing: note cleanup + quantization (from agents/audio2midi.py)
+# ---------------------------------------------------------------------------
+def clean_notes(instrument, stem_name: str = "other"):
+    """노트 정리: 너무 짧은 노트 제거, 겹치는 동일 피치 노트 병합."""
+    if not instrument.notes:
+        return instrument
+
+    instrument.notes.sort(key=lambda n: (n.pitch, n.start))
+
+    cleaned = []
+    min_duration = 0.01 if stem_name == "drums" else 0.03
+
+    for note in instrument.notes:
+        duration = note.end - note.start
+        if duration < min_duration:
+            continue
+
+        note.velocity = max(1, min(127, note.velocity))
+
+        if cleaned and cleaned[-1].pitch == note.pitch:
+            prev = cleaned[-1]
+            gap = note.start - prev.end
+            if 0 <= gap < 0.02:
+                prev.end = note.end
+                prev.velocity = max(prev.velocity, note.velocity)
+                continue
+            elif gap < 0:
+                prev.end = note.start - 0.001
+                if prev.end <= prev.start:
+                    cleaned.pop()
+
+        cleaned.append(note)
+
+    before = len(instrument.notes)
+    instrument.notes = cleaned
+    if before != len(cleaned):
+        print(f"    clean: {before} -> {len(cleaned)} notes")
+    return instrument
+
+
+def quantize_notes(instrument, grid: float = 0.01):
+    """노트를 그리드에 양자화 (기본 10ms)."""
+    if not instrument.notes:
+        return instrument
+    for note in instrument.notes:
+        note.start = round(note.start / grid) * grid
+        note.end = round(note.end / grid) * grid
+        if note.end <= note.start:
+            note.end = note.start + grid
+    return instrument
+
+
 def check_deps():
     if MISSING:
         print("=" * 50)
@@ -151,9 +221,11 @@ def audio_to_midi(
             maximum_frequency=maximum_frequency,
         )
 
-        # 유령 노트 필터링: velocity가 너무 낮은 노트 제거
+        # 후처리: 유령 노트 제거 + 겹침 병합 + 양자화
         for inst in midi_data.instruments:
             inst.notes = [n for n in inst.notes if n.velocity >= 30]
+            clean_notes(inst, stem_name=track_name)
+            quantize_notes(inst)
 
         midi_data.write(str(output_path))
         note_count = sum(len(inst.notes) for inst in midi_data.instruments)
@@ -416,11 +488,12 @@ def merge_midi_tracks(
     midi_paths: dict[str, Path],
     output_path: Path,
     song_name: str = "Converted",
+    bpm: float = 120.0,
 ) -> Path:
     """분리된 MIDI 파일들을 하나의 Type 1 MIDI로 합치기."""
-    print(f"\n[3/3] 트랙 합치기 → Type 1 MIDI...")
+    print(f"\n[3/3] 트랙 합치기 → Type 1 MIDI (BPM={bpm:.1f})...")
 
-    merged = pretty_midi.PrettyMIDI(initial_tempo=120.0)
+    merged = pretty_midi.PrettyMIDI(initial_tempo=bpm)
 
     for stem_type, midi_path in midi_paths.items():
         try:
@@ -478,6 +551,9 @@ def convert_single(
 
     start = time.time()
 
+    # Step 0: BPM detection
+    bpm = detect_bpm(audio_path)
+
     # Step 1: Separate
     stem_paths = separate_audio(audio_path, song_output, model_name=demucs_model)
 
@@ -495,7 +571,7 @@ def convert_single(
 
     # Step 3: Merge
     final_path = song_output / f"{song_name}_converted.mid"
-    merge_midi_tracks(midi_paths, final_path, song_name=song_name)
+    merge_midi_tracks(midi_paths, final_path, song_name=song_name, bpm=bpm)
 
     elapsed = time.time() - start
     print(f"\n완료! ({elapsed:.1f}s)")

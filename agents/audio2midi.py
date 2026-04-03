@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """
-Audio-to-MIDI High-Accuracy Converter
+[DEPRECATED] — tools/audio_to_midi/convert.py 로 통합됨
+
+이 파일의 기능(clean_notes, quantize_notes, detect_bpm)은
+tools/audio_to_midi/convert.py에 병합되었습니다.
+
+사용법:
+    python tools/audio_to_midi/convert.py "song.mp3" --output_dir E:/Ableton/audio_to_midi_output
+
+---
+(Original) Audio-to-MIDI High-Accuracy Converter
 ======================================
 WAV/MP3 → MIDI 변환 파이프라인 (목표 정확도: 95%+)
 

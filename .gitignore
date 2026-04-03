@@ -3,19 +3,51 @@
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
 
 # JUCE build
 juce_app/build/
 *.obj
-*.exe
 *.pdb
 *.ilk
+
+# Build artifacts
+dist/
+build/
+*.spec
+*.exe
+
+# Model checkpoints & training data (large files)
+checkpoints/
+midigpt_data/
+midigpt/dpo_pairs/
+*.pt
+*.onnx
+
+# Audio output (large WAV/MP3 files)
+audio_to_midi_output/
+*.wav
+*.mp3
+*.flac
 
 # Temp
 *.tmp
 build_log.txt
 fluidsynth/
 C:/soundfonts/
-dist/
-build/
-*.spec
+
+# Internal logs & feedback (sensitive)
+work_log.jsonl
+피드백
+db 파일 피드백/
+260327_*.json
+260329_*.json
+260329 *.txt
+DB구성*.txt
+임시db.zip
+Troubleshooter
+
+# IDE
+.vscode/
+.idea/
+*.swp
