@@ -610,6 +610,25 @@ class Mixer:
         chain = self.get_insert_chain(track_idx)
         return chain.add(effect)
 
+    def set_insert_bypass(self, track_idx: int, slot_idx: int, bypassed: bool):
+        """인서트 슬롯 바이패스 설정."""
+        chain = self.track_chains.get(track_idx)
+        if chain and 0 <= slot_idx < len(chain.effects):
+            chain.effects[slot_idx].bypassed = bypassed
+
+    def set_insert_mix(self, track_idx: int, slot_idx: int, mix: float):
+        """인서트 슬롯 dry/wet 믹스 (0.0=dry, 1.0=wet)."""
+        chain = self.track_chains.get(track_idx)
+        if chain and 0 <= slot_idx < len(chain.effects):
+            if hasattr(chain.effects[slot_idx], 'mix'):
+                chain.effects[slot_idx].mix = mix
+
+    def remove_insert(self, track_idx: int, slot_idx: int):
+        """인서트 슬롯에서 이펙트 제거."""
+        chain = self.track_chains.get(track_idx)
+        if chain and 0 <= slot_idx < len(chain.effects):
+            chain.effects.pop(slot_idx)
+
     def set_send_level(self, track_idx: int, send_idx: int, level: float):
         if track_idx not in self.send_levels:
             self.send_levels[track_idx] = {}

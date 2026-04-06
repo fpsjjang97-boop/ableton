@@ -106,6 +106,9 @@ class MIDILearnManager:
 class MIDIInputManager:
     """Real-time MIDI input handling."""
 
+    # Default ticks-per-beat (matches core.models.TICKS_PER_BEAT)
+    _DEFAULT_TPB = 480
+
     def __init__(self):
         self._input_port = None
         self._thru_port = None
@@ -121,6 +124,14 @@ class MIDIInputManager:
         self._start_time = 0.0
         self._step_position = 0
         self._step_duration = 480   # ticks per step
+
+        # Real-time recording state
+        self._bpm: float = 120.0
+        self._record_start_tick: int = 0
+        self._record_start_time: float = 0.0
+        self._record_buffer: list = []      # list of Note objects
+        self._pending_notes: dict = {}      # {(ch, pitch): (start_tick, velocity)}
+        self._thru_callback: Optional[Callable] = None
 
         # MIDI Learn
         self.learn_manager = MIDILearnManager()
@@ -218,12 +229,26 @@ class MIDIInputManager:
                 self._clock_callback('stop')
             return
 
-        # MIDI Thru
+        # MIDI Thru (hardware output port)
         if self._thru_enabled and self._thru_port:
             try:
                 self._thru_port.send(msg)
             except Exception:
                 pass
+
+        # MIDI Thru (software callback — route to AudioEngine for monitoring)
+        if msg.type == 'note_on' and msg.velocity > 0:
+            if self._thru_callback:
+                try:
+                    self._thru_callback(getattr(msg, 'channel', 0), msg.note, msg.velocity)
+                except Exception:
+                    pass
+        elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
+            if self._thru_callback:
+                try:
+                    self._thru_callback(getattr(msg, 'channel', 0), msg.note, 0)
+                except Exception:
+                    pass
 
         # MIDI Learn
         if msg.type == 'control_change':
@@ -233,9 +258,10 @@ class MIDIInputManager:
             self.learn_manager.process_input('note', msg_dict['channel'],
                                              note=msg.note, value=msg_dict.get('velocity', 0))
 
-        # Recording
+        # Real-time recording → Note objects
         if self._recording:
             self._recorded_events.append(msg_dict)
+            self._record_note_event(msg, now)
 
         # Step recording
         if self._step_recording and msg.type == 'note_on' and msg_dict['velocity'] > 0:
@@ -255,18 +281,87 @@ class MIDIInputManager:
             except Exception:
                 pass
 
+    def _record_note_event(self, msg, now: float):
+        """Pair note_on/note_off into Note objects in the record buffer."""
+        from core.models import Note
+
+        tpb = self._DEFAULT_TPB
+        elapsed = now - self._record_start_time
+        # Convert real time to ticks based on current BPM
+        ticks = int(elapsed * self._bpm / 60.0 * tpb) + self._record_start_tick
+
+        channel = getattr(msg, 'channel', 0)
+
+        if msg.type == 'note_on' and msg.velocity > 0:
+            self._pending_notes[(channel, msg.note)] = (ticks, msg.velocity)
+
+        elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
+            key = (channel, msg.note)
+            if key in self._pending_notes:
+                start, vel = self._pending_notes.pop(key)
+                duration = max(30, ticks - start)
+                self._record_buffer.append(Note(
+                    pitch=msg.note,
+                    velocity=vel,
+                    start_tick=start,
+                    duration_ticks=duration,
+                    channel=channel,
+                ))
+
+    # ── BPM / Thru configuration ──
+
+    def set_bpm(self, bpm: float):
+        """Set the BPM used for real-time-to-tick conversion during recording."""
+        self._bpm = max(1.0, bpm)
+
+    def set_thru_callback(self, callback: Optional[Callable]):
+        """Set a callback ``fn(channel, note, velocity)`` for MIDI thru monitoring.
+
+        Called on every note_on/note_off so the host can route to an AudioEngine.
+        Pass *velocity* = 0 for note-off.
+        """
+        self._thru_callback = callback
+
     # ── Recording ──
 
-    def start_recording(self):
+    def start_recording(self, start_tick: int = 0):
+        """Start recording MIDI input to buffer.
+
+        *start_tick* is the playback position at the moment recording begins,
+        so that captured notes are placed relative to the timeline.
+        """
         self._recording = True
+        self._record_start_tick = start_tick
+        self._record_buffer = []
+        self._pending_notes = {}
+        self._record_start_time = time.time()
         self._recorded_events.clear()
         self._start_time = time.time()
 
-    def stop_recording(self) -> list[dict]:
+    def stop_recording(self) -> list:
+        """Stop recording and return captured Note objects.
+
+        Any notes still held down at stop time are closed with a default
+        duration of one beat.
+        """
+        from core.models import Note, TICKS_PER_BEAT
+
         self._recording = False
-        events = self._recorded_events.copy()
-        self._recorded_events.clear()
-        return events
+
+        # Close any notes that were never released
+        for (ch, pitch), (start, vel) in self._pending_notes.items():
+            self._record_buffer.append(Note(
+                pitch=pitch,
+                velocity=vel,
+                start_tick=start,
+                duration_ticks=TICKS_PER_BEAT,
+                channel=ch,
+            ))
+        self._pending_notes.clear()
+
+        captured = list(self._record_buffer)
+        self._record_buffer = []
+        return captured
 
     def is_recording(self) -> bool:
         return self._recording

@@ -525,6 +525,13 @@ class ProjectState:
     loop_enabled: bool = False
     modified: bool = False
     song_context: Optional[SongContext] = None  # 편곡 컨텍스트
+    # Cubase 15 확장 속성
+    punch_in: bool = False
+    punch_out: bool = False
+    punch_in_tick: int = 0
+    punch_out_tick: int = 0
+    markers: list = field(default_factory=list)  # [{name, tick}, ...]
+    expression_map: str = "default"  # 현재 익스프레션 맵
 
     @property
     def total_ticks(self) -> int:

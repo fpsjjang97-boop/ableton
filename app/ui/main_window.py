@@ -38,7 +38,7 @@ from PyQt6.QtGui import QAction, QKeySequence, QFont, QCloseEvent
 
 from config import (
     APP_NAME, APP_VERSION, WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT,
-    COLORS, SNAP_VALUES,
+    COLORS, SNAP_VALUES, ZONE_DEFAULTS,
 )
 from core.models import (
     Note, Track, ProjectState, UndoManager, TICKS_PER_BEAT,
@@ -52,6 +52,7 @@ from ui.session_view import SessionView
 from ui.transport import TransportWidget
 from ui.detail_view import DetailView
 from ui.file_browser import FileBrowser
+from ui.track_inspector import TrackInspectorPanel
 from ui.styles import get_stylesheet
 
 logger = logging.getLogger(__name__)
@@ -203,6 +204,20 @@ class MainWindow(QMainWindow):
         )
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self._dock_browser)
 
+        # ---- Cubase 15 스타일 트랙 인스펙터 (Left Zone) -------------------
+        self._track_inspector = TrackInspectorPanel()
+        self._dock_inspector = QDockWidget("Inspector", self)
+        self._dock_inspector.setWidget(self._track_inspector)
+        self._dock_inspector.setMinimumWidth(280)
+        self._dock_inspector.setMaximumWidth(360)
+        self._dock_inspector.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
+            | QDockWidget.DockWidgetFeature.DockWidgetFloatable
+        )
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self._dock_inspector)
+        self._dock_inspector.setVisible(ZONE_DEFAULTS["left_inspector"])
+
     # ===================================================================
     # Menu bar
     # ===================================================================
@@ -321,6 +336,14 @@ class MainWindow(QMainWindow):
         # ---- View menu ---------------------------------------------------
         view_menu = menubar.addMenu("&View")
 
+        self._act_toggle_inspector = view_menu.addAction("Toggle &Inspector")
+        self._act_toggle_inspector.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        self._act_toggle_inspector.triggered.connect(
+            lambda: self._dock_inspector.setVisible(
+                not self._dock_inspector.isVisible()
+            )
+        )
+
         self._act_toggle_browser = view_menu.addAction("Toggle File &Browser")
         self._act_toggle_browser.setShortcut(QKeySequence("Ctrl+B"))
         self._act_toggle_browser.triggered.connect(
@@ -356,6 +379,25 @@ class MainWindow(QMainWindow):
         self._act_arrangement_view.setCheckable(True)
         self._act_arrangement_view.setChecked(False)
         self._act_arrangement_view.setEnabled(False)  # Future
+
+        view_menu.addSeparator()
+
+        # ---- Cubase 15 스타일 존 토글 ----
+        self._act_toggle_inspector = view_menu.addAction("Toggle &Inspector")
+        self._act_toggle_inspector.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        self._act_toggle_inspector.triggered.connect(self._toggle_inspector)
+
+        self._act_toggle_chord_pads = view_menu.addAction("Toggle &Chord Pads")
+        self._act_toggle_chord_pads.setShortcut(QKeySequence("Ctrl+Shift+C"))
+        self._act_toggle_chord_pads.triggered.connect(
+            lambda: self._detail_view.show_tab("chord_pads")
+        )
+
+        self._act_toggle_expr_map = view_menu.addAction("Toggle &Expression Map")
+        self._act_toggle_expr_map.setShortcut(QKeySequence("Ctrl+Shift+X"))
+        self._act_toggle_expr_map.triggered.connect(
+            lambda: self._detail_view.show_tab("expr_map")
+        )
 
         # ---- AI menu -----------------------------------------------------
         ai_menu = menubar.addMenu("A&I")
@@ -471,6 +513,56 @@ class MainWindow(QMainWindow):
         if hasattr(self._detail_view, 'selection_changed'):
             self._detail_view.selection_changed.connect(self._on_selection_changed)
 
+        # ---- Track Inspector -> Engine ------------------------------------
+        if hasattr(self, '_dock_inspector') and self._dock_inspector is not None:
+            inspector = self._track_inspector
+
+            def _on_inspector_volume(val: int) -> None:
+                idx = self._selected_track_index
+                p = self._project_manager.state
+                if 0 <= idx < len(p.tracks):
+                    p.tracks[idx].volume = val
+                    self._audio_engine.set_channel_volume(p.tracks[idx].channel, val)
+                    self._mark_modified()
+
+            def _on_inspector_pan(val: int) -> None:
+                idx = self._selected_track_index
+                p = self._project_manager.state
+                if 0 <= idx < len(p.tracks):
+                    p.tracks[idx].pan = val
+                    self._audio_engine.set_channel_pan(p.tracks[idx].channel, val)
+                    self._mark_modified()
+
+            def _on_inspector_program(prog: int) -> None:
+                idx = self._selected_track_index
+                p = self._project_manager.state
+                if 0 <= idx < len(p.tracks):
+                    p.tracks[idx].instrument = prog
+                    self._audio_engine.program_change(p.tracks[idx].channel, prog)
+                    self._mark_modified()
+
+            def _on_inspector_mute(muted: bool) -> None:
+                idx = self._selected_track_index
+                p = self._project_manager.state
+                if 0 <= idx < len(p.tracks):
+                    p.tracks[idx].muted = muted
+                    self._mark_modified()
+                    self._refresh_all()
+
+            def _on_inspector_solo(solo: bool) -> None:
+                idx = self._selected_track_index
+                p = self._project_manager.state
+                if 0 <= idx < len(p.tracks):
+                    p.tracks[idx].solo = solo
+                    self._mark_modified()
+                    self._refresh_all()
+
+            inspector.volume_changed.connect(_on_inspector_volume)
+            inspector.pan_changed.connect(_on_inspector_pan)
+            inspector.program_changed.connect(_on_inspector_program)
+            inspector.mute_toggled.connect(_on_inspector_mute)
+            inspector.solo_toggled.connect(_on_inspector_solo)
+
         # ---- File browser ------------------------------------------------
         self._file_browser.file_double_clicked.connect(self._on_file_activated)
 
@@ -501,6 +593,9 @@ class MainWindow(QMainWindow):
         if project.tracks:
             self._selected_track_index = 0
             self._detail_view.set_track(project.tracks[0], 0)
+            # Update inspector panel
+            if hasattr(self, '_track_inspector') and hasattr(self._track_inspector, 'set_track'):
+                self._track_inspector.set_track(project.tracks[0], 0)
         else:
             self._selected_track_index = -1
 
@@ -708,6 +803,9 @@ class MainWindow(QMainWindow):
         if 0 <= index < len(project.tracks):
             self._selected_track_index = index
             self._detail_view.set_track(project.tracks[index])
+            # Update inspector panel if available
+            if hasattr(self, '_track_inspector') and hasattr(self._track_inspector, 'set_track'):
+                self._track_inspector.set_track(project.tracks[index], index)
             self._update_status()
 
     def _on_clip_opened(self, track_index: int, clip_index: int) -> None:
@@ -1169,6 +1267,14 @@ class MainWindow(QMainWindow):
             self._detail_view.hide()
         else:
             self._detail_view.show()
+
+    def _toggle_inspector(self) -> None:
+        """Cubase 스타일 트랙 인스펙터 토글."""
+        if self._dock_inspector is not None:
+            vis = not self._dock_inspector.isVisible()
+            self._dock_inspector.setVisible(vis)
+            if vis:
+                self._dock_inspector.raise_()
 
     def _toggle_info_view(self, checked: bool) -> None:
         """Toggle the info view display."""

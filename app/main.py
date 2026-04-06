@@ -222,6 +222,8 @@ def main() -> int:
         transport.set_project(proj)
         session_view.set_project(proj)
         detail_view.set_project(proj)
+        if hasattr(arrangement_view, 'set_project'):
+            arrangement_view.set_project(proj)
         if proj.tracks:
             selected_track[0] = 0
             detail_view.set_track(proj.tracks[0], 0)
@@ -629,11 +631,61 @@ def main() -> int:
     def on_position(tick):
         transport.update_position(tick, project())
         detail_view.update_playhead(tick)
+        if hasattr(arrangement_view, 'update_playhead'):
+            arrangement_view.update_playhead(tick)
     midi_engine.position_changed.connect(on_position)
 
     def on_playback_state(state):
         transport.set_playing(state == "playing")
     midi_engine.playback_state_changed.connect(on_playback_state)
+
+    # --- MIDI Recording ---
+    _recording = [False]
+
+    def toggle_recording():
+        if _recording[0]:
+            # Stop recording
+            notes = midi_input.stop_recording()
+            _recording[0] = False
+            transport.set_recording(False)
+
+            if notes:
+                push_undo("MIDI Recording")
+                p = project()
+                idx = selected_track[0]
+                if 0 <= idx < len(p.tracks):
+                    p.tracks[idx].notes.extend(notes)
+                    mark_modified()
+                    detail_view.set_track(p.tracks[idx], idx)
+                sb.showMessage(f"Recorded {len(notes)} notes", 3000)
+            else:
+                sb.showMessage("Recording stopped (no notes captured)", 3000)
+        else:
+            # Start recording
+            _recording[0] = True
+            midi_input.set_bpm(project().bpm)
+            midi_input.set_thru_callback(
+                lambda ch, n, v: audio_engine.note_on(ch, n, v) if v > 0 else audio_engine.note_off(ch, n)
+            )
+            midi_input.start_recording(midi_engine.current_tick)
+            # Start playback when recording begins
+            if midi_engine.state != "playing":
+                midi_engine.toggle_playback()
+            transport.set_recording(True)
+            sb.showMessage("Recording...", 0)
+
+    if hasattr(transport, 'record_clicked'):
+        transport.record_clicked.connect(toggle_recording)
+
+    # Stop recording when Stop is pressed
+    def on_stop_during_recording():
+        if _recording[0]:
+            toggle_recording()
+    transport.stop_clicked.connect(on_stop_during_recording)
+
+    # Arrangement ruler seek
+    if hasattr(arrangement_view, '_ruler') and hasattr(arrangement_view._ruler, 'position_clicked'):
+        arrangement_view._ruler.position_clicked.connect(lambda tick: midi_engine.seek(max(0, tick)))
 
     # Session view
     def on_track_selected(idx):
@@ -790,6 +842,37 @@ def main() -> int:
             pr.set_snap(val)
     transport.snap_changed.connect(on_snap)
 
+    # --- 가상 MIDI 키보드 (QWERTY + 피아노 클릭) → AudioEngine ---
+    pr = detail_view.get_piano_roll()
+    if pr:
+        _vk_channel = [0]  # 현재 선택된 트랙의 채널
+
+        def on_virtual_note_on(pitch):
+            ch = _vk_channel[0]
+            audio_engine.note_on(ch, pitch, 100)
+
+        def on_virtual_note_off(pitch):
+            ch = _vk_channel[0]
+            audio_engine.note_off(ch, pitch)
+
+        if hasattr(pr, 'note_preview_requested'):
+            pr.note_preview_requested.connect(on_virtual_note_on)
+        if hasattr(pr, 'note_release_requested'):
+            pr.note_release_requested.connect(on_virtual_note_off)
+        # 피아노 키보드 클릭도 같은 핸들러 사용
+        if hasattr(pr, '_keyboard') and hasattr(pr._keyboard, 'note_preview'):
+            pr._keyboard.note_preview.connect(lambda pitch: (
+                audio_engine.note_on(_vk_channel[0], pitch, 100),
+                QTimer.singleShot(500, lambda: audio_engine.note_off(_vk_channel[0], pitch))
+            ))
+
+        # 트랙 선택 시 가상 키보드 채널 업데이트
+        def _update_vk_channel(idx):
+            p = project()
+            if 0 <= idx < len(p.tracks):
+                _vk_channel[0] = p.tracks[idx].channel
+        session_view.track_selected.connect(_update_vk_channel)
+
     # Session view mixer signals (safe connection with hasattr checks)
     if hasattr(session_view, 'mixer_volume_changed'):
         def on_mixer_volume(track_idx, value):
@@ -843,6 +926,205 @@ def main() -> int:
     meter_timer = QTimer(w)
     meter_timer.timeout.connect(simulate_meters)
     meter_timer.start(80)
+
+    # --- Chord Pad playback ---
+    if hasattr(detail_view, '_chord_pad_panel') and hasattr(detail_view._chord_pad_panel, 'chord_triggered'):
+        _active_chord_notes = []  # track currently sounding chord notes
+
+        def on_chord_triggered(note_events):
+            """Play chord through AudioEngine. note_events = list of {pitch, velocity, spread_ms}"""
+            nonlocal _active_chord_notes
+            # Stop previous chord
+            for n in _active_chord_notes:
+                audio_engine.note_off(1, n)  # channel 1 for chords
+            _active_chord_notes = []
+
+            for evt in note_events:
+                pitch = evt.get('pitch', 60)
+                vel = evt.get('velocity', 80)
+                spread = evt.get('spread_ms', 0)
+                if spread > 0:
+                    # Simple spread delay (non-blocking approximation)
+                    QTimer.singleShot(int(spread), lambda p=pitch, v=vel: audio_engine.note_on(1, p, v))
+                else:
+                    audio_engine.note_on(1, pitch, vel)
+                _active_chord_notes.append(pitch)
+
+            # Auto note-off after 2 seconds
+            def stop_chord(notes=list(_active_chord_notes)):
+                for n in notes:
+                    audio_engine.note_off(1, n)
+            QTimer.singleShot(2000, stop_chord)
+
+        detail_view._chord_pad_panel.chord_triggered.connect(on_chord_triggered)
+
+    # --- Step Sequencer → Track ---
+    if hasattr(detail_view, '_step_seq_panel'):
+        def on_step_pad_hit(row, col):
+            """Preview step sequencer hit."""
+            # GM drum map
+            drum_notes = [36, 38, 42, 46, 49, 51, 45, 39]  # kick, snare, hh, etc.
+            if 0 <= row < len(drum_notes):
+                note = drum_notes[row]
+                audio_engine.note_on(9, note, 100)
+                QTimer.singleShot(200, lambda: audio_engine.note_off(9, note))
+
+        if hasattr(detail_view._step_seq_panel, 'step_toggled'):
+            detail_view._step_seq_panel.step_toggled.connect(on_step_pad_hit)
+
+        # Convert step pattern to MIDI notes and add to project
+        if hasattr(detail_view._step_seq_panel, 'pattern_changed'):
+            def on_pattern_changed(pattern_data):
+                """Convert 16-step grid pattern to MIDI notes in the drum track."""
+                p = project()
+                # Find or create drum track
+                drum_track = None
+                drum_idx = -1
+                for i, t in enumerate(p.tracks):
+                    if t.channel == 9 or 'drum' in t.name.lower():
+                        drum_track = t
+                        drum_idx = i
+                        break
+                if drum_track is None:
+                    return
+
+                push_undo("Step Sequencer Edit")
+                drum_notes_map = [36, 38, 42, 46, 49, 51, 45, 39]
+                ticks_per_step = TICKS_PER_BEAT  # 16th note at 4/4
+
+                # Clear existing drum notes in first 4 bars
+                drum_track.notes = [n for n in drum_track.notes if n.start_tick >= ticks_per_step * 16]
+
+                # Add new pattern
+                if isinstance(pattern_data, dict):
+                    for row_idx, steps in pattern_data.items():
+                        if row_idx < len(drum_notes_map):
+                            note_num = drum_notes_map[row_idx]
+                            for step_idx, vel in enumerate(steps):
+                                if vel > 0:
+                                    drum_track.notes.append(Note(
+                                        pitch=note_num,
+                                        velocity=vel,
+                                        start_tick=step_idx * ticks_per_step,
+                                        duration=ticks_per_step // 2,
+                                    ))
+                mark_modified()
+            detail_view._step_seq_panel.pattern_changed.connect(on_pattern_changed)
+
+    # --- Transport extended controls ---
+    # Locators → loop range
+    if hasattr(transport, 'left_locator_changed'):
+        def on_left_locator(bar_beat_str):
+            """Set loop start from locator. Format: 'bar.beat.tick'"""
+            try:
+                parts = bar_beat_str.split('.')
+                bar = int(parts[0]) - 1
+                beat = int(parts[1]) - 1 if len(parts) > 1 else 0
+                tick = bar * TICKS_PER_BEAT * 4 + beat * TICKS_PER_BEAT
+                project().loop_start = tick
+            except (ValueError, IndexError):
+                pass
+        transport.left_locator_changed.connect(on_left_locator)
+
+    if hasattr(transport, 'right_locator_changed'):
+        def on_right_locator(bar_beat_str):
+            try:
+                parts = bar_beat_str.split('.')
+                bar = int(parts[0]) - 1
+                beat = int(parts[1]) - 1 if len(parts) > 1 else 0
+                tick = bar * TICKS_PER_BEAT * 4 + beat * TICKS_PER_BEAT
+                project().loop_end = tick
+            except (ValueError, IndexError):
+                pass
+        transport.right_locator_changed.connect(on_right_locator)
+
+    # Punch in/out → recording markers
+    if hasattr(transport, 'punch_in_toggled'):
+        transport.punch_in_toggled.connect(lambda on: setattr(project(), 'punch_in', on) if hasattr(project(), 'punch_in') else None)
+
+    if hasattr(transport, 'punch_out_toggled'):
+        transport.punch_out_toggled.connect(lambda on: setattr(project(), 'punch_out', on) if hasattr(project(), 'punch_out') else None)
+
+    # Marker navigation
+    if hasattr(transport, 'prev_marker_clicked'):
+        def go_prev_marker():
+            p = project()
+            if hasattr(p, 'markers') and p.markers:
+                current = midi_engine.current_tick
+                prev_markers = [m for m in p.markers if m.get('tick', 0) < current - TICKS_PER_BEAT]
+                if prev_markers:
+                    midi_engine.seek(prev_markers[-1]['tick'])
+                else:
+                    midi_engine.seek(0)
+        transport.prev_marker_clicked.connect(go_prev_marker)
+
+    if hasattr(transport, 'next_marker_clicked'):
+        def go_next_marker():
+            p = project()
+            if hasattr(p, 'markers') and p.markers:
+                current = midi_engine.current_tick
+                next_markers = [m for m in p.markers if m.get('tick', 0) > current + TICKS_PER_BEAT]
+                if next_markers:
+                    midi_engine.seek(next_markers[0]['tick'])
+        transport.next_marker_clicked.connect(go_next_marker)
+
+    # Cycle/loop toggle (transport uses 'loop_toggled' signal)
+    if hasattr(transport, 'loop_toggled'):
+        transport.loop_toggled.connect(lambda on: setattr(midi_engine, 'loop_enabled', on))
+    elif hasattr(transport, 'cycle_toggled'):
+        transport.cycle_toggled.connect(lambda on: setattr(midi_engine, 'loop_enabled', on))
+
+    # --- Expression Map integration ---
+    if hasattr(detail_view, '_expr_map_editor'):
+        _current_expression_map = {}
+        _current_articulation = 'natural'
+
+        if hasattr(detail_view._expr_map_editor, 'articulation_changed'):
+            def on_articulation_changed(art_name):
+                nonlocal _current_articulation
+                _current_articulation = art_name
+                sb.showMessage(f"Articulation: {art_name}", 2000)
+
+                # Apply CC changes for the articulation
+                try:
+                    from midigpt.cubase_data.expression_maps import apply_technique
+                    # Get the current track's channel
+                    p = project()
+                    idx = selected_track[0]
+                    if 0 <= idx < len(p.tracks):
+                        ch = p.tracks[idx].channel
+                        # Apply technique modifiers (velocity/CC/length)
+                        mod = apply_technique({}, art_name)
+                        if 'cc_events' in mod:
+                            for cc_num, cc_val in mod['cc_events']:
+                                audio_engine.send_cc(ch, cc_num, cc_val) if hasattr(audio_engine, 'send_cc') else None
+                except ImportError:
+                    pass
+
+            detail_view._expr_map_editor.articulation_changed.connect(on_articulation_changed)
+
+    # --- Effects panel → Mixer ---
+    if hasattr(detail_view, '_effects_panel'):
+        if hasattr(detail_view._effects_panel, 'effect_toggled'):
+            def on_effect_toggled(slot_idx, enabled):
+                idx = selected_track[0]
+                if hasattr(mixer, 'set_insert_bypass'):
+                    mixer.set_insert_bypass(idx, slot_idx, not enabled)
+            detail_view._effects_panel.effect_toggled.connect(on_effect_toggled)
+
+        if hasattr(detail_view._effects_panel, 'dry_wet_changed'):
+            def on_dry_wet(slot_idx, value):
+                idx = selected_track[0]
+                if hasattr(mixer, 'set_insert_mix'):
+                    mixer.set_insert_mix(idx, slot_idx, value / 100.0)
+            detail_view._effects_panel.dry_wet_changed.connect(on_dry_wet)
+
+        if hasattr(detail_view._effects_panel, 'send_level_changed'):
+            def on_send_level(send_idx, value):
+                idx = selected_track[0]
+                if hasattr(mixer, 'set_send_level'):
+                    mixer.set_send_level(idx, send_idx, value / 127.0)
+            detail_view._effects_panel.send_level_changed.connect(on_send_level)
 
     # --- Auto-load latest MIDI or CLI argument ---
     _auto_midi = None

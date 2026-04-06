@@ -21,6 +21,21 @@ SETTINGS_FILE = os.path.join(PROJECT_DIR, "settings.json")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# ─── Cubase 15 데이터 통합 ───
+try:
+    sys.path.insert(0, PROJECT_DIR)
+    from midigpt.cubase_data.chord_voicings import (
+        VOICING_LIBRARY, GROOVE_TEMPLATES, CHORD_INTERVALS,
+        voice_lead, apply_groove, get_voicing, get_groove_for_style,
+        build_chord_pad_set,
+    )
+    from midigpt.cubase_data.effect_chains import (
+        get_effect_chain, get_all_chains_for_style, chain_to_daw_metadata,
+    )
+    CUBASE_AVAILABLE = True
+except ImportError:
+    CUBASE_AVAILABLE = False
+
 # ─── MIDI 유틸리티 ───
 
 NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
@@ -134,6 +149,111 @@ STYLE_PRESETS = {
         'section_template': ['intro', 'verse', 'verse', 'bridge', 'verse', 'outro'],
         'energy_curve': ['low', 'medium', 'high', 'very_high', 'medium', 'very_low'],
     },
+    # ─── Cubase 15 프로젝트 템플릿 기반 확장 스타일 ───
+    'hiphop': {
+        'bpm': 90, 'velocity_range': (50, 100), 'note_density': 0.5,
+        'octave_range': (2, 5), 'sustain': False, 'chord_style': 'rhythm',
+        'rhythm_type': 'moderate',
+        'harmony_type': 'triadic',
+        'accompaniment_pattern': 'comping',
+        'voicing_type': 'close',
+        'dynamic_profile': 'moderate',
+        'default_articulation': 'staccato',
+        'groove_template': 'hiphop',
+        'section_template': ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'],
+        'energy_curve': ['low', 'medium', 'high', 'medium', 'high', 'medium', 'very_high', 'low'],
+    },
+    'rnb': {
+        'bpm': 85, 'velocity_range': (40, 90), 'note_density': 0.5,
+        'octave_range': (2, 5), 'sustain': True, 'chord_style': 'arpeggio',
+        'rhythm_type': 'moderate',
+        'harmony_type': 'dense_voicing',
+        'accompaniment_pattern': 'comping',
+        'voicing_type': 'drop2',
+        'dynamic_profile': 'expressive',
+        'default_articulation': 'legato',
+        'groove_template': 'rnb_neosoul',
+        'section_template': ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'],
+        'energy_curve': ['low', 'medium', 'high', 'medium', 'high', 'medium', 'very_high', 'low'],
+    },
+    'latin': {
+        'bpm': 110, 'velocity_range': (50, 100), 'note_density': 0.7,
+        'octave_range': (2, 5), 'sustain': False, 'chord_style': 'rhythm',
+        'rhythm_type': 'dense',
+        'harmony_type': 'triadic',
+        'accompaniment_pattern': 'comping',
+        'voicing_type': 'close',
+        'dynamic_profile': 'moderate',
+        'default_articulation': 'staccato',
+        'groove_template': 'bossa_nova',
+        'section_template': ['intro', 'verse', 'chorus', 'verse', 'chorus', 'solo', 'chorus', 'outro'],
+        'energy_curve': ['low', 'medium', 'high', 'medium', 'high', 'very_high', 'very_high', 'medium'],
+    },
+    'reggae': {
+        'bpm': 80, 'velocity_range': (40, 85), 'note_density': 0.4,
+        'octave_range': (2, 5), 'sustain': False, 'chord_style': 'rhythm',
+        'rhythm_type': 'sparse',
+        'harmony_type': 'triadic',
+        'accompaniment_pattern': 'comping',
+        'voicing_type': 'close',
+        'dynamic_profile': 'flat',
+        'default_articulation': 'staccato',
+        'groove_template': 'reggae',
+        'section_template': ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'],
+        'energy_curve': ['low', 'medium', 'medium', 'medium', 'high', 'medium', 'high', 'low'],
+    },
+    'funk': {
+        'bpm': 105, 'velocity_range': (60, 110), 'note_density': 0.8,
+        'octave_range': (2, 5), 'sustain': False, 'chord_style': 'rhythm',
+        'rhythm_type': 'dense',
+        'harmony_type': 'dyadic',
+        'accompaniment_pattern': 'comping',
+        'voicing_type': 'close',
+        'dynamic_profile': 'moderate',
+        'default_articulation': 'staccato',
+        'groove_template': 'funk_16th',
+        'section_template': ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'],
+        'energy_curve': ['medium', 'high', 'very_high', 'high', 'very_high', 'medium', 'very_high', 'medium'],
+    },
+    'metal': {
+        'bpm': 140, 'velocity_range': (80, 127), 'note_density': 0.9,
+        'octave_range': (1, 5), 'sustain': False, 'chord_style': 'rhythm',
+        'rhythm_type': 'dense',
+        'harmony_type': 'dyadic',
+        'accompaniment_pattern': 'comping',
+        'voicing_type': 'close',
+        'dynamic_profile': 'flat',
+        'default_articulation': 'staccato',
+        'groove_template': 'metal',
+        'section_template': ['intro', 'verse', 'chorus', 'verse', 'chorus', 'solo', 'chorus', 'outro'],
+        'energy_curve': ['high', 'high', 'very_high', 'high', 'very_high', 'very_high', 'very_high', 'medium'],
+    },
+    'folk': {
+        'bpm': 95, 'velocity_range': (40, 85), 'note_density': 0.5,
+        'octave_range': (2, 5), 'sustain': False, 'chord_style': 'arpeggio',
+        'rhythm_type': 'moderate',
+        'harmony_type': 'triadic',
+        'accompaniment_pattern': 'mixed',
+        'voicing_type': 'guitar',
+        'dynamic_profile': 'moderate',
+        'default_articulation': 'legato',
+        'groove_template': 'country',
+        'section_template': ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'],
+        'energy_curve': ['low', 'medium', 'high', 'medium', 'high', 'medium', 'very_high', 'low'],
+    },
+    'orchestral': {
+        'bpm': 75, 'velocity_range': (20, 110), 'note_density': 0.5,
+        'octave_range': (1, 7), 'sustain': True, 'chord_style': 'pad',
+        'rhythm_type': 'sparse',
+        'harmony_type': 'dense_voicing',
+        'accompaniment_pattern': 'pad',
+        'voicing_type': 'open',
+        'dynamic_profile': 'expressive',
+        'default_articulation': 'legato',
+        'groove_template': 'classical_rubato',
+        'section_template': ['intro', 'buildup', 'climax', 'interlude', 'buildup', 'climax', 'outro'],
+        'energy_curve': ['very_low', 'medium', 'very_high', 'low', 'high', 'very_high', 'very_low'],
+    },
 }
 
 
@@ -235,7 +355,7 @@ def generate_melody(scale_notes, settings, ticks_per_beat=480):
 
 
 def generate_chords(root, scale_name, settings, ticks_per_beat=480):
-    """코드 트랙 생성"""
+    """코드 트랙 생성 — Cubase 15 보이싱 시스템 + 그루브 템플릿 통합."""
     track = mido.MidiTrack()
     track.name = 'Chords'
 
@@ -243,27 +363,70 @@ def generate_chords(root, scale_name, settings, ticks_per_beat=480):
     vel_low, vel_high = settings.get('velocity_range', [30, 60])
     root_idx = NOTE_NAMES.index(root)
     intervals = SCALES.get(scale_name, SCALES['minor'])
+    style = settings.get('style', 'ambient')
+    preset = STYLE_PRESETS.get(style, STYLE_PRESETS['ambient'])
 
     # 코드 진행 생성 (디그리: I, IV, V, vi 등)
-    degrees = [0, 3, 4, 0, 5, 3, 4, 0]  # 기본 진행
-    chord_duration = ticks_per_beat * 4  # 한 마디
+    degrees = [0, 3, 4, 0, 5, 3, 4, 0]
+    chord_duration = ticks_per_beat * 4
+
+    # Cubase 보이싱 타입 결정
+    voicing_type = preset.get('voicing_type', 'close')
+    if not CUBASE_AVAILABLE:
+        voicing_type = None
+
+    # 장단조 판별 테이블
+    minor_degrees = {1, 2, 5} if scale_name == 'major' else {0, 2, 3}
 
     last_event_tick = 0
+    prev_voicing_pitches = []  # 보이스 리딩용
 
     for m in range(measures):
         degree = degrees[m % len(degrees)]
-        chord_root = root_idx + intervals[degree % len(intervals)] + 48  # 옥타브 3
+        chord_root_pc = (root_idx + intervals[degree % len(intervals)]) % 12
 
-        # 코드 타입 결정
-        if degree in [0, 3, 4]:
-            pattern = CHORD_PATTERNS['triad']
+        # 코드 품질 결정
+        if degree in minor_degrees:
+            quality = 'min'
+        elif degree == 6:  # vii
+            quality = 'dim'
         else:
-            pattern = CHORD_PATTERNS['minor']
+            quality = 'maj'
 
-        chord_notes = [chord_root + p for p in pattern if 0 <= chord_root + p <= 127]
+        # 하모니 타입에 따라 7th 확장
+        if preset.get('harmony_type') == 'dense_voicing':
+            quality_map = {'maj': 'maj7', 'min': 'm7', 'dim': 'm7b5'}
+            quality = quality_map.get(quality, quality)
+
         vel = random.randint(vel_low, vel_high)
-
         delta = max(0, (m * chord_duration) - last_event_tick)
+
+        # Cubase 보이싱 시스템 사용
+        if CUBASE_AVAILABLE and voicing_type:
+            if prev_voicing_pitches:
+                # 보이스 리딩 적용
+                chord_notes = voice_lead(
+                    prev_voicing_pitches, chord_root_pc, quality,
+                    voicing_type=voicing_type, octave=3,
+                )
+            else:
+                # 첫 코드: get_voicing 사용
+                voicing_events = get_voicing(
+                    chord_root_pc, quality,
+                    voicing_type=voicing_type, octave=3,
+                    velocity_base=vel,
+                )
+                chord_notes = [e['pitch'] for e in voicing_events]
+
+            prev_voicing_pitches = chord_notes
+        else:
+            # 폴백: 기존 방식
+            chord_root = root_idx + intervals[degree % len(intervals)] + 48
+            if degree in [0, 3, 4]:
+                pattern = CHORD_PATTERNS['triad']
+            else:
+                pattern = CHORD_PATTERNS['minor']
+            chord_notes = [chord_root + p for p in pattern if 0 <= chord_root + p <= 127]
 
         # 코드 노트 동시 발음
         for i, note in enumerate(chord_notes):
@@ -1084,6 +1247,37 @@ def compose(settings=None):
             mid.tracks.append(generate_guitar(key, scale, settings, tpb, song_context))
             print(f"   + Guitar 트랙 생성 (코드폼 + 스트럼)")
 
+    # ─── Cubase 15 그루브 템플릿 사후 적용 ───
+    if CUBASE_AVAILABLE:
+        groove_name = STYLE_PRESETS.get(settings.get('style', 'ambient'), {}).get('groove_template')
+        if groove_name and groove_name in GROOVE_TEMPLATES:
+            print(f"   + Cubase 그루브 적용: {groove_name}")
+            # 노트 이벤트를 수집하고 그루브를 적용하는 건
+            # MIDI 레벨에서는 복잡하므로, 메타데이터로 기록하여
+            # DAW 연동 시 활용할 수 있게 함
+            groove_info = GROOVE_TEMPLATES[groove_name]
+            groove_meta = {
+                'name': groove_info.name,
+                'swing_amount': groove_info.swing_amount,
+                'ghost_note_probability': groove_info.ghost_note_probability,
+            }
+        else:
+            groove_meta = None
+    else:
+        groove_meta = None
+
+    # ─── Cubase 15 이펙트 체인 메타데이터 ───
+    effect_chain_meta = None
+    if CUBASE_AVAILABLE:
+        style = settings.get('style', 'pop')
+        chains = get_all_chains_for_style(style)
+        if chains:
+            effect_chain_meta = {
+                track_type: chain_to_daw_metadata(chain)
+                for track_type, chain in chains.items()
+            }
+            print(f"   + Cubase 이펙트 체인 프리셋: {len(chains)}개 트랙")
+
     # 저장
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f"composed_{key}_{scale}_{bpm}bpm_{timestamp}.mid"
@@ -1101,9 +1295,13 @@ def compose(settings=None):
         'total_notes': sum(1 for t in mid.tracks for m in t if m.type == 'note_on' and m.velocity > 0),
         'duration_sec': mid.length,
         'status': 'pending_review',
+        # Cubase 15 확장 메타데이터
+        'cubase_groove': groove_meta,
+        'cubase_effect_chains': effect_chain_meta,
+        'voicing_type': STYLE_PRESETS.get(settings.get('style', 'ambient'), {}).get('voicing_type', 'close'),
     }
     meta_path = os.path.join(OUTPUT_DIR, f"{filename}.meta.json")
-    with open(meta_path, 'w') as f:
+    with open(meta_path, 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
     print(f"\n저장: {filepath}")

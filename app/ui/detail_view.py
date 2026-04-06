@@ -96,6 +96,9 @@ _TABS = [
     ("effects",      "Effects"),
     ("drum_seq",     "Step Seq"),
     ("score",        "Score"),
+    # Cubase 15 확장 탭
+    ("chord_pads",   "Chord Pads"),
+    ("expr_map",     "Expr Map"),
 ]
 
 
@@ -228,6 +231,26 @@ class DetailView(QWidget):
         # Score tab — notation view
         self._score_panel = ScoreViewPanel()
         self._tab_widgets["score"] = self._score_panel
+
+        # Cubase 15 확장: Chord Pads tab
+        try:
+            from ui.chord_pad_panel import ChordPadPanel
+            self._chord_pad_panel = ChordPadPanel()
+            self._tab_widgets["chord_pads"] = self._chord_pad_panel
+        except ImportError:
+            self._chord_pad_panel = QLabel("Chord Pads (loading...)")
+            self._chord_pad_panel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._tab_widgets["chord_pads"] = self._chord_pad_panel
+
+        # Cubase 15 확장: Expression Map Editor tab
+        try:
+            from ui.expression_map_editor import ExpressionMapEditor
+            self._expr_map_editor = ExpressionMapEditor()
+            self._tab_widgets["expr_map"] = self._expr_map_editor
+        except ImportError:
+            self._expr_map_editor = QLabel("Expression Map Editor (loading...)")
+            self._expr_map_editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._tab_widgets["expr_map"] = self._expr_map_editor
 
         # Add all tab widgets to content layout
         for widget in self._tab_widgets.values():

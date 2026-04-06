@@ -873,6 +873,9 @@ class PianoRollWidget(QWidget):
     note_modified = pyqtSignal(object)
     notes_selected = pyqtSignal(list)
     selection_changed = pyqtSignal()
+    # 가상 키보드 시그널 — AudioEngine 연결용
+    note_preview_requested = pyqtSignal(int)   # pitch (note on)
+    note_release_requested = pyqtSignal(int)   # pitch (note off)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1084,8 +1087,69 @@ class PianoRollWidget(QWidget):
         self._view.note_modified.emit(item.note)
 
     def _on_key_preview(self, pitch: int):
-        """Keyboard key clicked — could trigger sound preview (handled externally)."""
-        pass  # parent app can connect to keyboard.note_preview
+        """Keyboard key clicked — trigger sound preview via AudioEngine."""
+        self.note_preview_requested.emit(pitch)
+
+    # -- QWERTY Virtual MIDI Keyboard (Cubase/Ableton 스타일) ---------------
+    # 하단 2행: Z~/ = C3~B3 (자연음+반음), 상단 2행: Q~] = C4~B4
+    _QWERTY_MAP_LOWER = {
+        Qt.Key.Key_Z: 48, Qt.Key.Key_S: 49, Qt.Key.Key_X: 50, Qt.Key.Key_D: 51,
+        Qt.Key.Key_C: 52, Qt.Key.Key_V: 53, Qt.Key.Key_G: 54, Qt.Key.Key_B: 55,
+        Qt.Key.Key_H: 56, Qt.Key.Key_N: 57, Qt.Key.Key_J: 58, Qt.Key.Key_M: 59,
+        Qt.Key.Key_Comma: 60, Qt.Key.Key_L: 61, Qt.Key.Key_Period: 62,
+        Qt.Key.Key_Semicolon: 63, Qt.Key.Key_Slash: 64,
+    }
+    _QWERTY_MAP_UPPER = {
+        Qt.Key.Key_Q: 60, Qt.Key.Key_2: 61, Qt.Key.Key_W: 62, Qt.Key.Key_3: 63,
+        Qt.Key.Key_E: 64, Qt.Key.Key_R: 65, Qt.Key.Key_5: 66, Qt.Key.Key_T: 67,
+        Qt.Key.Key_6: 68, Qt.Key.Key_Y: 69, Qt.Key.Key_7: 70, Qt.Key.Key_U: 71,
+        Qt.Key.Key_I: 72, Qt.Key.Key_9: 73, Qt.Key.Key_O: 74, Qt.Key.Key_0: 75,
+        Qt.Key.Key_P: 76,
+    }
+    _qwerty_octave_offset: int = 0  # 옥타브 시프트 (위/아래 화살표)
+    _qwerty_held: set = set()       # 현재 눌린 키 추적
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """QWERTY 가상 키보드 — PC 키보드로 연주."""
+        if event.isAutoRepeat():
+            return
+        key = event.key()
+
+        # 옥타브 시프트
+        if key == Qt.Key.Key_Minus:
+            self._qwerty_octave_offset = max(self._qwerty_octave_offset - 12, -36)
+            return
+        if key == Qt.Key.Key_Equal:
+            self._qwerty_octave_offset = min(self._qwerty_octave_offset + 12, 36)
+            return
+
+        # QWERTY → MIDI 매핑
+        pitch = self._QWERTY_MAP_LOWER.get(key) or self._QWERTY_MAP_UPPER.get(key)
+        if pitch is not None:
+            pitch += self._qwerty_octave_offset
+            pitch = max(0, min(127, pitch))
+            if pitch not in self._qwerty_held:
+                self._qwerty_held.add(pitch)
+                self._keyboard.set_pressed_keys(self._qwerty_held)
+                self.note_preview_requested.emit(pitch)
+            return
+
+        super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event: QKeyEvent):
+        """QWERTY 가상 키보드 — 키 릴리즈."""
+        if event.isAutoRepeat():
+            return
+        key = event.key()
+        pitch = self._QWERTY_MAP_LOWER.get(key) or self._QWERTY_MAP_UPPER.get(key)
+        if pitch is not None:
+            pitch += self._qwerty_octave_offset
+            pitch = max(0, min(127, pitch))
+            self._qwerty_held.discard(pitch)
+            self._keyboard.set_pressed_keys(self._qwerty_held)
+            self.note_release_requested.emit(pitch)
+            return
+        super().keyReleaseEvent(event)
 
     # -- public API ------------------------------------------------------
 

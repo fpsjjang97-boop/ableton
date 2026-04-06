@@ -1,12 +1,25 @@
 """
-MidiGPT Vocabulary — ~300 tokens for hierarchical MIDI tokenization.
+MidiGPT Vocabulary — ~448 tokens for hierarchical MIDI tokenization.
 
-Layer 3 (Structure):  Key, Style, Section
+Layer 3 (Structure):  Key, Style, Section, Tempo
 Layer 2 (Harmony):    ChordRoot, ChordQual, Chord_NC, Bass, Function
 Layer 1 (Note):       Bar, Position, Pitch, Velocity, Duration, Track
+Expressive:           Articulation, Dynamics, CC (Expression/Modulation/Sustain),
+                      PitchBend, Instrument
 
 Chord tokens are factored into root (12) + quality (24) + NC (1) = 37 tokens
 instead of the previous 289 combined tokens.
+
+v2.0 — Cubase 15 기반 확장:
+  - 아티큘레이션: 8 → 32 (Cubase 298개 중 핵심 선별)
+  - 다이나믹스: 6 → 13 (Cubase 25개 중 핵심 선별)
+  - CC Expression (CC11): 16단계
+  - CC Modulation (CC1): 16단계
+  - CC Sustain Pedal (CC64): on/off
+  - PitchBend: 16단계 (-8192 ~ +8191)
+  - 악기 패밀리: 11종 (Cubase 21개 패밀리 중 주요 그룹)
+  - 스타일: 8 → 16 (Cubase 프로젝트 템플릿 기반 확장)
+  - 트랙 타입: 8 → 14 (Cubase 트랙 구조 기반 확장)
 """
 from __future__ import annotations
 
@@ -29,20 +42,58 @@ CHORD_QUALITIES = [
 
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
-STYLES = ["ambient", "classical", "pop", "cinematic", "edm", "jazz", "lo-fi", "experimental"]
+STYLES = [
+    "ambient", "classical", "pop", "cinematic", "edm", "jazz", "lo-fi", "experimental",
+    # Cubase 15 프로젝트 템플릿 기반 확장
+    "hiphop", "rnb", "latin", "reggae", "funk", "metal", "folk", "orchestral",
+]
 
 SECTIONS = [
     "intro", "verse", "prechorus", "chorus", "bridge",
     "outro", "interlude", "solo", "breakdown", "unknown",
 ]
 
-TRACK_TYPES = ["melody", "accomp", "bass", "drums", "pad", "lead", "arp", "other"]
+TRACK_TYPES = [
+    "melody", "accomp", "bass", "drums", "pad", "lead", "arp", "other",
+    # Cubase 15 트랙 구조 기반 확장
+    "strings", "brass", "woodwind", "vocal", "guitar", "fx",
+]
 
 HARMONIC_FUNCTIONS = ["tonic", "subdominant", "dominant", "predominant", "passing", "unknown"]
 
-ARTICULATIONS = ["normal", "staccato", "legato", "accent", "tenuto", "marcato", "ghost", "muted"]
+ARTICULATIONS = [
+    # 기본 (기존 8개 유지)
+    "normal", "staccato", "legato", "accent", "tenuto", "marcato", "ghost", "muted",
+    # Cubase 15 kLengths 계열 확장
+    "staccatissimo", "portato", "spiccato", "detache", "martellato",
+    "colle", "ricochet", "saltando", "non_legato",
+    # Cubase 15 kTechniques 계열 (핵심)
+    "pizzicato", "tremolo", "trill", "harmonics",
+    "palm_mute", "snap", "flutter", "col_legno",
+    # Cubase 15 kOrnaments 계열 (핵심)
+    "bend", "slide", "vibrato", "glissando",
+    "arpeggio_up", "arpeggio_down", "strum_up", "strum_down",
+]
 
-DYNAMICS = ["pp", "p", "mp", "mf", "f", "ff"]
+DYNAMICS = [
+    "pp", "p", "mp", "mf", "f", "ff",
+    # Cubase 15 확장 다이나믹스
+    "ppp", "fff", "fp", "sfz", "sfp", "ffp", "pf",
+]
+
+# ---------------------------------------------------------------------------
+# Cubase 15 기반 Expression 토큰
+# ---------------------------------------------------------------------------
+NUM_CC_EXPRESSION = 16   # CC11 Expression: 0~127 → 16단계
+NUM_CC_MODULATION = 16   # CC1 Modulation: 0~127 → 16단계
+NUM_PITCH_BEND = 16      # PitchBend: -8192~+8191 → 16단계
+
+# 악기 패밀리 (Cubase 15 ScoringEngine 21 families 중 핵심 11종)
+INSTRUMENT_FAMILIES = [
+    "keyboard", "strings", "brass", "wind", "fretted",
+    "percussion", "pitchedperc", "singers", "electronics",
+    "latin", "orchestral",
+]
 
 # ---------------------------------------------------------------------------
 # Ranges
@@ -137,13 +188,34 @@ class MidiVocab:
             tokens.append(f"Track_{track}")
 
         # --- Expressive ---
-        # Articulations
+        # Articulations (8 → 32: Cubase 15 확장)
         for art in ARTICULATIONS:
             tokens.append(f"Art_{art}")
 
-        # Dynamics
+        # Dynamics (6 → 13: Cubase 15 확장)
         for dyn in DYNAMICS:
             tokens.append(f"Dyn_{dyn}")
+
+        # --- Cubase 15 Expression 토큰 ---
+        # CC11 Expression (오케스트라 볼륨 컨트롤)
+        for e in range(NUM_CC_EXPRESSION):
+            tokens.append(f"Expr_{e}")
+
+        # CC1 Modulation (비브라토 깊이 등)
+        for m in range(NUM_CC_MODULATION):
+            tokens.append(f"Mod_{m}")
+
+        # CC64 Sustain Pedal (on/off)
+        tokens.append("Pedal_on")
+        tokens.append("Pedal_off")
+
+        # PitchBend (글리산도, 벤드, 슬라이드)
+        for pb in range(NUM_PITCH_BEND):
+            tokens.append(f"PB_{pb}")
+
+        # 악기 패밀리 (Cubase 15 ScoringEngine 기반)
+        for fam in INSTRUMENT_FAMILIES:
+            tokens.append(f"InstFam_{fam}")
 
         # Build mappings
         self._token2id = {tok: i for i, tok in enumerate(tokens)}
@@ -241,6 +313,63 @@ class MidiVocab:
             return None
         root, qual = m.group(1), m.group(2)
         return [f"ChordRoot_{root}", f"ChordQual_{qual}"]
+
+    # ------------------------------------------------------------------
+    # Cubase 15 Expression helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def cc_to_expression_bin(cc_value: int) -> int:
+        """CC11 Expression 값 (0-127) → 16단계 빈."""
+        return min(15, max(0, cc_value * NUM_CC_EXPRESSION // 128))
+
+    @staticmethod
+    def expression_bin_to_cc(bin_val: int) -> int:
+        """16단계 빈 → CC11 중앙값."""
+        return min(127, (bin_val * 128 + 64) // NUM_CC_EXPRESSION)
+
+    @staticmethod
+    def cc_to_modulation_bin(cc_value: int) -> int:
+        """CC1 Modulation 값 (0-127) → 16단계 빈."""
+        return min(15, max(0, cc_value * NUM_CC_MODULATION // 128))
+
+    @staticmethod
+    def modulation_bin_to_cc(bin_val: int) -> int:
+        """16단계 빈 → CC1 중앙값."""
+        return min(127, (bin_val * 128 + 64) // NUM_CC_MODULATION)
+
+    @staticmethod
+    def pitchbend_to_bin(pb_value: int) -> int:
+        """PitchBend (-8192~+8191) → 16단계 빈."""
+        normalized = (pb_value + 8192) / 16384.0  # 0.0 ~ 1.0
+        return min(15, max(0, int(normalized * NUM_PITCH_BEND)))
+
+    @staticmethod
+    def bin_to_pitchbend(bin_val: int) -> int:
+        """16단계 빈 → PitchBend 중앙값."""
+        return int((bin_val / NUM_PITCH_BEND) * 16384 - 8192)
+
+    def encode_expression(self, cc11_value: int) -> int:
+        """CC11 Expression → 토큰 ID."""
+        b = self.cc_to_expression_bin(cc11_value)
+        return self._token2id.get(f"Expr_{b}", self.unk_id)
+
+    def encode_modulation(self, cc1_value: int) -> int:
+        """CC1 Modulation → 토큰 ID."""
+        b = self.cc_to_modulation_bin(cc1_value)
+        return self._token2id.get(f"Mod_{b}", self.unk_id)
+
+    def encode_pitchbend(self, pb_value: int) -> int:
+        """PitchBend → 토큰 ID."""
+        b = self.pitchbend_to_bin(pb_value)
+        return self._token2id.get(f"PB_{b}", self.unk_id)
+
+    def encode_pedal(self, on: bool) -> int:
+        """서스테인 페달 → 토큰 ID."""
+        return self._token2id["Pedal_on" if on else "Pedal_off"]
+
+    def encode_instrument_family(self, family: str) -> int:
+        """악기 패밀리 → 토큰 ID."""
+        return self._token2id.get(f"InstFam_{family}", self.unk_id)
 
     def __contains__(self, token: str) -> bool:
         return token in self._token2id

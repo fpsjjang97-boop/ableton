@@ -1,15 +1,16 @@
 """
 Transport bar widget for the MIDI AI Workstation.
 
-Modeled after Ableton Live's top transport bar: compact 36px strip with
-tap tempo, BPM, time signature, metronome, playback controls, position
-displays, key/scale/snap selectors, CPU meter, and MIDI indicator.
+Cubase 15 스타일 트랜스포트 바: 로케이터 디스플레이, 사이클/루프,
+펀치 인/아웃, 프리롤, 마커 섹션, 이중 퍼포먼스 미터,
+Cubase 블루 액센트, 구분선, 40px 높이.
 """
 from __future__ import annotations
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QLabel, QPushButton, QDoubleSpinBox,
     QComboBox, QFrame, QToolButton, QSizePolicy, QSpacerItem,
+    QVBoxLayout, QLineEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QFont, QPainter, QColor, QPaintEvent, QPen
@@ -19,16 +20,19 @@ from config import COLORS, MIN_BPM, MAX_BPM, SNAP_VALUES
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Constants / Helpers
 # ---------------------------------------------------------------------------
 
 _SEP_COLOR = "#2A2A2A"
 _BTN_SIZE = 24
 _MONO = "Consolas"
+_CUBASE_BLUE = "#5B9BD5"          # Cubase 15 블루 액센트
+_CUBASE_BLUE_DIM = "#3A6A9A"      # 비활성 블루
+_CUBASE_ORANGE = "#E8983A"        # 펀치 인/아웃 오렌지
 
 
 def _sep() -> QFrame:
-    """Thin vertical separator line."""
+    """얇은 수직 구분선."""
     s = QFrame()
     s.setFrameShape(QFrame.Shape.VLine)
     s.setFixedWidth(1)
@@ -37,7 +41,7 @@ def _sep() -> QFrame:
 
 
 class _IconButton(QPushButton):
-    """Transport button that paints a vector icon instead of text."""
+    """벡터 아이콘을 직접 그리는 트랜스포트 버튼."""
 
     def __init__(self, icon_name: str, tip: str, size: int = 28,
                  checkable: bool = False, parent=None):
@@ -160,7 +164,7 @@ def _flat_btn(text: str, tip: str, size: int = _BTN_SIZE,
 
 
 def _display_label(text: str, width: int = 80) -> QLabel:
-    """Recessed monospace display box (position / time)."""
+    """우묵한 모노스페이스 디스플레이 박스 (위치 / 시간)."""
     lbl = QLabel(text)
     lbl.setFont(QFont(_MONO, 11, QFont.Weight.Bold))
     lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -190,33 +194,152 @@ def _compact_combo(items: list[str], width: int = 60) -> QComboBox:
 
 
 # ---------------------------------------------------------------------------
-# CPU meter (decorative)
+# Cubase 15 스타일 토글 버튼 (블루/오렌지 액센트)
 # ---------------------------------------------------------------------------
 
-class _CpuMeter(QWidget):
-    """Tiny horizontal bar simulating CPU load."""
+def _cubase_toggle_btn(text: str, tip: str, w: int = 28, h: int = 22,
+                       active_color: str = _CUBASE_BLUE,
+                       font_size: int = 8) -> QPushButton:
+    """Cubase 15 스타일 컬러 토글 버튼."""
+    btn = QPushButton(text)
+    btn.setToolTip(tip)
+    btn.setCheckable(True)
+    btn.setFixedSize(w, h)
+    btn.setFont(QFont("Segoe UI", font_size, QFont.Weight.Bold))
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    btn.setStyleSheet(
+        f"QPushButton{{background:#2A2A2A;border:1px solid #444;color:{COLORS['text_dim']};"
+        f"border-radius:3px;}}"
+        f"QPushButton:hover{{color:{COLORS['text_primary']};background:#3A3A3A;"
+        f"border:1px solid #555;}}"
+        f"QPushButton:checked{{background:{active_color};color:#FFF;"
+        f"border:1px solid {active_color};}}"
+    )
+    return btn
+
+
+# ---------------------------------------------------------------------------
+# 로케이터 디스플레이 (클릭하여 편집 가능)
+# ---------------------------------------------------------------------------
+
+class _LocatorDisplay(QWidget):
+    """Cubase 스타일 로케이터 디스플레이 (L/R). bar.beat.tick 포맷."""
+
+    position_changed = pyqtSignal(str, str)  # label ("L"/"R"), new_text
+
+    def __init__(self, label: str = "L", default_pos: str = "1.1.0",
+                 parent: QWidget | None = None):
+        super().__init__(parent)
+        self._label_text = label
+        self.setFixedSize(70, 22)
+        self.setToolTip(f"{'Left' if label == 'L' else 'Right'} Locator — 클릭하여 편집")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        # L/R 라벨
+        lbl = QLabel(label)
+        lbl.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        lbl.setFixedWidth(12)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label_color = _CUBASE_BLUE if label == "L" else "#E07040"
+        lbl.setStyleSheet(
+            f"color: {label_color}; background: transparent;"
+        )
+        layout.addWidget(lbl)
+
+        # 위치 표시 / 편집
+        self._edit = QLineEdit(default_pos)
+        self._edit.setFont(QFont(_MONO, 8, QFont.Weight.Bold))
+        self._edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._edit.setFixedHeight(18)
+        self._edit.setReadOnly(True)
+        self._edit.setStyleSheet(
+            f"QLineEdit{{background:{COLORS['bg_darkest']};color:{COLORS['accent_light']};"
+            f"border:1px solid {_SEP_COLOR};border-radius:2px;padding:0 2px;}}"
+            f"QLineEdit:focus{{border:1px solid {_CUBASE_BLUE};}}"
+        )
+        self._edit.mousePressEvent = self._on_click
+        self._edit.editingFinished.connect(self._on_edited)
+        layout.addWidget(self._edit, 1)
+
+    def set_position(self, text: str) -> None:
+        self._edit.setText(text)
+
+    def get_position(self) -> str:
+        return self._edit.text()
+
+    def _on_click(self, event) -> None:
+        self._edit.setReadOnly(False)
+        self._edit.selectAll()
+        self._edit.setFocus()
+
+    def _on_edited(self) -> None:
+        self._edit.setReadOnly(True)
+        self.position_changed.emit(self._label_text, self._edit.text())
+
+
+# ---------------------------------------------------------------------------
+# 퍼포먼스 미터 (Audio / MIDI 이중 바)
+# ---------------------------------------------------------------------------
+
+class _PerformanceMeter(QWidget):
+    """Cubase 15 스타일 이중 퍼포먼스 미터: Audio + MIDI 수평 바."""
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        self._value = 0.12
-        self.setFixedSize(50, 18)
-        self.setToolTip("CPU")
+        self._audio_value = 0.12
+        self._midi_value = 0.05
+        self.setFixedSize(60, 32)
+        self.setToolTip("Performance: Audio / MIDI")
 
-    def set_value(self, v: float) -> None:
-        self._value = max(0.0, min(v, 1.0))
+    def set_audio(self, v: float) -> None:
+        self._audio_value = max(0.0, min(v, 1.0))
+        self.update()
+
+    def set_midi(self, v: float) -> None:
+        self._midi_value = max(0.0, min(v, 1.0))
         self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
         p.fillRect(self.rect(), QColor(COLORS["bg_darkest"]))
-        bar_w = int((self.width() - 2) * self._value)
-        color = COLORS["meter_green"] if self._value < 0.6 else (
-            COLORS["meter_yellow"] if self._value < 0.85 else COLORS["meter_red"])
-        p.fillRect(1, 10, bar_w, 6, QColor(color))
-        p.setPen(QColor(COLORS["text_secondary"]))
-        p.setFont(QFont("Segoe UI", 7))
-        p.drawText(2, 9, f"CPU {int(self._value * 100)}%")
+
+        # "Audio" 라벨 + 바
+        p.setPen(QColor(COLORS["text_dim"]))
+        p.setFont(QFont("Segoe UI", 6))
+        p.drawText(1, 9, "Audio")
+        bar_x = 28
+        bar_w = w - bar_x - 2
+        # Audio 바 배경
+        p.fillRect(bar_x, 3, bar_w, 7, QColor(COLORS["bg_mid"]))
+        # Audio 바 값
+        aw = int(bar_w * self._audio_value)
+        if aw > 0:
+            ac = _CUBASE_BLUE if self._audio_value < 0.7 else (
+                "#FFC107" if self._audio_value < 0.9 else "#F44336")
+            p.fillRect(bar_x, 3, aw, 7, QColor(ac))
+
+        # "MIDI" 라벨 + 바
+        p.setPen(QColor(COLORS["text_dim"]))
+        p.drawText(1, 22, "MIDI")
+        # MIDI 바 배경
+        p.fillRect(bar_x, 16, bar_w, 7, QColor(COLORS["bg_mid"]))
+        # MIDI 바 값
+        mw = int(bar_w * self._midi_value)
+        if mw > 0:
+            mc = "#4CAF50" if self._midi_value < 0.7 else (
+                "#FFC107" if self._midi_value < 0.9 else "#F44336")
+            p.fillRect(bar_x, 16, mw, 7, QColor(mc))
+
+        # 테두리
+        p.setPen(QColor(COLORS["border"]))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRect(0, 0, w - 1, h - 1)
         p.end()
 
 
@@ -225,7 +348,7 @@ class _CpuMeter(QWidget):
 # ---------------------------------------------------------------------------
 
 class _MidiIndicator(QWidget):
-    """Small dot that blinks on MIDI activity."""
+    """MIDI 액티비티 표시 — 점멸 점."""
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -253,13 +376,13 @@ class _MidiIndicator(QWidget):
 
 
 # ---------------------------------------------------------------------------
-# TransportWidget
+# TransportWidget — Cubase 15 스타일 트랜스포트 바
 # ---------------------------------------------------------------------------
 
 class TransportWidget(QWidget):
-    """Ableton-style top transport bar — compact 36px strip."""
+    """Cubase 15 스타일 트랜스포트 바 — 40px 높이, 로케이터, 펀치, 마커, 퍼포먼스 미터."""
 
-    # Signals
+    # 기존 시그널 유지
     play_clicked = pyqtSignal()
     stop_clicked = pyqtSignal()
     record_clicked = pyqtSignal()
@@ -272,6 +395,15 @@ class TransportWidget(QWidget):
     metronome_toggled = pyqtSignal(bool)
     tap_tempo = pyqtSignal()
 
+    # Cubase 15 추가 시그널
+    punch_in_toggled = pyqtSignal(bool)
+    punch_out_toggled = pyqtSignal(bool)
+    preroll_toggled = pyqtSignal(bool)
+    left_locator_changed = pyqtSignal(str)
+    right_locator_changed = pyqtSignal(str)
+    prev_marker_clicked = pyqtSignal()
+    next_marker_clicked = pyqtSignal()
+
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._playing = False
@@ -279,7 +411,8 @@ class TransportWidget(QWidget):
         self._project: ProjectState | None = None
         self._tap_times: list[float] = []
 
-        self.setFixedHeight(44)
+        # Cubase 15: 40px 높이
+        self.setFixedHeight(48)
         self.setStyleSheet(
             f"TransportWidget{{background:#1A1A1A;border-bottom:1px solid #333;}}"
         )
@@ -333,11 +466,37 @@ class TransportWidget(QWidget):
 
         root.addWidget(_sep())
 
+        # ── 로케이터 디스플레이 (Cubase 15) ──────────────────────────────
+        self.locator_left = _LocatorDisplay("L", "1.1.0")
+        self.locator_right = _LocatorDisplay("R", "5.1.0")
+        root.addWidget(self.locator_left)
+        root.addWidget(self.locator_right)
+
+        root.addWidget(_sep())
+
+        # ── 프리롤 / 펀치 인/아웃 (Cubase 15) ───────────────────────────
+        self.btn_preroll = _cubase_toggle_btn(
+            "Pre", "Pre-roll", w=30, h=22, active_color=_CUBASE_BLUE, font_size=7
+        )
+        root.addWidget(self.btn_preroll)
+
+        self.btn_punch_in = _cubase_toggle_btn(
+            "I", "Punch In", w=22, h=22, active_color=_CUBASE_ORANGE
+        )
+        root.addWidget(self.btn_punch_in)
+
+        self.btn_punch_out = _cubase_toggle_btn(
+            "O", "Punch Out", w=22, h=22, active_color=_CUBASE_ORANGE
+        )
+        root.addWidget(self.btn_punch_out)
+
+        root.addWidget(_sep())
+
         # ── CENTER SPACER ─────────────────────────────────────────────────
         root.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding,
                                        QSizePolicy.Policy.Minimum))
 
-        # ── CENTER: Transport controls ────────────────────────────────────
+        # ── CENTER: 트랜스포트 컨트롤 ────────────────────────────────────
         self.btn_rewind = _icon_btn("rewind", "Rewind", 30)
         self.btn_play = _icon_btn("play", "Play / Pause", 34, checkable=True)
         self.btn_play.setStyleSheet(
@@ -360,6 +519,15 @@ class TransportWidget(QWidget):
 
         root.addWidget(_sep())
 
+        # ── 사이클/루프 버튼 (Cubase 블루 액센트) ──────────────────────
+        self.btn_loop = _cubase_toggle_btn(
+            "LOOP", "Cycle On/Off", w=42, h=24,
+            active_color=_CUBASE_BLUE, font_size=7
+        )
+        root.addWidget(self.btn_loop)
+
+        root.addWidget(_sep())
+
         # ── Position / Time displays ──────────────────────────────────────
         self.lbl_position = _display_label("1.1.1", width=72)
         self.lbl_time = _display_label("00:00.00", width=76)
@@ -377,12 +545,7 @@ class TransportWidget(QWidget):
         root.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding,
                                        QSizePolicy.Policy.Minimum))
 
-        # ── RIGHT: Loop / Key / Scale / Snap ──────────────────────────────
-        self.btn_loop = _flat_btn("LOOP", "Loop On/Off", checkable=True)
-        self.btn_loop.setFixedSize(40, 24)
-        self.btn_loop.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
-        root.addWidget(self.btn_loop)
-
+        # ── RIGHT: Key / Scale / Snap ─────────────────────────────────────
         self.combo_key = _compact_combo(NOTE_NAMES, width=48)
         self.combo_key.setToolTip("Key")
         root.addWidget(self.combo_key)
@@ -400,13 +563,51 @@ class TransportWidget(QWidget):
 
         root.addWidget(_sep())
 
-        # ── CPU meter & MIDI indicator ────────────────────────────────────
-        self._cpu_meter = _CpuMeter()
+        # ── 마커 섹션 (Cubase 15) ─────────────────────────────────────────
+        self.btn_prev_marker = QPushButton("|◄")
+        self.btn_prev_marker.setToolTip("Previous Marker")
+        self.btn_prev_marker.setFixedSize(24, 22)
+        self.btn_prev_marker.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        self.btn_prev_marker.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_prev_marker.setStyleSheet(
+            f"QPushButton{{background:#2A2A2A;border:1px solid #444;color:{COLORS['text_secondary']};"
+            f"border-radius:3px;}}"
+            f"QPushButton:hover{{color:#FFF;background:#444;}}"
+        )
+        root.addWidget(self.btn_prev_marker)
+
+        self.lbl_marker = QLabel("Marker 1")
+        self.lbl_marker.setFont(QFont("Segoe UI", 7))
+        self.lbl_marker.setFixedWidth(56)
+        self.lbl_marker.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_marker.setStyleSheet(
+            f"color:{COLORS['text_dim']};background:{COLORS['bg_darkest']};"
+            f"border:1px solid {_SEP_COLOR};border-radius:2px;padding:0 2px;"
+        )
+        self.lbl_marker.setToolTip("Current Marker")
+        root.addWidget(self.lbl_marker)
+
+        self.btn_next_marker = QPushButton("►|")
+        self.btn_next_marker.setToolTip("Next Marker")
+        self.btn_next_marker.setFixedSize(24, 22)
+        self.btn_next_marker.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        self.btn_next_marker.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_next_marker.setStyleSheet(
+            f"QPushButton{{background:#2A2A2A;border:1px solid #444;color:{COLORS['text_secondary']};"
+            f"border-radius:3px;}}"
+            f"QPushButton:hover{{color:#FFF;background:#444;}}"
+        )
+        root.addWidget(self.btn_next_marker)
+
+        root.addWidget(_sep())
+
+        # ── 퍼포먼스 미터 (Audio/MIDI 이중 바) & MIDI 인디케이터 ──────────
+        self._perf_meter = _PerformanceMeter()
         self._midi_ind = _MidiIndicator()
-        root.addWidget(self._cpu_meter)
+        root.addWidget(self._perf_meter)
         root.addWidget(self._midi_ind)
 
-        # ── Connect signals ───────────────────────────────────────────────
+        # ── 시그널 연결 ───────────────────────────────────────────────────
         self.btn_tap.clicked.connect(self._on_tap)
         self.btn_play.clicked.connect(self._on_play)
         self.btn_stop.clicked.connect(self._on_stop)
@@ -419,7 +620,18 @@ class TransportWidget(QWidget):
         self.combo_scale.currentTextChanged.connect(self.scale_changed.emit)
         self.combo_snap.currentTextChanged.connect(self._on_snap)
 
-        # Fake CPU animation
+        # Cubase 15 추가 시그널 연결
+        self.btn_punch_in.toggled.connect(self.punch_in_toggled.emit)
+        self.btn_punch_out.toggled.connect(self.punch_out_toggled.emit)
+        self.btn_preroll.toggled.connect(self.preroll_toggled.emit)
+        self.locator_left.position_changed.connect(
+            lambda lbl, txt: self.left_locator_changed.emit(txt))
+        self.locator_right.position_changed.connect(
+            lambda lbl, txt: self.right_locator_changed.emit(txt))
+        self.btn_prev_marker.clicked.connect(self.prev_marker_clicked.emit)
+        self.btn_next_marker.clicked.connect(self.next_marker_clicked.emit)
+
+        # 퍼포먼스 미터 애니메이션 타이머
         self._meter_timer = QTimer(self)
         self._meter_timer.timeout.connect(self._tick_cpu)
         self._meter_timer.start(900)
@@ -430,12 +642,12 @@ class TransportWidget(QWidget):
         import time
         now = time.monotonic()
         self._tap_times.append(now)
-        # Keep last 6 taps
+        # 마지막 6회 탭만 유지
         self._tap_times = self._tap_times[-6:]
         if len(self._tap_times) >= 2:
             intervals = [self._tap_times[i] - self._tap_times[i - 1]
                          for i in range(1, len(self._tap_times))]
-            # Discard stale taps (>2 sec gap)
+            # 2초 이상 간격 제거
             intervals = [iv for iv in intervals if iv < 2.0]
             if intervals:
                 avg = sum(intervals) / len(intervals)
@@ -465,13 +677,17 @@ class TransportWidget(QWidget):
 
     def _tick_cpu(self) -> None:
         import random
-        v = self._cpu_meter._value + random.uniform(-0.03, 0.04)
-        self._cpu_meter.set_value(max(0.05, min(v, 0.40)))
+        # Audio 퍼포먼스 시뮬레이션
+        av = self._perf_meter._audio_value + random.uniform(-0.03, 0.04)
+        self._perf_meter.set_audio(max(0.05, min(av, 0.40)))
+        # MIDI 퍼포먼스 시뮬레이션
+        mv = self._perf_meter._midi_value + random.uniform(-0.02, 0.03)
+        self._perf_meter.set_midi(max(0.02, min(mv, 0.25)))
 
     # ── Public API ────────────────────────────────────────────────────────
 
     def update_position(self, tick: int, project_state: ProjectState) -> None:
-        """Update both position (bar.beat.sub) and time (MM:SS.ms) displays."""
+        """위치 (bar.beat.sub) 및 시간 (MM:SS.ms) 디스플레이 업데이트."""
         tpb = project_state.ticks_per_beat
         ts_num = project_state.time_signature.numerator
         beats_total = tick / tpb
@@ -501,7 +717,7 @@ class TransportWidget(QWidget):
         self.btn_record.blockSignals(False)
 
     def set_project(self, project_state: ProjectState) -> None:
-        """Sync all controls to the given project state."""
+        """모든 컨트롤을 프로젝트 상태에 동기화."""
         self._project = project_state
 
         self.spin_bpm.blockSignals(True)
@@ -528,6 +744,15 @@ class TransportWidget(QWidget):
 
         self.update_position(0, project_state)
 
+    def set_marker_name(self, name: str) -> None:
+        """현재 마커 이름 표시 업데이트."""
+        self.lbl_marker.setText(name)
+
+    def set_locators(self, left: str, right: str) -> None:
+        """로케이터 위치 설정."""
+        self.locator_left.set_position(left)
+        self.locator_right.set_position(right)
+
     def flash_midi(self) -> None:
-        """Call this on any MIDI activity to blink the indicator."""
+        """MIDI 액티비티 시 인디케이터 점멸."""
         self._midi_ind.blink()

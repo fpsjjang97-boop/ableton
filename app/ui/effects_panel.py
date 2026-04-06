@@ -102,6 +102,10 @@ class EffectsChainPanel(QWidget):
     effect_added = pyqtSignal(int, str)      # track_idx, effect_name
     effect_removed = pyqtSignal(int, int)    # track_idx, slot_idx
     effect_bypassed = pyqtSignal(int, int, bool)
+    # 배선용 시그널 (main.py에서 연결)
+    effect_toggled = pyqtSignal(int, bool)   # slot_idx, enabled
+    dry_wet_changed = pyqtSignal(int, int)   # slot_idx, value 0-100
+    send_level_changed = pyqtSignal(int, int)  # send_idx, value 0-100
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -146,7 +150,8 @@ class EffectsChainPanel(QWidget):
         send_hdr.setStyleSheet(f"color: {C['text_secondary']}; font-size: 10px; font-weight: bold; padding-top: 4px;")
         root.addWidget(send_hdr)
 
-        for name in ["Reverb", "Delay"]:
+        self._send_sliders = []
+        for send_idx, name in enumerate(["Reverb", "Delay"]):
             row = QHBoxLayout()
             row.addWidget(QLabel(name))
             sl = QSlider(Qt.Orientation.Horizontal)
@@ -163,8 +168,10 @@ class EffectsChainPanel(QWidget):
             val.setFixedWidth(24)
             val.setStyleSheet(f"color: {C['text_dim']}; font-size: 9px;")
             sl.valueChanged.connect(lambda v, l=val: l.setText(str(v)))
+            sl.valueChanged.connect(lambda v, si=send_idx: self.send_level_changed.emit(si, v))
             row.addWidget(val)
             root.addLayout(row)
+            self._send_sliders.append(sl)
 
     def _show_add_menu(self):
         from core.effects_engine import EFFECT_PRESETS
@@ -181,6 +188,8 @@ class EffectsChainPanel(QWidget):
         idx = len(self._slots)
         slot = EffectSlotWidget(idx, name)
         slot.bypass_toggled.connect(lambda i, b: self.effect_bypassed.emit(self._track_idx, i, b))
+        slot.bypass_toggled.connect(lambda i, b: self.effect_toggled.emit(i, not b))
+        slot._drywet.valueChanged.connect(lambda v, i=idx: self.dry_wet_changed.emit(i, v))
         slot.remove_requested.connect(self._remove_effect)
         self._slots.append(slot)
         self._slots_layout.insertWidget(self._slots_layout.count() - 1, slot)

@@ -175,6 +175,24 @@ class AudioEngine:
         except Exception:
             logger.exception("sustain failed (ch=%d)", channel)
 
+    def send_cc(self, channel: int, cc_number: int, value: int) -> None:
+        """범용 CC 메시지 전송 — 익스프레션맵/오토메이션용."""
+        if not self.available or self._synth is None:
+            return
+        try:
+            self._synth.cc(channel, cc_number, max(0, min(127, value)))
+        except Exception:
+            logger.exception("send_cc failed (ch=%d, cc=%d)", channel, cc_number)
+
+    def pitch_bend(self, channel: int, value: int) -> None:
+        """피치벤드 전송 (-8192 ~ +8191)."""
+        if not self.available or self._synth is None:
+            return
+        try:
+            self._synth.pitch_bend(channel, max(0, min(16383, value + 8192)))
+        except Exception:
+            logger.exception("pitch_bend failed (ch=%d)", channel)
+
     def all_notes_off(self) -> None:
         """Panic – silence every channel immediately."""
         if not self.available or self._synth is None:

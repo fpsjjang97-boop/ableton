@@ -1,7 +1,8 @@
 """
 Comprehensive Qt stylesheet for MIDI AI Workstation.
 
-Dark theme inspired by Ableton Live, FL Studio, and modern DAW aesthetics.
+Dark theme inspired by Cubase 15, Ableton Live, and modern DAW aesthetics.
+Cubase 15 스타일 확장: blue-gray 팔레트, 접이식 인스펙터, 코드패드, 익스프레션맵.
 Provides pixel-perfect styling for every widget in the application.
 """
 
@@ -920,6 +921,239 @@ def get_stylesheet() -> str:
 
     QTextEdit:focus, QPlainTextEdit:focus {{
         border-color: {c['border_focus']};
+    }}
+
+    /* ================================================================
+       CUBASE 15 STYLE EXTENSIONS
+       ================================================================ */
+
+    /* ---- Collapsible Section (Inspector / Lower Zone) ---- */
+
+    QWidget[cssClass="collapsible-header"] {{
+        background-color: {c.get('inspector_section_bg', c['bg_header'])};
+        border: none;
+        border-bottom: 1px solid {c.get('inspector_section_border', c['border'])};
+        padding: 4px 8px;
+        min-height: 22px;
+    }}
+
+    QWidget[cssClass="collapsible-header"]:hover {{
+        background-color: {c['bg_hover']};
+    }}
+
+    QWidget[cssClass="collapsible-content"] {{
+        background-color: {c.get('bg_inspector', c['bg_dark'])};
+        border: none;
+        padding: 4px;
+    }}
+
+    /* ---- Inspector Panel ---- */
+
+    QDockWidget[cssClass="inspector"] {{
+        background-color: {c.get('bg_inspector', c['bg_dark'])};
+        border-right: 1px solid {c['border']};
+    }}
+
+    QDockWidget[cssClass="inspector"]::title {{
+        background-color: {c['bg_header']};
+        padding: 6px 8px;
+        font-weight: bold;
+        color: {c['text_secondary']};
+        border-bottom: 1px solid {c['border']};
+    }}
+
+    /* ---- Insert Slot ---- */
+
+    QWidget[cssClass="insert-slot"] {{
+        background-color: {c['bg_widget']};
+        border: 1px dashed {c['border']};
+        border-radius: 2px;
+        padding: 2px 4px;
+        min-height: 16px;
+        max-height: 20px;
+    }}
+
+    QWidget[cssClass="insert-slot"]:hover {{
+        border-color: {c.get('accent_dim', c['accent_secondary'])};
+        background-color: {c['bg_hover']};
+    }}
+
+    QWidget[cssClass="insert-slot-active"] {{
+        background-color: {c.get('accent_dim', '#2A4A6A')};
+        border: 1px solid {c.get('accent_secondary', c['accent'])};
+        border-radius: 2px;
+        padding: 2px 4px;
+        min-height: 16px;
+        max-height: 20px;
+        color: {c['text_primary']};
+    }}
+
+    /* ---- Chord Pad ---- */
+
+    QPushButton[cssClass="chord-pad"] {{
+        background-color: {c['bg_mid']};
+        border: 1px solid {c['border']};
+        border-radius: 4px;
+        padding: 8px;
+        min-width: 64px;
+        min-height: 48px;
+        font-size: 13px;
+        font-weight: bold;
+        color: {c['text_primary']};
+    }}
+
+    QPushButton[cssClass="chord-pad"]:hover {{
+        background-color: {c['bg_hover']};
+        border-color: {c.get('accent_dim', c['accent_secondary'])};
+    }}
+
+    QPushButton[cssClass="chord-pad"]:pressed {{
+        background-color: {c.get('accent_dim', c['bg_selected'])};
+        border-color: {c['accent']};
+    }}
+
+    QPushButton[cssClass="chord-pad"]:checked {{
+        background-color: {c.get('accent_dim', c['bg_selected'])};
+        border: 2px solid {c['accent']};
+        color: {c['text_accent']};
+    }}
+
+    /* ---- Chord Pad Tonic/Dominant/Subdominant color variants ---- */
+
+    QPushButton[cssClass="chord-pad-tonic"] {{
+        background-color: rgba(74, 144, 217, 25);
+        border: 1px solid rgba(74, 144, 217, 60);
+        border-radius: 4px;
+        padding: 8px;
+        min-width: 64px;
+        min-height: 48px;
+        font-size: 13px;
+        font-weight: bold;
+    }}
+
+    QPushButton[cssClass="chord-pad-dominant"] {{
+        background-color: rgba(244, 67, 54, 25);
+        border: 1px solid rgba(244, 67, 54, 60);
+        border-radius: 4px;
+        padding: 8px;
+        min-width: 64px;
+        min-height: 48px;
+        font-size: 13px;
+        font-weight: bold;
+    }}
+
+    QPushButton[cssClass="chord-pad-subdominant"] {{
+        background-color: rgba(76, 175, 80, 25);
+        border: 1px solid rgba(76, 175, 80, 60);
+        border-radius: 4px;
+        padding: 8px;
+        min-width: 64px;
+        min-height: 48px;
+        font-size: 13px;
+        font-weight: bold;
+    }}
+
+    /* ---- Expression Map Technique List ---- */
+
+    QTreeWidget[cssClass="technique-tree"] {{
+        background-color: {c.get('bg_inspector', c['bg_dark'])};
+        border: 1px solid {c['border']};
+        border-radius: 3px;
+        alternate-background-color: {c['bg_mid']};
+    }}
+
+    QTreeWidget[cssClass="technique-tree"]::item {{
+        padding: 3px 6px;
+        border: none;
+    }}
+
+    QTreeWidget[cssClass="technique-tree"]::item:selected {{
+        background-color: {c['bg_selected']};
+        color: {c['text_accent']};
+    }}
+
+    QTreeWidget[cssClass="technique-tree"]::item:hover {{
+        background-color: {c['bg_hover']};
+    }}
+
+    /* ---- Articulation Quick Button ---- */
+
+    QPushButton[cssClass="articulation-btn"] {{
+        background-color: {c['bg_mid']};
+        border: 1px solid {c['border']};
+        border-radius: 3px;
+        padding: 3px 8px;
+        font-size: 10px;
+        min-height: 20px;
+    }}
+
+    QPushButton[cssClass="articulation-btn"]:checked {{
+        background-color: {c['accent']};
+        color: #FFFFFF;
+        border-color: {c['accent']};
+    }}
+
+    /* ---- Strip Effect Toggle (Mixer) ---- */
+
+    QPushButton[cssClass="strip-toggle"] {{
+        background-color: {c['bg_dark']};
+        border: 1px solid {c['border']};
+        border-radius: 2px;
+        padding: 1px;
+        min-width: 18px;
+        max-width: 18px;
+        min-height: 18px;
+        max-height: 18px;
+        font-size: 8px;
+        color: {c['text_dim']};
+    }}
+
+    QPushButton[cssClass="strip-toggle"]:checked {{
+        background-color: {c.get('accent_dim', '#2A4A6A')};
+        color: {c['accent']};
+        border-color: {c['accent']};
+    }}
+
+    /* ---- Transport Locator Display ---- */
+
+    QLabel[cssClass="locator-display"] {{
+        background-color: {c['bg_input']};
+        border: 1px solid {c['border']};
+        border-radius: 2px;
+        padding: 2px 6px;
+        font-family: "Consolas", "Courier New", monospace;
+        font-size: 11px;
+        color: {c['text_primary']};
+        min-width: 60px;
+    }}
+
+    /* ---- Transport Punch Button ---- */
+
+    QPushButton[cssClass="punch-btn"] {{
+        background-color: {c['bg_dark']};
+        border: 1px solid {c['border']};
+        border-radius: 2px;
+        padding: 2px 6px;
+        min-width: 20px;
+        min-height: 20px;
+        font-size: 10px;
+        font-weight: bold;
+        color: {c['text_secondary']};
+    }}
+
+    QPushButton[cssClass="punch-btn"]:checked {{
+        background-color: rgba(255, 152, 0, 40);
+        color: {c.get('accent_orange', '#FF9800')};
+        border-color: {c.get('accent_orange', '#FF9800')};
+    }}
+
+    /* ---- Transport Section Separator ---- */
+
+    QFrame[cssClass="transport-separator"] {{
+        background-color: {c['border']};
+        max-width: 1px;
+        min-width: 1px;
+        margin: 4px 6px;
     }}
     """
 

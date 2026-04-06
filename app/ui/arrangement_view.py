@@ -216,14 +216,19 @@ class TrackHeader(QWidget):
 class ArrangementPanel(QWidget):
     """Full arrangement view with track headers + timeline."""
 
+    seek_requested = pyqtSignal(int)  # tick
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._px_per_tick = 0.12
         self._offset = 0
         self._playhead = 0
         self._total_ticks = 1920 * 16
+        self._tpb = 480
+        self._time_sig = (4, 4)
         self._track_lanes: list[ArrangementTrackLane] = []
         self._track_headers: list[TrackHeader] = []
+        self._project = None
         self._build_ui()
 
     def _build_ui(self):
@@ -329,11 +334,107 @@ class ArrangementPanel(QWidget):
             self._offset = max(0, self._offset)
             self._refresh_all()
 
+    # ── Project integration ──────────────────────────────────────────────
+
+    def set_project(self, project):
+        """Load a project and create track lanes for every track.
+
+        *project* is expected to be a ``ProjectState`` (from core.models).
+        """
+        self._project = project
+
+        # Derive timeline length from project data
+        tpb = getattr(project, 'ticks_per_beat', 480)
+        self._tpb = tpb
+
+        ts = getattr(project, 'time_signature', None)
+        if ts is not None:
+            self._time_sig = (getattr(ts, 'numerator', 4), getattr(ts, 'denominator', 4))
+
+        # Compute total ticks from the furthest note end across all tracks
+        max_tick = tpb * self._time_sig[0] * 16  # at least 16 bars
+        for trk in getattr(project, 'tracks', []):
+            for n in getattr(trk, 'notes', []):
+                end = getattr(n, 'end_tick', 0)
+                if end > max_tick:
+                    max_tick = end
+        # Round up to the next bar boundary + some margin
+        bar_ticks = tpb * self._time_sig[0]
+        self._total_ticks = ((max_tick // bar_ticks) + 4) * bar_ticks
+
+        # Remove old lanes and headers
+        for hdr in self._track_headers:
+            hdr.setParent(None)
+            hdr.deleteLater()
+        for lane in self._track_lanes:
+            lane.setParent(None)
+            lane.deleteLater()
+        self._track_headers.clear()
+        self._track_lanes.clear()
+
+        # Build new lanes from project tracks
+        tracks = getattr(project, 'tracks', [])
+        for idx, trk in enumerate(tracks):
+            color = getattr(trk, 'color', '#888')
+            name = getattr(trk, 'name', f'Track {idx + 1}')
+            self.add_track(name, color)
+
+            # Build clip dictionaries from the track's notes
+            clips = self._clips_from_track(trk, idx)
+            self.update_track(idx, clips)
+
+        self._refresh_all()
+
+    def _clips_from_track(self, trk, track_idx: int) -> list[dict]:
+        """Convert a track's notes into clip dicts for the lane renderer.
+
+        Groups notes into one contiguous "clip" per track. If the track has
+        no notes an empty list is returned.
+        """
+        notes = getattr(trk, 'notes', [])
+        if not notes:
+            return []
+
+        # Find extent of notes in the track
+        min_start = min(n.start_tick for n in notes)
+        max_end = max(n.end_tick for n in notes)
+        length = max(self._tpb, max_end - min_start)
+
+        # Build mini-note data for the lane painter (limit to 80 for perf)
+        mini_notes = []
+        for n in notes[:80]:
+            mini_notes.append({
+                'start': n.start_tick - min_start,
+                'pitch': n.pitch,
+                'dur': n.duration_ticks,
+            })
+
+        color = getattr(trk, 'color', C.get('accent', '#888'))
+        name = getattr(trk, 'name', f'Track {track_idx + 1}')
+
+        return [{
+            'start': min_start,
+            'length': length,
+            'name': name,
+            'color': color,
+            'notes': mini_notes,
+        }]
+
+    def update_playhead(self, tick: int):
+        """Move the playhead to *tick* and repaint the ruler."""
+        self._playhead = tick
+        self._ruler.set_params(
+            self._total_ticks, self._px_per_tick, self._offset,
+            tick, self._tpb, self._time_sig,
+        )
+
     def _refresh_all(self):
         self._ruler.set_params(
-            self._total_ticks, self._px_per_tick, self._offset, self._playhead
+            self._total_ticks, self._px_per_tick, self._offset,
+            self._playhead, self._tpb, self._time_sig,
         )
         for lane in self._track_lanes:
             lane._px_per_tick = self._px_per_tick
             lane._offset = self._offset
+            lane._total_ticks = self._total_ticks
             lane.update()

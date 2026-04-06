@@ -67,6 +67,7 @@ class StepSequencerPanel(QWidget):
     """16-step drum sequencer with row controls."""
     pattern_changed = pyqtSignal()
     pad_triggered = pyqtSignal(int, int)  # note, velocity
+    step_toggled = pyqtSignal(int, int)   # row, col — 스텝 토글 시 발생
 
     _DEFAULT_ROWS = [
         ("Kick", 36), ("Snare", 38), ("Cl HH", 42), ("Op HH", 46),
@@ -200,6 +201,7 @@ class StepSequencerPanel(QWidget):
         root.addLayout(trans)
 
     def _on_step_toggled(self, row, col, velocity):
+        self.step_toggled.emit(row, col)
         self.pattern_changed.emit()
 
     def _clear_all(self):
