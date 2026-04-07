@@ -81,6 +81,7 @@ The full design lives under [docs/spec/](docs/spec/) (Korean, BalloonFlow standa
 - ✅ Python core engines (MIDI / harmony / groove / AI / FX / synth)
 - ✅ Multi-agent system (Composer, Manager, Reviewer, Orchestrator)
 - ✅ Audio → MIDI (Demucs + Basic Pitch)
+- ✅ **Sheet → MIDI (image → MIDI via SMT++ OMR)** — `agents/sheet2midi.py`
 - ✅ JUCE C++ frontend
 - 🔶 Partial: VST3/CLAP plug-in hosting (planned)
 

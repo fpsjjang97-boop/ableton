@@ -363,6 +363,87 @@ huggingface-cli upload <user>/midigpt-checkpoints \
 
 ---
 
+## 9.5 보너스 — 악보 이미지로도 입력하기 (sheet2midi)
+
+`agents/sheet2midi.py` 는 SOTA 오픈소스 OMR 모델인 **SMT++** (Sheet Music
+Transformer ++, MIT, antoniorv6/SMT-plusplus, 21.4M params) 를 래핑한
+에이전트입니다. 악보 사진/PDF 페이지를 받아서 MIDI로 변환하고, 그 자리에서
+바로 MidiGPT 변주까지 만들 수 있습니다.
+
+### 9.5.1 추가 설치 (선택)
+
+기본 학습 파이프라인에는 **불필요**합니다. 악보 입력 기능을 쓸 때만 설치:
+
+```bash
+# 1) SMT++ (PyPI에 없음, 소스에서 설치)
+git clone https://github.com/antoniorv6/SMT-plusplus.git
+cd SMT-plusplus
+pip install -e .
+cd ..
+
+# 2) kern → MIDI 변환기
+pip install music21
+
+# 3) 이미지 로드
+pip install opencv-python
+```
+
+> ⚠️ 첫 실행 시 HuggingFace에서 `antoniorv6/smt-camera-grandstaff` 가중치
+> (~85MB) 를 자동 다운로드합니다. 인터넷 필요.
+
+### 9.5.2 사용법 — 악보 → MIDI
+
+```bash
+python -m agents.sheet2midi \
+    --image score.png \
+    --output ./output/score.mid
+```
+
+### 9.5.3 사용법 — 악보 → MIDI → MidiGPT 변주 (한 번에)
+
+```bash
+python -m agents.sheet2midi \
+    --image score.png \
+    --output ./output/score.mid \
+    --vary \
+    --base_model ./checkpoints/midigpt_ema.pt \
+    --variation_output ./output/score_var.mid \
+    --style jazz \
+    --tempo 120
+```
+
+### 9.5.4 사용법 — Python API
+
+```python
+from agents.sheet2midi import Sheet2MidiAgent
+
+agent = Sheet2MidiAgent()  # 기본: piano-only checkpoint
+
+# 악보 → MIDI만
+midi_path, transcription = agent.transcribe_to_midi(
+    "score.png", "output/score.mid"
+)
+print("OMR text:\n", transcription.kern_text)
+
+# 악보 → MIDI → MidiGPT 변주
+result = agent.transcribe_and_vary(
+    image_path="score.png",
+    midi_output_path="output/score.mid",
+    variation_output_path="output/score_var.mid",
+    midigpt_base_model="./checkpoints/midigpt_ema.pt",
+    meta_style="jazz",
+    repetition_penalty=1.1,
+    no_repeat_ngram_size=4,
+)
+```
+
+### 9.5.5 한계
+- 기본 체크포인트는 **피아노 악보 전용** (smt-camera-grandstaff). 오케스트라/멀티 악기 악보는 인식률 낮음
+- 손글씨 / 저해상도 / 비뚤어진 사진은 OMR 결과가 깨질 수 있음 (`music21` parse 실패 → 명확한 에러 메시지)
+- 다른 SMT 체크포인트는 `--model antoniorv6/<other-name>` 으로 교체 가능
+
+---
+
 ## 10. 참고 문서
 
 - 표준 명세 INDEX: [`docs/spec/MidiGPT_표준명세_INDEX.md`](spec/MidiGPT_표준명세_INDEX.md)

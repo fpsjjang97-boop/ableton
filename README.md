@@ -81,6 +81,7 @@
 - ✅ Python core 엔진 (MIDI/하모니/그루브/AI/효과/신스)
 - ✅ 멀티 에이전트 (Composer, Manager, Reviewer, Orchestrator)
 - ✅ Audio2MIDI (Demucs + Basic Pitch)
+- ✅ **Sheet2MIDI (악보 이미지 → MIDI, SMT++ 통합)** — `agents/sheet2midi.py`
 - ✅ JUCE C++ 프론트엔드
 - 🔶 부분: VST3/CLAP 호스팅 (계획됨)
 
