@@ -7,6 +7,10 @@ Features:
   - LoRA hot-swap at runtime
   - Quantized model support (FP16/INT8)
   - Harmonic constraint: masks off-scale pitches during generation
+  - KV-cache accelerated decoding (Phase 1)
+  - Repetition penalty (Phase 1)
+  - No-repeat n-gram blocking (Phase 1)
+  - Multi-sample (num_return_sequences) candidate browsing (Phase 1)
 """
 from __future__ import annotations
 
@@ -14,7 +18,7 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple, List
 
 import torch
 import torch.nn.functional as F
@@ -145,6 +149,76 @@ def _allowed_pitch_classes(root_pc: int, quality: str) -> set[int]:
     if intervals is None:
         return set(range(12))  # unknown quality — allow everything
     return {(root_pc + iv) % 12 for iv in intervals}
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 sampling utilities
+# ---------------------------------------------------------------------------
+def _apply_repetition_penalty(
+    logits: torch.Tensor,
+    context_ids: torch.Tensor,
+    penalty: float,
+) -> torch.Tensor:
+    """Penalise tokens that already appear in the context.
+
+    Implementation follows Keskar et al. (CTRL, 2019):
+        - For tokens already seen, divide positive logits by ``penalty``
+          and multiply negative logits by ``penalty``.  This makes the
+          token uniformly less likely regardless of its sign.
+
+    Args:
+        logits: shape (B, V).  Modified in place and returned.
+        context_ids: shape (B, T).  All tokens generated so far in the
+            current sequence.
+        penalty: 1.0 = no penalty.  Typical range 1.05-1.3.  Values above
+            1.5 tend to break musical structure (kills repeated motifs).
+    """
+    if penalty == 1.0:
+        return logits
+    for b in range(logits.size(0)):
+        seen = torch.unique(context_ids[b])
+        seen_logits = logits[b, seen]
+        seen_logits = torch.where(
+            seen_logits > 0, seen_logits / penalty, seen_logits * penalty
+        )
+        logits[b, seen] = seen_logits
+    return logits
+
+
+def _block_repeat_ngrams(
+    logits: torch.Tensor,
+    context_ids: torch.Tensor,
+    ngram_size: int,
+) -> torch.Tensor:
+    """Set logits to -inf for tokens that would create a repeated n-gram.
+
+    Hugging Face style ``no_repeat_ngram_size`` block.  Helps prevent
+    pathological loops like "Bar_3 Bar_3 Bar_3 ..." while still allowing
+    intended musical repetition at larger scales (e.g. choruses).
+
+    Args:
+        logits: shape (B, V).  Modified in place and returned.
+        context_ids: shape (B, T).  Generated context.
+        ngram_size: n.  0 disables the feature.  Typical: 3-5.
+    """
+    if ngram_size <= 0:
+        return logits
+
+    for b in range(logits.size(0)):
+        seq = context_ids[b].tolist()
+        if len(seq) < ngram_size:
+            continue
+        # The (n-1)-token prefix that the next token would extend.
+        prefix = tuple(seq[-(ngram_size - 1):]) if ngram_size > 1 else ()
+        banned: set[int] = set()
+        for i in range(len(seq) - ngram_size + 1):
+            ngram = tuple(seq[i:i + ngram_size])
+            if ngram[:-1] == prefix:
+                banned.add(ngram[-1])
+        if banned:
+            banned_t = torch.tensor(list(banned), device=logits.device, dtype=torch.long)
+            logits[b, banned_t] = float("-inf")
+    return logits
 
 
 @dataclass
@@ -291,35 +365,81 @@ class MidiGPTInference:
         top_k: int = 50,
         top_p: float = 0.95,
         eos_id: int = 2,
+        repetition_penalty: float = 1.0,
+        no_repeat_ngram_size: int = 0,
+        use_kv_cache: bool = True,
     ) -> torch.Tensor:
         """Autoregressive generation with harmonic constraint.
 
-        Mirrors model.generate() but applies a scale-aware mask on pitch tokens
-        before sampling, preventing notes outside the current chord's scale.
+        Mirrors :meth:`MidiGPT.generate` but applies a scale-aware mask on
+        pitch tokens before sampling, preventing notes outside the current
+        chord's scale.
+
+        Phase 1 additions:
+          * KV-cache acceleration (``use_kv_cache``) — O(1) per step.
+          * Repetition penalty (``repetition_penalty``) — CTRL-style.
+          * No-repeat n-gram blocking (``no_repeat_ngram_size``).
+
+        All new options default to backwards-compatible values, so existing
+        callers see identical behaviour unless they opt in.
         """
         assert self.model is not None
         self.model.eval()
         block_size = self.model.config.block_size
 
+        past_kv_list: Optional[list[Tuple[torch.Tensor, torch.Tensor]]] = None
+
         for _ in range(max_new_tokens):
-            # Crop to block_size
-            idx_cond = idx if idx.size(1) <= block_size else idx[:, -block_size:]
+            # ----- Forward pass -----
+            if use_kv_cache:
+                if past_kv_list is None:
+                    # Prefill: process the whole prompt once.
+                    idx_input = idx if idx.size(1) <= block_size \
+                        else idx[:, -block_size:]
+                    logits, _, past_kv_list = self.model(idx_input, past_kv_list=None)
+                else:
+                    cur_len = past_kv_list[0][0].size(2) + 1
+                    if cur_len > block_size:
+                        # Cache would overflow — re-prefill from the tail.
+                        past_kv_list = None
+                        idx_input = idx[:, -block_size:]
+                        logits, _, past_kv_list = self.model(
+                            idx_input, past_kv_list=None
+                        )
+                    else:
+                        logits, _, past_kv_list = self.model(
+                            idx[:, -1:], past_kv_list=past_kv_list,
+                        )
+            else:
+                # Legacy path: recompute every step.
+                idx_cond = idx if idx.size(1) <= block_size \
+                    else idx[:, -block_size:]
+                logits, _, _ = self.model(idx_cond)
 
-            # Forward pass
-            logits, _, _ = self.model(idx_cond)
-            logits = logits[:, -1, :] / temperature  # (B, V)
+            logits = logits[:, -1, :]  # (B, V)
 
-            # --- Harmonic constraint (per batch element) ---
+            # ----- Repetition penalty (before temperature, before mask) -----
+            if repetition_penalty != 1.0:
+                logits = _apply_repetition_penalty(logits, idx, repetition_penalty)
+
+            # ----- No-repeat n-gram blocking -----
+            if no_repeat_ngram_size > 0:
+                logits = _block_repeat_ngrams(logits, idx, no_repeat_ngram_size)
+
+            # Apply temperature
+            logits = logits / temperature
+
+            # ----- Harmonic constraint (per batch element) -----
             for b in range(logits.size(0)):
                 context = idx[b].tolist()
                 logits[b] = self._apply_harmonic_mask(logits[b], context)
 
-            # Top-K filtering
+            # ----- Top-K filtering -----
             if top_k > 0:
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
                 logits[logits < v[:, [-1]]] = float("-inf")
 
-            # Top-P (nucleus) filtering
+            # ----- Top-P (nucleus) filtering -----
             if top_p < 1.0:
                 sorted_logits, sorted_indices = torch.sort(logits, descending=True)
                 cumulative_probs = torch.cumsum(
@@ -331,7 +451,7 @@ class MidiGPTInference:
                 sorted_logits[sorted_mask] = float("-inf")
                 logits = sorted_logits.scatter(1, sorted_indices, sorted_logits)
 
-            # Sample
+            # ----- Sample -----
             probs = F.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
 
@@ -357,7 +477,11 @@ class MidiGPTInference:
         temperature: float = 0.9,
         top_k: int = 50,
         top_p: float = 0.95,
-    ) -> list[dict]:
+        repetition_penalty: float = 1.0,
+        no_repeat_ngram_size: int = 0,
+        num_return_sequences: int = 1,
+        use_kv_cache: bool = True,
+    ) -> list[dict] | list[list[dict]]:
         """Generate a MIDI variation.
 
         Args:
@@ -369,9 +493,21 @@ class MidiGPTInference:
             temperature: Sampling temperature
             top_k: Top-K sampling
             top_p: Nucleus sampling
+            repetition_penalty: CTRL-style penalty for repeated tokens.
+                ``1.0`` disables (default).  Recommended range: 1.05-1.2.
+                Values > 1.5 break musical motif repetition.
+            no_repeat_ngram_size: Block any n-gram of this length from
+                repeating.  ``0`` disables (default).  Recommended: 3-5.
+            num_return_sequences: Number of independent variations to
+                generate in a single call.  When > 1, the return type
+                becomes ``list[list[dict]]`` (one note list per variation).
+            use_kv_cache: Use KV cache for O(1) per-step decoding.
+                Default ``True``; set ``False`` for the legacy recompute
+                path (e.g. for debugging).
 
         Returns:
-            List of note dicts [{pitch, velocity, start_tick, duration_tick, track_type}]
+            * ``num_return_sequences == 1``: list of note dicts.
+            * ``num_return_sequences > 1``:  list of (list of note dicts).
         """
         if self.model is None:
             raise RuntimeError("Model not loaded")
@@ -390,44 +526,52 @@ class MidiGPTInference:
 
         # Add SEP token to signal "now generate variation"
         input_ids.append(self.vocab.sep_id)
+        sep_pos = len(input_ids)
 
-        # Generate with harmonic constraint
         start_time = time.time()
-        input_tensor = torch.tensor([input_ids], dtype=torch.long, device=self.device)
+        variations: list[list[dict]] = []
 
-        with torch.no_grad():
-            output = self._generate_with_harmony(
-                input_tensor,
-                max_new_tokens=max_tokens,
-                temperature=temperature,
-                top_k=top_k,
-                top_p=top_p,
-                eos_id=self.vocab.eos_id,
+        for seq_idx in range(max(1, num_return_sequences)):
+            input_tensor = torch.tensor(
+                [input_ids], dtype=torch.long, device=self.device
             )
+            with torch.no_grad():
+                output = self._generate_with_harmony(
+                    input_tensor,
+                    max_new_tokens=max_tokens,
+                    temperature=temperature,
+                    top_k=top_k,
+                    top_p=top_p,
+                    eos_id=self.vocab.eos_id,
+                    repetition_penalty=repetition_penalty,
+                    no_repeat_ngram_size=no_repeat_ngram_size,
+                    use_kv_cache=use_kv_cache,
+                )
+
+            variation_ids = output[0].tolist()[sep_pos:]
+            decoded_notes = self.decoder.decode_to_notes(variation_ids)
+            note_dicts = [
+                {
+                    "pitch": n.pitch,
+                    "velocity": n.velocity,
+                    "start_tick": n.start_tick,
+                    "duration_tick": n.duration_tick,
+                    "track_type": n.track_type,
+                }
+                for n in decoded_notes
+            ]
+            variations.append(note_dicts)
 
         elapsed = time.time() - start_time
+        total_notes = sum(len(v) for v in variations)
+        print(
+            f"MidiGPT: Generated {len(variations)} variation(s), "
+            f"{total_notes} notes total in {elapsed:.2f}s"
+        )
 
-        # Extract generated tokens (after SEP)
-        generated_ids = output[0].tolist()
-        sep_pos = len(input_ids)
-        variation_ids = generated_ids[sep_pos:]
-
-        # Decode to notes
-        decoded_notes = self.decoder.decode_to_notes(variation_ids)
-
-        # Convert to dict format
-        result = []
-        for note in decoded_notes:
-            result.append({
-                "pitch": note.pitch,
-                "velocity": note.velocity,
-                "start_tick": note.start_tick,
-                "duration_tick": note.duration_tick,
-                "track_type": note.track_type,
-            })
-
-        print(f"MidiGPT: Generated {len(result)} notes in {elapsed:.2f}s")
-        return result
+        if num_return_sequences <= 1:
+            return variations[0]
+        return variations
 
     def generate_to_midi(
         self,
@@ -437,8 +581,16 @@ class MidiGPTInference:
         chords: list[ChordEvent] | None = None,
         max_tokens: int = 512,
         temperature: float = 0.9,
+        top_k: int = 50,
+        top_p: float = 0.95,
+        repetition_penalty: float = 1.0,
+        no_repeat_ngram_size: int = 0,
+        use_kv_cache: bool = True,
     ) -> str:
-        """Generate variation and save as MIDI file."""
+        """Generate variation and save as MIDI file.
+
+        See :meth:`generate_variation` for parameter documentation.
+        """
         if self.model is None:
             raise RuntimeError("Model not loaded")
 
@@ -454,7 +606,12 @@ class MidiGPTInference:
                 input_tensor,
                 max_new_tokens=max_tokens,
                 temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
                 eos_id=self.vocab.eos_id,
+                repetition_penalty=repetition_penalty,
+                no_repeat_ngram_size=no_repeat_ngram_size,
+                use_kv_cache=use_kv_cache,
             )
 
         variation_ids = output[0].tolist()[len(input_ids):]

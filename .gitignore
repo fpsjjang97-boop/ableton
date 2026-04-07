@@ -21,8 +21,13 @@ build/
 checkpoints/
 midigpt_data/
 midigpt/dpo_pairs/
+midigpt_pipeline/augmented/
+midigpt_pipeline/tokenized/
 *.pt
 *.onnx
+
+# Generated MIDI outputs
+output/
 
 # Audio output (large WAV/MP3 files)
 audio_to_midi_output/

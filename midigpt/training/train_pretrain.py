@@ -1,5 +1,5 @@
 """
-MidiGPT Pre-training Script — Next-token prediction on MIDI sequences.
+MidiGPT Pre-training Script - Next-token prediction on MIDI sequences.
 
 Usage:
     python -m midigpt.training.train_pretrain --data_dir ./midigpt_data --epochs 10
@@ -29,6 +29,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from midigpt.model import MidiGPTConfig, MidiGPT
 from midigpt.data.dataset import MidiDataset, MidiCollator
 from midigpt.tokenizer.vocab import VOCAB
+from midigpt.training.ema import EMA
 
 
 def get_lr(step: int, warmup_steps: int, max_steps: int, max_lr: float, min_lr: float) -> float:
@@ -49,7 +50,7 @@ def train(args):
         print(f"GPU: {torch.cuda.get_device_name()}")
         print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
-    # Model config — uses MidiGPTConfig defaults (50M: n_embd=576, n_inner=2304)
+    # Model config - uses MidiGPTConfig defaults (50M: n_embd=576, n_inner=2304)
     config = MidiGPTConfig(
         vocab_size=VOCAB.size,
         block_size=args.block_size,
@@ -62,7 +63,7 @@ def train(args):
     params = model.count_parameters()
     print(f"Trainable parameters: {params:,} ({params/1e6:.1f}M)")
 
-    # Dataset — 90/10 train/val split
+    # Dataset - 90/10 train/val split
     full_dataset = MidiDataset(args.data_dir, mode="pretrain", block_size=args.block_size)
     collator = MidiCollator()
     val_size = max(1, int(len(full_dataset) * 0.1))
@@ -89,7 +90,7 @@ def train(args):
         pin_memory=True,
         drop_last=False,
     )
-    print(f"Dataset: {len(full_dataset)} chunks — {train_size} train, {val_size} val")
+    print(f"Dataset: {len(full_dataset)} chunks - {train_size} train, {val_size} val")
     print(f"Batches/epoch: {len(loader)} train, {len(val_loader)} val")
 
     # Optimizer
@@ -120,6 +121,16 @@ def train(args):
     use_amp = device.type == "cuda" and args.fp16
     scaler = torch.amp.GradScaler(enabled=use_amp)
     autocast_dtype = torch.float16 if use_amp else torch.float32
+
+    # ------------------------------------------------------------------
+    # EMA (Exponential Moving Average) — Phase 1 addition
+    # Tracks a slowly-moving copy of the weights for stabler eval/inference.
+    # Disabled by default to keep existing runs reproducible.
+    # ------------------------------------------------------------------
+    ema: EMA | None = None
+    if args.ema:
+        ema = EMA(model, decay=args.ema_decay)
+        print(f"EMA enabled (decay={args.ema_decay})")
 
     # Training state
     total_steps = args.epochs * len(loader)
@@ -173,6 +184,10 @@ def train(args):
                 scaler.update()
                 optimizer.zero_grad(set_to_none=True)
 
+                # EMA update (after every optimiser step)
+                if ema is not None:
+                    ema.update(model)
+
             # Logging
             batch_loss = loss.item() * args.grad_accum
             epoch_loss += batch_loss
@@ -205,6 +220,12 @@ def train(args):
         avg_train_loss = epoch_loss / len(loader) if len(loader) > 0 else 0
 
         # --- Validation ---
+        # If EMA is enabled, evaluate the EMA weights instead of the live ones.
+        # We use store/copy_to/restore so the optimiser state stays untouched.
+        if ema is not None:
+            ema.store(model)
+            ema.copy_to(model)
+
         model.eval()
         val_loss_sum = 0.0
         val_batches = 0
@@ -217,6 +238,9 @@ def train(args):
                 val_loss_sum += v_loss.item()
                 val_batches += 1
         avg_val_loss = val_loss_sum / val_batches if val_batches > 0 else 0
+
+        if ema is not None:
+            ema.restore(model)
 
         print(
             f"\n--- Epoch {epoch+1} complete | "
@@ -244,6 +268,8 @@ def train(args):
             "train_loss": avg_train_loss,
             "val_loss": avg_val_loss,
         }
+        if ema is not None:
+            checkpoint["ema_state_dict"] = ema.state_dict()
 
         # Save latest
         torch.save(checkpoint, checkpoint_dir / "midigpt_latest.pt")
@@ -279,6 +305,14 @@ def train(args):
     torch.save(model.state_dict(), checkpoint_dir / "midigpt_base.pt")
     print(f"Weights-only: {checkpoint_dir / 'midigpt_base.pt'}")
 
+    # Save the EMA copy as a separate, deployment-ready checkpoint.
+    if ema is not None:
+        ema.store(model)
+        ema.copy_to(model)
+        torch.save(model.state_dict(), checkpoint_dir / "midigpt_ema.pt")
+        ema.restore(model)
+        print(f"EMA weights:  {checkpoint_dir / 'midigpt_ema.pt'}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="MidiGPT Pre-training")
@@ -300,6 +334,12 @@ def main():
     parser.add_argument("--save_every", type=int, default=2, help="Save checkpoint every N epochs")
     parser.add_argument("--early_stop_patience", type=int, default=5,
                         help="Stop training after N epochs without val loss improvement (0=disable)")
+    parser.add_argument("--ema", action="store_true", default=False,
+                        help="Maintain an EMA copy of the weights for stabler "
+                             "evaluation/inference (Phase 1, default off).")
+    parser.add_argument("--ema_decay", type=float, default=0.999,
+                        help="EMA decay factor.  0.999 is a sane default; use "
+                             "0.9999 for very long runs.")
 
     args = parser.parse_args()
     train(args)
