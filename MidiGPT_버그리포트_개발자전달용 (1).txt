@@ -1,0 +1,222 @@
+================================================================
+  MidiGPT 로컬 학습 테스트 - 버그 리포트 & 피드백
+  작성: 작곡가 테스터 (비개발자)
+  테스트 환경: Windows 10, RTX 4080, Python 3.11.9
+  날짜: 2026-04-08
+================================================================
+
+[테스트 개요]
+- 레포: https://github.com/fpsjjang97-boop/ableton
+- 학습 데이터: midi_data/ 폴더 내 54개 MIDI 파일
+- 실행한 명령어들:
+    python -m midigpt.pipeline --midi_dir ./midi_data --epochs 1
+    python -m midigpt.training.train_pretrain --data_dir ./midigpt_pipeline/tokenized --epochs 10 --batch_size 16 --ema --ema_decay 0.999
+    python scripts/run_self_improvement_loop.py --base_model ./checkpoints/midigpt_ema.pt --cycles 3 --variants_per_song 3
+- 학습 결과: Train Loss 0.1271 / Val Loss 2.7823 (10 epochs)
+- 생성된 체크포인트: checkpoints/midigpt_ema.pt ✅
+
+
+================================================================
+  [버그 목록] — 코드 수정 필요
+================================================================
+
+---[BUG 1] README/문서와 실제 코드 경로 불일치---
+- 문서(MD)에는 --data_dir ./midigpt_data 라고 명시
+- 실제 pipeline 실행 후 토큰이 저장되는 경로는 midigpt_pipeline/tokenized/tokens/
+- train_pretrain.py는 {data_dir}/tokens 를 찾도록 하드코딩되어 있음
+- 결과: 처음 실행하면 무조건 FileNotFoundError 발생
+
+  재현 방법:
+    python -m midigpt.training.train_pretrain --data_dir ./midigpt_data ...
+    → FileNotFoundError: Token directory not found: midigpt_data\tokens
+
+  올바른 명령어 (현재 임시 해결책):
+    python -m midigpt.training.train_pretrain --data_dir ./midigpt_pipeline/tokenized ...
+
+
+---[BUG 2] requirements.txt 한국어/UTF-8 인코딩 문제 (Windows)---
+- requirements.txt 파일이 UTF-8로 저장되어 있으나
+  Windows pip가 CP949(한국어 Windows 기본 인코딩)로 읽으려 해서 실패
+- 결과: pip install -r requirements.txt 실행 시 바로 에러
+
+  에러 메시지:
+    UnicodeDecodeError: 'cp949' codec can't decode byte 0xe2 in position 10
+
+  해결 제안:
+    requirements.txt 를 BOM 없는 ASCII/UTF-8 순수 영문으로 저장
+    또는 파일 내 한글 주석 제거
+
+
+---[BUG 3] build_dpo_pairs.py — JSON 리뷰 파일 인코딩 문제---
+- 강화학습 루프(run_self_improvement_loop.py) 실행 시
+  리뷰 JSON 파일을 저장할 때 시스템 인코딩(CP949)으로 저장됨
+- build_dpo_pairs.py 는 UTF-8로 열려고 해서 에러 발생
+
+  에러 메시지:
+    UnicodeDecodeError: 'utf-8' codec can't decode byte 0xb7 in position 573
+
+  위치: build_dpo_pairs.py, line 144
+    review = json.load(f)
+
+  해결 제안:
+    파일 열 때 encoding='utf-8' 또는 encoding='cp949' 명시
+    또는 저장 시 항상 UTF-8 강제: open(path, 'w', encoding='utf-8')
+
+
+---[BUG 4] 생성 MIDI 파일 크기가 비정상적으로 작음 (핵심 버그)---
+- 학습에 사용된 원본 MIDI 파일: 최소 10KB 이상
+- 강화학습 후 생성된 MIDI 파일: 전부 약 1KB 이하
+- 즉 생성물이 학습 데이터의 1/10 수준에도 못 미침
+- 음악으로서 기능하지 못하는 수준이며, 이 상태로는
+  리뷰 점수나 DPO 강화학습 자체가 의미 없음
+
+  수치 비교:
+    학습 데이터 평균 토큰 수: 7,922 tokens/file
+    생성 파일 길이: 2~5초 (정상: 30초~2분 이상이어야 함)
+    생성 파일 크기: ~1KB (정상: 10KB 이상이어야 함)
+    생성 파일 노트 수: 트랙당 1~5개 (정상: 수십~수백 개)
+
+  원인 추정:
+    - 추론 엔진(inference/engine.py)이 EOS 토큰을 너무 이르게 감지하고 생성 중단
+    - max_new_tokens 또는 max_length 파라미터가 너무 낮게 설정되어 있을 가능성
+    - temperature가 너무 낮아 반복적으로 EOS를 선택할 가능성
+
+  해결 제안:
+    - inference/engine.py 에서 min_length, max_new_tokens 파라미터 확인 및 상향
+    - EOS 토큰 early stopping 로직 점검
+    - 생성 시 min_new_tokens 강제 설정 검토
+
+
+---[BUG 5] 추론 엔진 EOS 토큰 조기 종료 (BUG 4의 근본 원인)---
+- BUG 4의 근본 원인으로 추정
+- 모델이 생성 초반에 EOS 토큰을 높은 확률로 예측하여 즉시 종료
+- 학습 시 val_loss(2.78)와 train_loss(0.13) 간 격차가 큰 것으로 보아
+  모델이 학습 데이터에 과적합되어 새로운 시퀀스 생성 능력이 부족할 수 있음
+
+  해결 제안:
+    - inference/engine.py 에서 eos_token_id suppression 추가
+    - temperature 올리기 (예: 0.8 → 1.2)
+    - repetition_penalty 파라미터 추가 검토
+
+
+---[BUG 6] 생성 MIDI에 'accomp' 트랙이 모든 파일에 존재---
+- 강화학습 후 생성된 모든 MIDI 파일에 'accomp' 라는 이름의 트랙이 포함됨
+- 원본 학습 데이터 54개 MIDI 파일 어디에도 'accomp'라는 트랙명은 없음
+  (원본 트랙명 예시: E.PIANO, SYNTHBASS, VIOLIN_LEGATO, SYNTHPAD 등)
+- 이는 두 가지 가능성이 있음:
+  (A) 인코더가 원본 트랙명을 accomp/drums/bass/melody/pad 5가지 카테고리로
+      강제 분류하도록 설계된 경우 → 의도된 동작이지만 문서화 필요
+  (B) 트랙명을 인식 못할 때 fallback으로 'accomp'를 사용하는 버그
+
+  증상:
+    생성된 거의 모든 파일의 트랙 이름 = accomp / drums / bass / melody / pad
+    원본의 실제 악기명(E.PIANO, VIOLIN 등)은 완전히 소실됨
+    DAW(Ableton 등)에서 열면 악기 정보 없이 accomp 트랙만 표시됨
+
+  질문 (개발자에게):
+    'accomp'는 의도적으로 설계한 트랙 카테고리인가요?
+    원본 악기명(트랙명) 복원은 설계상 지원하지 않는 건가요?
+    만약 카테고리 토큰이라면, 어떤 기준으로 원본 트랙을 분류하나요?
+
+  해결 제안 (버그인 경우):
+    - midigpt/tokenizer/encoder.py 에서 트랙명 분류 로직 점검
+    - midigpt/tokenizer/decoder.py 에서 트랙명 복원 로직 점검
+    - 트랙명 토큰이 vocab에 어떻게 정의되어 있는지 확인 필요
+
+
+================================================================
+  [품질 이슈] — 모델 출력 품질 관련
+================================================================
+
+---[QUALITY 1] 생성 음악이 학습 데이터를 반영하지 않는 것으로 의심---
+- 학습 데이터는 City Pop, J-Rock, House, Metal 등 다양한 장르
+- 생성 결과물은 장르 구분 없이 유사한 음표 패턴 반복
+- 특히 METAL 계열 파일 점수가 39~48점으로 가장 낮음
+  (WALTZ, J POP 계열은 상대적으로 높은 65~77점)
+- 데이터가 54곡으로 적어 일반화 어려움 (개발자 목표: 2000곡 이상)
+
+
+---[QUALITY 2] 스케일 일관성 점수 낮음---
+- 자동 리뷰어 기준 스케일 일관성 55~75% (이상적: 85% 이상)
+- D major 스케일 기준으로 평가되는데, 
+  원본 파일들이 다양한 조성을 사용하므로 이 평가 기준 자체가 편향될 수 있음
+- 리뷰어 설정에서 스케일 감지를 동적으로 처리하는지 확인 필요
+
+
+---[QUALITY 3] 벨로시티 범위 이탈 문제---
+- 대부분의 생성 파일에서 벨로시티 범위 이탈률이 15~65%
+- 정상 범위(60~100)를 자주 벗어남 (너무 약하거나 너무 강한 노트)
+- 리뷰어 기준과 실제 음악적 감각 간 차이 가능성도 있음
+
+
+---[QUALITY 4] DPO 학습이 한 번도 실행되지 않음---
+- 강화학습 3 사이클 모두 DPO 파인튜닝 단계 SKIP됨
+- 이유 1: Grade A (chosen) 파일이 0개 → 비교 쌍 생성 불가
+- 이유 2: BUG 3의 인코딩 오류로 리뷰 파일 자체를 읽지 못함
+- 리뷰어의 A등급 기준이 지나치게 엄격하거나
+  현재 모델 수준에서 A등급 달성이 불가능한 구조일 수 있음
+
+
+================================================================
+  [환경 정보]
+================================================================
+
+OS        : Windows 10 (19045.6691)
+Python    : 3.11.9 (venv)
+GPU       : NVIDIA GeForce RTX 4080 (17.2 GB)
+PyTorch   : 2.5.1+cu121
+CUDA      : 12.1
+작업 경로  : C:\Users\USER\ableton
+토큰 경로  : midigpt_pipeline\tokenized\tokens\ (660파일, 5,229,006 토큰)
+체크포인트 : checkpoints\midigpt_ema.pt ⭐ (배포 권장 파일)
+설치 패키지: torch, numpy, pretty_midi, mido (requirements.txt는 직접 설치)
+
+
+================================================================
+  [전체 실행 흐름 요약]
+================================================================
+
+1. git clone → venv 생성 → torch + 패키지 수동 설치 ✅
+   (requirements.txt 인코딩 오류로 직접 설치 필요했음)
+
+2. python scripts/setup_check.py → 통과 ✅
+   (mido 버전 경고만 있었음, 기능에는 문제 없음)
+
+3. python -m midigpt.pipeline --midi_dir ./midi_data --epochs 1
+   → 660개 파일 생성, 5,229,006 토큰 ✅
+
+4. python -m midigpt.training.train_pretrain --data_dir ./midigpt_pipeline/tokenized ...
+   → 경로 버그(BUG 1)로 2번 실패 후 올바른 경로 찾아서 성공
+   → Train Loss: 0.1271 / Val Loss: 2.7823 (10 epochs, 0.3시간) ✅
+
+5. python scripts/run_self_improvement_loop.py ...
+   → 3 사이클 실행됨
+   → 리뷰는 완료 (162개 파일, 평균 59.0점)
+   → DPO 빌드에서 인코딩 오류(BUG 3)로 실패 ❌
+   → DPO 파인튜닝 SKIP ❌
+
+
+================================================================
+  [제안 사항]
+================================================================
+
+1. Windows 호환성 개선이 필요함
+   - 경로, 인코딩 관련 버그가 Windows에서만 발생하는 것으로 보임
+   - open() 호출 시 encoding 파라미터 명시 권장
+
+2. 추론 품질 개선이 최우선
+   - 현재 생성 파일이 1KB / 2~5초라 음악으로 평가하기 어려움
+   - EOS 조기 종료 문제 해결 없이는 강화학습이 무의미함
+
+3. 데이터 부족 문제
+   - 54곡 → 660곡(증강 후)으로 학습했지만 품질 한계 명확
+   - 목표인 2000곡 수준의 데이터가 필요함
+
+4. 리뷰어 A등급 기준 재검토
+   - 현재 3사이클 × 162파일에서 A등급이 단 0개
+   - DPO 학습이 한 번도 실행되지 않음
+   - 기준을 완화하거나 B등급도 chosen으로 사용할 수 있게 수정 검토
+
+================================================================
+  END OF REPORT
+================================================================
