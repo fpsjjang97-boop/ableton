@@ -1,8 +1,15 @@
 """
 MidiGPT Pre-training Script - Next-token prediction on MIDI sequences.
 
-Usage:
-    python -m midigpt.training.train_pretrain --data_dir ./midigpt_data --epochs 10
+Usage (after running ``python -m midigpt.pipeline --midi_dir ./midi_data``):
+
+    # Default data_dir matches pipeline output -- no flag needed
+    python -m midigpt.training.train_pretrain --epochs 10 --batch_size 16 --ema
+
+    # Or be explicit
+    python -m midigpt.training.train_pretrain \
+        --data_dir ./midigpt_pipeline/tokenized \
+        --epochs 10 --batch_size 16 --ema --ema_decay 0.999
 
 Hardware:
     RTX 4090 (24GB):  batch_size=32, ~12-24 hours
@@ -213,7 +220,7 @@ def train(args):
                     f"Tok/s {tokens_per_sec:.0f} | "
                     f"{elapsed/60:.1f}min"
                 )
-                with open(log_path, "a") as f:
+                with open(log_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(log_entry) + "\n")
 
         # Epoch summary (training)
@@ -255,7 +262,7 @@ def train(args):
             "train_loss": round(avg_train_loss, 4),
             "val_loss": round(avg_val_loss, 4),
         }
-        with open(log_path, "a") as f:
+        with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(val_log_entry) + "\n")
 
         # Save checkpoint
@@ -316,7 +323,16 @@ def train(args):
 
 def main():
     parser = argparse.ArgumentParser(description="MidiGPT Pre-training")
-    parser.add_argument("--data_dir", type=str, required=True, help="Path to tokenized data directory")
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        default="./midigpt_pipeline/tokenized",
+        help="Path to tokenized data directory. Default matches the layout "
+             "produced by 'python -m midigpt.pipeline'. The dataset loader "
+             "auto-detects whether the path is the parent or the tokens dir "
+             "itself, so both ./midigpt_pipeline/tokenized and "
+             "./midigpt_pipeline/tokenized/tokens work.",
+    )
     parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints", help="Save directory")
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=16)

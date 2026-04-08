@@ -39,7 +39,7 @@ SCALES = {
 
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE) as f:
+        with open(SETTINGS_FILE, encoding='utf-8') as f:
             return json.load(f)
     return {}
 
@@ -289,18 +289,21 @@ def review_midi(filepath):
     }
 
     review_path = os.path.join(REVIEW_DIR, f"review_{basename}.json")
-    with open(review_path, 'w') as f:
+    # encoding='utf-8' is required: on Korean Windows the default text-mode
+    # encoding is CP949, which then causes UnicodeDecodeError downstream when
+    # build_dpo_pairs.py reads these files with encoding='utf-8'.
+    with open(review_path, 'w', encoding='utf-8') as f:
         json.dump(review, f, indent=2, ensure_ascii=False)
     print(f"\n💾 리뷰 저장: {review_path}")
 
     # 메타데이터 업데이트
     meta_path = filepath + '.meta.json'
     if os.path.exists(meta_path):
-        with open(meta_path) as f:
+        with open(meta_path, encoding='utf-8') as f:
             meta = json.load(f)
         meta['status'] = 'approved' if not issues else 'needs_revision'
         meta['review'] = review
-        with open(meta_path, 'w') as f:
+        with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
     return review
@@ -316,7 +319,7 @@ def list_pending():
         meta_path = mf + '.meta.json'
         status = 'unknown'
         if os.path.exists(meta_path):
-            with open(meta_path) as f:
+            with open(meta_path, encoding='utf-8') as f:
                 meta = json.load(f)
                 status = meta.get('status', 'unknown')
 

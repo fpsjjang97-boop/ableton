@@ -256,7 +256,7 @@ class AbletonBridge:
 
         # 설정에서 BPM 가져오기
         if os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE) as f:
+            with open(SETTINGS_FILE, encoding='utf-8') as f:
                 settings = json.load(f)
             self.set_tempo(settings.get('bpm', 120))
 

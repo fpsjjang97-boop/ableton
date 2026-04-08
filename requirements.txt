@@ -1,9 +1,9 @@
-# MidiGPT — Python dependencies
+# MidiGPT -- Python dependencies
 #
 # Install:
 #   pip install -r requirements.txt
 #
-# IMPORTANT — torch installation:
+# IMPORTANT -- torch installation:
 #   The torch line below installs the CPU build by default.
 #   For CUDA (NVIDIA GPU) builds, install torch SEPARATELY first:
 #
@@ -15,6 +15,11 @@
 #   ...then run:
 #       pip install -r requirements.txt
 #   (pip will see torch is already installed and skip it)
+#
+# Note: this file is intentionally pure ASCII so that pip on Windows
+# (which reads requirements.txt with the system codepage, often CP949 on
+# Korean Windows) does not raise UnicodeDecodeError. Do not add em-dashes,
+# Korean text, or other non-ASCII characters here.
 
 # --- Core ML ---
 torch>=2.0,<3.0          # PyTorch 2.x for FlashAttention via scaled_dot_product_attention

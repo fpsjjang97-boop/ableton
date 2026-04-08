@@ -361,6 +361,7 @@ class MidiGPTInference:
         self,
         idx: torch.Tensor,
         max_new_tokens: int = 512,
+        min_new_tokens: int = 0,
         temperature: float = 0.9,
         top_k: int = 50,
         top_p: float = 0.95,
@@ -380,6 +381,11 @@ class MidiGPTInference:
           * Repetition penalty (``repetition_penalty``) — CTRL-style.
           * No-repeat n-gram blocking (``no_repeat_ngram_size``).
 
+        Phase 1.1 (BUG 4/5 fix): ``min_new_tokens`` suppresses the EOS
+        token until at least that many tokens have been generated. The
+        previous behaviour produced ~1KB / 2-5 second MIDIs because the
+        overfit base model emits EOS within the first few steps.
+
         All new options default to backwards-compatible values, so existing
         callers see identical behaviour unless they opt in.
         """
@@ -389,7 +395,7 @@ class MidiGPTInference:
 
         past_kv_list: Optional[list[Tuple[torch.Tensor, torch.Tensor]]] = None
 
-        for _ in range(max_new_tokens):
+        for step in range(max_new_tokens):
             # ----- Forward pass -----
             if use_kv_cache:
                 if past_kv_list is None:
@@ -425,6 +431,14 @@ class MidiGPTInference:
             # ----- No-repeat n-gram blocking -----
             if no_repeat_ngram_size > 0:
                 logits = _block_repeat_ngrams(logits, idx, no_repeat_ngram_size)
+
+            # ----- Suppress EOS until min_new_tokens reached (BUG 4/5 fix) -----
+            # Without this, an overfit base model emits EOS within the first
+            # few steps, producing ~1KB / 2-5 second MIDIs. Forcing a floor on
+            # the generation length is the standard fix (cf. HF transformers
+            # ``min_new_tokens`` / ``min_length`` parameters).
+            if min_new_tokens > 0 and step < min_new_tokens:
+                logits[:, eos_id] = float("-inf")
 
             # Apply temperature
             logits = logits / temperature
@@ -473,7 +487,8 @@ class MidiGPTInference:
         notes: list[dict] | None = None,
         meta: SongMeta | None = None,
         chords: list[ChordEvent] | None = None,
-        max_tokens: int = 512,
+        max_tokens: int = 1024,
+        min_new_tokens: int = 256,
         temperature: float = 0.9,
         top_k: int = 50,
         top_p: float = 0.95,
@@ -490,6 +505,10 @@ class MidiGPTInference:
             meta: Song metadata (key, style, section, tempo)
             chords: Chord analysis results
             max_tokens: Maximum tokens to generate
+            min_new_tokens: Suppress EOS until at least this many tokens
+                have been emitted. Set ``0`` to disable. Default ``256`` —
+                this is the BUG 4/5 fix that prevents the overfit base
+                model from terminating after only a handful of tokens.
             temperature: Sampling temperature
             top_k: Top-K sampling
             top_p: Nucleus sampling
@@ -539,6 +558,7 @@ class MidiGPTInference:
                 output = self._generate_with_harmony(
                     input_tensor,
                     max_new_tokens=max_tokens,
+                    min_new_tokens=min_new_tokens,
                     temperature=temperature,
                     top_k=top_k,
                     top_p=top_p,
@@ -579,7 +599,8 @@ class MidiGPTInference:
         output_path: str,
         meta: SongMeta | None = None,
         chords: list[ChordEvent] | None = None,
-        max_tokens: int = 512,
+        max_tokens: int = 1024,
+        min_new_tokens: int = 256,
         temperature: float = 0.9,
         top_k: int = 50,
         top_p: float = 0.95,
@@ -605,6 +626,7 @@ class MidiGPTInference:
             output = self._generate_with_harmony(
                 input_tensor,
                 max_new_tokens=max_tokens,
+                min_new_tokens=min_new_tokens,
                 temperature=temperature,
                 top_k=top_k,
                 top_p=top_p,

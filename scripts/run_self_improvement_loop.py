@@ -90,6 +90,7 @@ def step_generate(
     cycle: int,
     variants_per_song: int,
     max_tokens: int,
+    min_new_tokens: int,
     temperature: float,
     repetition_penalty: float,
     no_repeat_ngram_size: int,
@@ -140,6 +141,7 @@ def step_generate(
                         key="C", style="pop", section="verse", tempo=120
                     ),
                     max_tokens=max_tokens,
+                    min_new_tokens=min_new_tokens,
                     temperature=temperature,
                     repetition_penalty=repetition_penalty,
                     no_repeat_ngram_size=no_repeat_ngram_size,
@@ -152,6 +154,7 @@ def step_generate(
                     meta_extra={
                         "variant": k,
                         "max_tokens": max_tokens,
+                        "min_new_tokens": min_new_tokens,
                         "temperature": temperature,
                         "repetition_penalty": repetition_penalty,
                         "no_repeat_ngram_size": no_repeat_ngram_size,
@@ -352,8 +355,18 @@ def main() -> int:
     parser.add_argument("--variants_per_song", type=int, default=3)
     parser.add_argument("--limit", type=int, default=None,
                         help="Limit number of source MIDIs per cycle (debugging).")
-    parser.add_argument("--max_tokens", type=int, default=512)
-    parser.add_argument("--temperature", type=float, default=0.9)
+    parser.add_argument("--max_tokens", type=int, default=1024,
+                        help="Hard ceiling on tokens generated per variation.")
+    parser.add_argument("--min_new_tokens", type=int, default=256,
+                        help="EOS suppression floor (BUG 4/5 fix). Set 0 to "
+                             "disable. Default 256 produces ~30s+ MIDIs.")
+    parser.add_argument("--temperature", type=float, default=1.2,
+                        help="Sampling temperature. Bumped from 0.9 -> 1.2 per "
+                             "the BUG 5 report — overfit base models collapse "
+                             "to a few tokens at low temperature. Harmonic "
+                             "constraint already masks off-scale pitches, so "
+                             "1.2 is safe here even though it would be high "
+                             "for an unconstrained LM.")
     parser.add_argument("--repetition_penalty", type=float, default=1.1)
     parser.add_argument("--no_repeat_ngram_size", type=int, default=4)
     parser.add_argument("--dpo_epochs", type=int, default=3)
@@ -382,6 +395,7 @@ def main() -> int:
             cycle=cycle,
             variants_per_song=args.variants_per_song,
             max_tokens=args.max_tokens,
+            min_new_tokens=args.min_new_tokens,
             temperature=args.temperature,
             repetition_penalty=args.repetition_penalty,
             no_repeat_ngram_size=args.no_repeat_ngram_size,

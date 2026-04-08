@@ -103,7 +103,7 @@ def get_chord_scale(chord_name, key_root='D', key_scale='major'):
 
 
 def load_settings():
-    with open(SETTINGS_FILE) as f:
+    with open(SETTINGS_FILE, encoding='utf-8') as f:
         return json.load(f)
 
 
@@ -465,7 +465,7 @@ def main():
         'duration_sec': mid.length,
     }
     meta_path = filepath + ".meta.json"
-    with open(meta_path, 'w') as f:
+    with open(meta_path, 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
     print()

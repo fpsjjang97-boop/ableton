@@ -46,13 +46,13 @@ AVAILABLE_KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B
 
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE) as f:
+        with open(SETTINGS_FILE, encoding='utf-8') as f:
             return json.load(f)
     return DEFAULT_SETTINGS.copy()
 
 
 def save_settings(settings):
-    with open(SETTINGS_FILE, 'w') as f:
+    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
     log_event('settings_updated', settings)
     print(f"✓ 설정 저장: {SETTINGS_FILE}")
@@ -64,7 +64,7 @@ def log_event(event_type, data=None):
         'event': event_type,
         'data': data,
     }
-    with open(LOG_FILE, 'a') as f:
+    with open(LOG_FILE, 'a', encoding='utf-8') as f:
         f.write(json.dumps(entry, ensure_ascii=False) + '\n')
 
 
@@ -105,7 +105,7 @@ def show_status():
             meta_path = mf + '.meta.json'
             status = '?'
             if os.path.exists(meta_path):
-                with open(meta_path) as f:
+                with open(meta_path, encoding='utf-8') as f:
                     meta = json.load(f)
                     status = meta.get('status', '?')
             print(f"  {basename} [{status}]")
@@ -115,7 +115,7 @@ def show_status():
     # 작업 로그 최근 5개
     if os.path.exists(LOG_FILE):
         print(f"\n[최근 작업 로그]")
-        with open(LOG_FILE) as f:
+        with open(LOG_FILE, encoding='utf-8') as f:
             lines = f.readlines()
         for line in lines[-5:]:
             entry = json.loads(line)
@@ -271,7 +271,7 @@ if __name__ == '__main__':
                     remove_track(parts[1])
                 elif cmd == 'log':
                     if os.path.exists(LOG_FILE):
-                        with open(LOG_FILE) as f:
+                        with open(LOG_FILE, encoding='utf-8') as f:
                             for line in f:
                                 entry = json.loads(line)
                                 print(f"{entry['timestamp'][:19]} | {entry['event']}")

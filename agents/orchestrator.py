@@ -74,7 +74,7 @@ def step_audio_to_midi(audio_path, keep_stems=False):
             'created_at': datetime.now().isoformat(),
             'status': 'pending_review',
         }
-        with open(output_midi + '.meta.json', 'w') as f:
+        with open(output_midi + '.meta.json', 'w', encoding='utf-8') as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
         return output_midi
@@ -280,7 +280,7 @@ def show_status():
         status = '?'
         method = '?'
         if os.path.exists(meta_path):
-            with open(meta_path) as mf:
+            with open(meta_path, encoding='utf-8') as mf:
                 meta = json.load(mf)
                 status = meta.get('status', '?')
                 method = meta.get('method', '?')
@@ -289,7 +289,7 @@ def show_status():
 
     # 설정
     if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE) as f:
+        with open(SETTINGS_FILE, encoding='utf-8') as f:
             settings = json.load(f)
         print(f"\n[현재 설정]")
         print(f"  Key: {settings.get('key')} {settings.get('scale')}")

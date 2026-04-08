@@ -283,7 +283,7 @@ def get_scale_notes(root, scale_name, octave_low, octave_high):
 def load_settings():
     """설정 파일 로드"""
     if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE) as f:
+        with open(SETTINGS_FILE, encoding='utf-8') as f:
             return json.load(f)
     return get_default_settings()
 

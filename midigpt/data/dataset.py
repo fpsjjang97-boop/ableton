@@ -53,12 +53,37 @@ class MidiDataset(Dataset):
     # Pre-training mode
     # ------------------------------------------------------------------
     def _load_pretrain(self):
-        """Load all .npy token files and concatenate into one big sequence."""
-        self.sequences: list[np.ndarray] = []
-        token_dir = self.data_dir / "tokens"
+        """Load all .npy token files and concatenate into one big sequence.
 
-        if not token_dir.exists():
-            raise FileNotFoundError(f"Token directory not found: {token_dir}")
+        Resolves the token directory in this priority order:
+            1. ``{data_dir}/tokens/``                  (canonical layout)
+            2. ``{data_dir}/``                         (if user already pointed at the tokens dir)
+            3. ``{data_dir}/tokenized/tokens/``        (pipeline.py work_dir layout)
+
+        This makes ``train_pretrain.py --data_dir ./midigpt_pipeline/tokenized``
+        and ``--data_dir ./midigpt_pipeline/tokenized/tokens`` and the legacy
+        ``--data_dir ./midigpt_data`` (if it contains a tokens subdir) all work.
+        """
+        self.sequences: list[np.ndarray] = []
+
+        candidates = [
+            self.data_dir / "tokens",                    # canonical
+            self.data_dir,                               # data_dir IS tokens dir
+            self.data_dir / "tokenized" / "tokens",      # pipeline work_dir
+        ]
+        token_dir = next(
+            (p for p in candidates if p.exists() and any(p.glob("*.npy"))),
+            None,
+        )
+
+        if token_dir is None:
+            tried = "\n  ".join(str(p) for p in candidates)
+            raise FileNotFoundError(
+                f"No token .npy files found. Looked in:\n  {tried}\n"
+                f"Run 'python -m midigpt.pipeline --midi_dir ./midi_data' first, "
+                f"or pass --data_dir pointing at the directory that contains "
+                f"the .npy token files (or its parent)."
+            )
 
         for npy_file in sorted(token_dir.glob("*.npy")):
             tokens = np.load(npy_file).astype(np.int64)
@@ -66,7 +91,9 @@ class MidiDataset(Dataset):
                 self.sequences.append(tokens)
 
         if not self.sequences:
-            raise FileNotFoundError(f"No .npy files found in {token_dir}")
+            raise FileNotFoundError(
+                f"All .npy files in {token_dir} were too short (<10 tokens)."
+            )
 
         # Build index: (file_idx, start_pos) for each block_size chunk
         self.chunks: list[tuple[int, int]] = []

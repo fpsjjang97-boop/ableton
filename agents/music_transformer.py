@@ -35,7 +35,7 @@ SCALES = {
 
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE) as f:
+        with open(SETTINGS_FILE, encoding='utf-8') as f:
             return json.load(f)
     return {}
 
@@ -253,7 +253,7 @@ def continue_midi(midi_path, additional_measures=8):
         'created_at': timestamp,
         'status': 'pending_review',
     }
-    with open(filepath + '.meta.json', 'w') as f:
+    with open(filepath + '.meta.json', 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
     print(f"✓ 저장: {filepath}")
@@ -320,7 +320,7 @@ def transform_style(midi_path, target_style):
         'created_at': timestamp,
         'status': 'pending_review',
     }
-    with open(filepath + '.meta.json', 'w') as f:
+    with open(filepath + '.meta.json', 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
     print(f"✓ 저장: {filepath}")
@@ -403,7 +403,7 @@ def harmonize(midi_path, harmony_type='thirds'):
         'created_at': timestamp,
         'status': 'pending_review',
     }
-    with open(filepath + '.meta.json', 'w') as f:
+    with open(filepath + '.meta.json', 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
     print(f"✓ 저장: {filepath}")

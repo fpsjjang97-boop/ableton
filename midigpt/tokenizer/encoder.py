@@ -342,7 +342,32 @@ class MidiEncoder:
         return notes
 
     def _classify_track(self, inst: "pretty_midi.Instrument") -> str:
-        """Classify instrument track type based on program number and register."""
+        """Classify a MIDI instrument into one of the fixed track-type
+        categories defined in ``vocab.TRACK_TYPES``.
+
+        This is **intentional** — the model does not see original instrument
+        names like ``E.PIANO`` or ``VIOLIN_LEGATO``. Each track is collapsed
+        into one of the categories below before tokenisation, and the
+        decoder writes that category as the output MIDI track name.
+
+        Categories (vocab.TRACK_TYPES, in priority order for the lookup):
+            melody / accomp / bass / drums / pad / lead / arp / other
+            strings / brass / woodwind / vocal / guitar / fx
+
+        Resolution order:
+            1. Substring match on the original track name
+               (``melody``, ``bass``, ``drum``, ``pad``, ``arp``).
+            2. GM program number range (piano/guitar -> ``accomp``, etc.).
+            3. Average pitch register fallback.
+            4. Default ``accomp``.
+
+        Note on BUG 6 (developer Q): if every generated MIDI shows only
+        ``accomp``, that is *not* a classification fallback bug — it is the
+        downstream symptom of an overfit model that terminates generation
+        within a handful of tokens (BUG 4/5). Once inference produces
+        sequences long enough to contain multiple ``Track_`` tokens, the
+        diversity of categories returns naturally.
+        """
         name_lower = inst.name.lower() if inst.name else ""
 
         # Name-based detection

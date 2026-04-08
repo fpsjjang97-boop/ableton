@@ -52,6 +52,13 @@ CHOSEN_THRESHOLD = 80       # avg_score >= 80 -> grade A (chosen)
 REJECTED_THRESHOLD = 60     # avg_score <  60 -> grade C/D (rejected)
 TEMPO_TOLERANCE = 30        # BPM range for "similar tempo"
 
+# Fallback when fixed thresholds yield no/few pairs (e.g. immature base model
+# whose scores cluster in 40-70). Top/bottom percentile of the score
+# distribution is used instead. See `categorise_items()`.
+QUANTILE_FALLBACK = 0.30    # top 30% -> chosen, bottom 30% -> rejected
+QUANTILE_MIN_GAP = 5.0      # require chosen_score - rejected_score >= this
+QUANTILE_MIN_PER_BUCKET = 3 # require >= N items per bucket to enable fallback
+
 
 # ---------------------------------------------------------------------------
 # Internal data structures
@@ -132,8 +139,101 @@ def _estimate_tempo_from_review(review: dict) -> float:
     return 120.0
 
 
+def _category_for_score(score: float) -> str:
+    if score >= CHOSEN_THRESHOLD:
+        return "chosen"
+    if score < REJECTED_THRESHOLD:
+        return "rejected"
+    return "neutral"
+
+
+def categorise_items(items: list[ReviewedMidi]) -> tuple[str, dict]:
+    """Assign chosen/rejected/neutral labels to ``items`` in place.
+
+    Strategy:
+        1. Fixed thresholds (CHOSEN_THRESHOLD / REJECTED_THRESHOLD).
+        2. If that yields fewer than ``QUANTILE_MIN_PER_BUCKET`` items in
+           either bucket, fall back to a percentile split: top
+           ``QUANTILE_FALLBACK`` -> chosen, bottom ``QUANTILE_FALLBACK``
+           -> rejected, with a hard floor on the score gap so we never
+           pair near-identical scores.
+
+    Returns ``(strategy_name, info_dict)`` for the summary.
+    """
+    # 1) Fixed-threshold pass.
+    for it in items:
+        it.category = _category_for_score(it.avg_score)
+
+    valid = [it for it in items if it.midi_path]
+    n_chosen = sum(1 for it in valid if it.category == "chosen")
+    n_rejected = sum(1 for it in valid if it.category == "rejected")
+
+    if n_chosen >= QUANTILE_MIN_PER_BUCKET and n_rejected >= QUANTILE_MIN_PER_BUCKET:
+        return "fixed_threshold", {
+            "chosen_threshold": CHOSEN_THRESHOLD,
+            "rejected_threshold": REJECTED_THRESHOLD,
+            "n_chosen": n_chosen,
+            "n_rejected": n_rejected,
+        }
+
+    # 2) Quantile fallback. Operates only on items that have a resolvable
+    #    MIDI path (others can never participate in pairs anyway).
+    if len(valid) < 2 * QUANTILE_MIN_PER_BUCKET:
+        # Not enough data even for quantile mode -- leave fixed labels.
+        return "fixed_threshold_only", {
+            "n_valid": len(valid),
+            "n_chosen": n_chosen,
+            "n_rejected": n_rejected,
+        }
+
+    sorted_valid = sorted(valid, key=lambda it: it.avg_score)
+    bucket_size = max(QUANTILE_MIN_PER_BUCKET, int(len(sorted_valid) * QUANTILE_FALLBACK))
+    rejected_pool = sorted_valid[:bucket_size]
+    chosen_pool = sorted_valid[-bucket_size:]
+
+    # Enforce minimum gap so we don't pair near-identical scores.
+    chosen_min = min(c.avg_score for c in chosen_pool)
+    rejected_max = max(r.avg_score for r in rejected_pool)
+    if chosen_min - rejected_max < QUANTILE_MIN_GAP:
+        return "fixed_threshold_only", {
+            "n_valid": len(valid),
+            "n_chosen": n_chosen,
+            "n_rejected": n_rejected,
+            "quantile_skipped": "score_gap_too_small",
+            "gap": round(chosen_min - rejected_max, 2),
+        }
+
+    chosen_set = {id(it) for it in chosen_pool}
+    rejected_set = {id(it) for it in rejected_pool}
+    for it in items:
+        if id(it) in chosen_set:
+            it.category = "chosen"
+        elif id(it) in rejected_set:
+            it.category = "rejected"
+        else:
+            it.category = "neutral"
+
+    return "quantile_fallback", {
+        "quantile": QUANTILE_FALLBACK,
+        "n_chosen": len(chosen_pool),
+        "n_rejected": len(rejected_pool),
+        "chosen_score_range": [
+            round(min(c.avg_score for c in chosen_pool), 1),
+            round(max(c.avg_score for c in chosen_pool), 1),
+        ],
+        "rejected_score_range": [
+            round(min(r.avg_score for r in rejected_pool), 1),
+            round(max(r.avg_score for r in rejected_pool), 1),
+        ],
+    }
+
+
 def collect_reviews() -> list[ReviewedMidi]:
-    """Scan reviews/ and reviewed/metadata/ directories and collect all review records."""
+    """Scan reviews/ and reviewed/metadata/ directories and collect all review records.
+
+    Items are returned with ``category`` set by the fixed-threshold rule.
+    Call :func:`categorise_items` afterwards to apply the quantile fallback.
+    """
     items: list[ReviewedMidi] = []
 
     # --- reviews/ directory (produced by reviewer.py) ---
@@ -151,13 +251,6 @@ def collect_reviews() -> list[ReviewedMidi]:
             key = _estimate_key_from_review(review)
             tempo = _estimate_tempo_from_review(review)
 
-            if avg_score >= CHOSEN_THRESHOLD:
-                category = "chosen"
-            elif avg_score < REJECTED_THRESHOLD:
-                category = "rejected"
-            else:
-                category = "neutral"
-
             items.append(ReviewedMidi(
                 review_path=str(jf),
                 review=review,
@@ -165,7 +258,7 @@ def collect_reviews() -> list[ReviewedMidi]:
                 avg_score=avg_score,
                 key=key,
                 tempo=tempo,
-                category=category,
+                category=_category_for_score(avg_score),
             ))
 
     # --- reviewed/metadata/ (pair metadata with quality_score) ---
@@ -194,13 +287,6 @@ def collect_reviews() -> list[ReviewedMidi]:
                 mkey = sub.get("key", "C")
                 mtempo = sub.get("tempo", 120.0)
 
-                if score >= CHOSEN_THRESHOLD:
-                    cat = "chosen"
-                elif score < REJECTED_THRESHOLD:
-                    cat = "rejected"
-                else:
-                    cat = "neutral"
-
                 items.append(ReviewedMidi(
                     review_path=str(jf),
                     review={"file": os.path.basename(midi_rel), "avg_score": score},
@@ -208,7 +294,7 @@ def collect_reviews() -> list[ReviewedMidi]:
                     avg_score=score,
                     key=mkey,
                     tempo=mtempo,
-                    category=cat,
+                    category=_category_for_score(score),
                 ))
 
     return items
@@ -240,10 +326,10 @@ def build_pairs(
     rejected = [r for r in items if r.category == "rejected" and r.midi_path]
 
     if not chosen:
-        print("[INFO] No chosen candidates (avg_score >= 80 with valid MIDI path).")
+        print("[INFO] No chosen candidates after categorisation.")
         return []
     if not rejected:
-        print("[INFO] No rejected candidates (avg_score < 60 with valid MIDI path).")
+        print("[INFO] No rejected candidates after categorisation.")
         return []
 
     # Sort by score descending / ascending for best pairing
@@ -490,6 +576,13 @@ def run(dry_run: bool = False) -> dict:
     if not items:
         print("  No reviews found. Nothing to do.")
         return {"total_reviews": 0, "pairs_matched": 0, "pairs_saved": 0}
+
+    # Step 1b: Apply chosen/rejected categorisation (with quantile fallback
+    # if fixed thresholds yield too few pairs).
+    strategy, strategy_info = categorise_items(items)
+    print(f"  Categorisation strategy: {strategy}")
+    for k, v in strategy_info.items():
+        print(f"    {k}: {v}")
 
     for item in items:
         midi_status = "OK" if item.midi_path else "MISSING"
