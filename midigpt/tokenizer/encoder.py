@@ -345,59 +345,129 @@ class MidiEncoder:
         """Classify a MIDI instrument into one of the fixed track-type
         categories defined in ``vocab.TRACK_TYPES``.
 
-        This is **intentional** — the model does not see original instrument
-        names like ``E.PIANO`` or ``VIOLIN_LEGATO``. Each track is collapsed
-        into one of the categories below before tokenisation, and the
-        decoder writes that category as the output MIDI track name.
+        The model does not see original instrument names like ``E.PIANO``
+        or ``VIOLIN_LEGATO``; each track is collapsed into one of the 14
+        categories below before tokenisation, and the decoder writes that
+        category as the output MIDI track name.
 
-        Categories (vocab.TRACK_TYPES, in priority order for the lookup):
+        Categories (vocab.TRACK_TYPES, all 14):
             melody / accomp / bass / drums / pad / lead / arp / other
             strings / brass / woodwind / vocal / guitar / fx
 
         Resolution order:
-            1. Substring match on the original track name
-               (``melody``, ``bass``, ``drum``, ``pad``, ``arp``).
-            2. GM program number range (piano/guitar -> ``accomp``, etc.).
-            3. Average pitch register fallback.
-            4. Default ``accomp``.
+            1. Substring match on the original track name — expanded to
+               cover real-world DAW naming conventions (E.PIANO, VIOLIN_*,
+               E.GUITAR*, SYNTHBASS, SYNTHPAD, etc.)
+            2. GM program number range → the semantically closest
+               ``TRACK_TYPES`` entry (not all GM families collapse to
+               ``accomp`` any more; guitar/strings/brass/woodwind now get
+               their own categories).
+            3. Average pitch register fallback (bass / melody).
+            4. Default ``other``.
 
-        Note on BUG 6 (developer Q): if every generated MIDI shows only
-        ``accomp``, that is *not* a classification fallback bug — it is the
-        downstream symptom of an overfit model that terminates generation
-        within a handful of tokens (BUG 4/5). Once inference produces
-        sequences long enough to contain multiple ``Track_`` tokens, the
-        diversity of categories returns naturally.
+        History (2026-04-09 fix, BUG 6 correction):
+            The previous version of this function mapped Guitar → accomp,
+            Strings → pad, Brass → lead, Reed/Pipe → melody — these were
+            inconsistent with ``vocab.TRACK_TYPES`` which already has
+            ``guitar``, ``strings``, ``brass``, ``woodwind``, ``vocal``.
+            Result: almost every non-drum track collapsed to 2-3 categories
+            (``accomp`` / ``pad`` / ``bass``), producing the "everything is
+            accomp" symptom reported in 2nd tester feedback. This is fixed
+            here. After applying this fix, re-tokenise the dataset and
+            retrain (previous checkpoints are incompatible with the new
+            distribution).
         """
         name_lower = inst.name.lower() if inst.name else ""
 
-        # Name-based detection
-        if "melody" in name_lower or "lead" in name_lower:
-            return "melody"
-        if "bass" in name_lower:
-            return "bass"
-        if "drum" in name_lower or "perc" in name_lower:
+        # -------------------------------------------------------------
+        # 1. Name-based detection (priority 1) — most specific first
+        # -------------------------------------------------------------
+        # Drums (defensive — caller already short-circuits inst.is_drum)
+        if any(k in name_lower for k in
+               ("drum", "perc", "kick", "snare", "hihat", "cymbal", "tom")):
             return "drums"
+
+        # Bass (check before "brass" which contains "bass" — we guard below)
+        if "bass" in name_lower and "brass" not in name_lower:
+            return "bass"
+
+        # Vocal
+        if any(k in name_lower for k in ("vocal", "voice", "vox", "choir")):
+            return "vocal"
+
+        # Strings family
+        if any(k in name_lower for k in
+               ("violin", "viola", "cello", "contrabass", "strings", "string_")):
+            return "strings"
+
+        # Brass family
+        if any(k in name_lower for k in
+               ("trumpet", "trombone", "french_horn", "horn", "tuba", "brass")):
+            return "brass"
+
+        # Woodwind family
+        if any(k in name_lower for k in
+               ("flute", "clarinet", "oboe", "bassoon", "sax", "saxophone",
+                "woodwind", "pipe", "reed", "piccolo")):
+            return "woodwind"
+
+        # Guitar family (electric / acoustic / muted)
+        if any(k in name_lower for k in ("guitar", "e.guitar", "gtr", "e_guitar")):
+            return "guitar"
+
+        # Keys family → accomp (closest vocab entry; there is no "keys")
+        if any(k in name_lower for k in
+               ("piano", "e.piano", "epiano", "rhodes", "wurl", "keys",
+                "organ", "harpsichord", "clav")):
+            return "accomp"
+
+        # Pad
         if "pad" in name_lower:
             return "pad"
+
+        # Arp / arpeggio
         if "arp" in name_lower:
             return "arp"
 
-        # Program-based detection
-        prog = inst.program
-        if 0 <= prog <= 7:     # Piano family
-            return "accomp"
-        if 24 <= prog <= 31:   # Guitar family
-            return "accomp"
-        if 32 <= prog <= 39:   # Bass family
-            return "bass"
-        if 48 <= prog <= 55:   # Strings
-            return "pad"
-        if 56 <= prog <= 63:   # Brass
+        # Lead / pluck
+        if any(k in name_lower for k in ("lead", "synth_lead", "pluck")):
             return "lead"
-        if 64 <= prog <= 79:   # Reed/Pipe
+
+        # Melody
+        if "melody" in name_lower:
             return "melody"
 
-        # Register-based: if average pitch is low, likely bass
+        # FX / atmosphere
+        if any(k in name_lower for k in ("fx", "effect", "atmo", "sfx")):
+            return "fx"
+
+        # -------------------------------------------------------------
+        # 2. GM program-number detection (priority 2)
+        #    General MIDI program ranges → semantically closest TRACK_TYPE.
+        #    Previously several ranges were wrongly collapsed to accomp /
+        #    pad / lead / melody — those are corrected here.
+        # -------------------------------------------------------------
+        prog = inst.program
+        if 0 <= prog <= 7:      return "accomp"    # Piano family
+        if 8 <= prog <= 15:     return "accomp"    # Chromatic perc (celesta, vibes, marimba)
+        if 16 <= prog <= 23:    return "accomp"    # Organ family
+        if 24 <= prog <= 31:    return "guitar"    # Guitar family  (was: accomp)
+        if 32 <= prog <= 39:    return "bass"      # Bass family
+        if 40 <= prog <= 47:    return "strings"   # Solo strings   (was: — / fell-through)
+        if 48 <= prog <= 55:    return "strings"   # Ensemble strings (was: pad)
+        if 56 <= prog <= 63:    return "brass"     # Brass family   (was: lead)
+        if 64 <= prog <= 71:    return "woodwind"  # Reed           (was: melody)
+        if 72 <= prog <= 79:    return "woodwind"  # Pipe / flute   (was: melody)
+        if 80 <= prog <= 87:    return "lead"      # Synth lead
+        if 88 <= prog <= 95:    return "pad"       # Synth pad
+        if 96 <= prog <= 103:   return "fx"        # Synth effects
+        if 104 <= prog <= 111:  return "strings"   # Ethnic (sitar, banjo, koto → closest)
+        if 112 <= prog <= 119:  return "drums"     # Percussive
+        if 120 <= prog <= 127:  return "fx"        # Sound effects
+
+        # -------------------------------------------------------------
+        # 3. Register-based fallback (priority 3)
+        # -------------------------------------------------------------
         if inst.notes:
             avg_pitch = sum(n.pitch for n in inst.notes) / len(inst.notes)
             if avg_pitch < 48:
@@ -405,7 +475,11 @@ class MidiEncoder:
             if avg_pitch > 72:
                 return "melody"
 
-        return "accomp"
+        # -------------------------------------------------------------
+        # 4. Final fallback — use 'other' (was: 'accomp', which caused
+        #    silent drift of unknown tracks into the accomp category).
+        # -------------------------------------------------------------
+        return "other"
 
     def _estimate_meta(self, pm: "pretty_midi.PrettyMIDI") -> SongMeta:
         """Estimate song metadata from MIDI."""
