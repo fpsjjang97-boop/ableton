@@ -14,8 +14,10 @@ Features:
 """
 from __future__ import annotations
 
+import math
 import os
 import time
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple, List
@@ -479,6 +481,292 @@ class MidiGPTInference:
         return idx
 
     # ------------------------------------------------------------------
+    # Beam search decoding
+    # ------------------------------------------------------------------
+    def beam_search(
+        self,
+        input_ids: torch.Tensor,
+        max_tokens: int = 1024,
+        min_new_tokens: int = 256,
+        beam_width: int = 4,
+        length_penalty: float = 1.0,
+        chords: list | None = None,
+    ) -> list[tuple[list[int], float]]:
+        """Return top ``beam_width`` sequences sorted by score (highest first).
+
+        Each entry is ``(token_ids, log_probability_score)``.
+
+        Args:
+            input_ids: Prompt token tensor of shape ``(1, T)``.
+            max_tokens: Maximum number of new tokens to generate.
+            min_new_tokens: Suppress EOS until this many tokens are emitted.
+            beam_width: Number of beams to maintain at each step.
+            length_penalty: Exponent applied to sequence length in scoring.
+                ``>1`` prefers longer sequences, ``<1`` prefers shorter ones.
+            chords: Optional chord events for harmonic masking.
+
+        Returns:
+            List of ``(token_ids, score)`` tuples sorted by descending score.
+        """
+        assert self.model is not None
+        self.model.eval()
+
+        eos_id = self.vocab.eos_id
+        prompt_len = input_ids.size(1)
+
+        # Each beam: (token_id_list, cumulative_log_prob)
+        active_beams: list[tuple[list[int], float]] = [
+            (input_ids[0].tolist(), 0.0),
+        ]
+        finished_beams: list[tuple[list[int], float]] = []
+
+        for step in range(max_tokens):
+            all_candidates: list[tuple[list[int], float]] = []
+
+            for seq, cum_log_prob in active_beams:
+                seq_tensor = torch.tensor(
+                    [seq], dtype=torch.long, device=self.device,
+                )
+                block_size = self.model.config.block_size
+                seq_cond = seq_tensor if seq_tensor.size(1) <= block_size \
+                    else seq_tensor[:, -block_size:]
+
+                with torch.no_grad():
+                    logits, _, _ = self.model(seq_cond)
+                logits = logits[:, -1, :]  # (1, V)
+
+                # Suppress EOS until min_new_tokens reached
+                new_tokens_so_far = len(seq) - prompt_len
+                if min_new_tokens > 0 and new_tokens_so_far < min_new_tokens:
+                    logits[:, eos_id] = float("-inf")
+
+                # Harmonic constraint
+                context = seq
+                logits[0] = self._apply_harmonic_mask(logits[0], context)
+
+                # Convert to log probabilities
+                log_probs = F.log_softmax(logits[0], dim=-1)  # (V,)
+
+                # Select top-k candidates (k = beam_width * 2)
+                k = min(beam_width * 2, log_probs.size(-1))
+                top_log_probs, top_indices = torch.topk(log_probs, k)
+
+                for i in range(k):
+                    token_id = top_indices[i].item()
+                    token_log_prob = top_log_probs[i].item()
+                    new_seq = seq + [token_id]
+                    new_cum = cum_log_prob + token_log_prob
+
+                    if token_id == eos_id:
+                        # Length-normalised score
+                        gen_len = len(new_seq) - prompt_len
+                        score = new_cum / (gen_len ** length_penalty)
+                        finished_beams.append((new_seq, score))
+                    else:
+                        all_candidates.append((new_seq, new_cum))
+
+            # If no active candidates remain, stop
+            if not all_candidates:
+                break
+
+            # Keep only the top beam_width candidates by cumulative log prob
+            # (length penalty is applied only to finished beams for ranking)
+            all_candidates.sort(key=lambda x: x[1], reverse=True)
+            active_beams = all_candidates[:beam_width]
+
+            # Early stop: enough finished beams
+            if len(finished_beams) >= beam_width:
+                break
+
+        # Move remaining active beams to finished (force-finish)
+        for seq, cum_log_prob in active_beams:
+            gen_len = len(seq) - prompt_len
+            if gen_len > 0:
+                score = cum_log_prob / (gen_len ** length_penalty)
+            else:
+                score = cum_log_prob
+            finished_beams.append((seq, score))
+
+        # Sort by score descending and return top beam_width
+        finished_beams.sort(key=lambda x: x[1], reverse=True)
+        return finished_beams[:beam_width]
+
+    # ------------------------------------------------------------------
+    # Self-consistency scoring
+    # ------------------------------------------------------------------
+    def score_sequence(self, token_ids: list[int]) -> dict:
+        """Score a generated token sequence on musical quality metrics.
+
+        Analyses the token stream for scale adherence, rhythmic stability,
+        pitch range usage, and repetition patterns.
+
+        Args:
+            token_ids: List of token IDs (the generated portion only).
+
+        Returns:
+            Dictionary with keys:
+                - ``scale_consistency``: float 0-1 (pitch-in-scale ratio)
+                - ``rhythm_stability``: float 0-1 (position pattern regularity)
+                - ``pitch_range``: float 0-1 (appropriate pitch range usage)
+                - ``repetition_score``: float 0-1 (penalises excessive repetition)
+                - ``total``: float 0-1 (weighted average)
+        """
+        tokens = [self.vocab.decode_id(tid) for tid in token_ids]
+
+        scale_consistency = self._score_scale_consistency(tokens)
+        rhythm_stability = self._score_rhythm_stability(tokens)
+        pitch_range = self._score_pitch_range(tokens)
+        repetition_score = self._score_repetition(token_ids)
+
+        total = (
+            0.4 * scale_consistency
+            + 0.2 * rhythm_stability
+            + 0.2 * pitch_range
+            + 0.2 * repetition_score
+        )
+
+        return {
+            "scale_consistency": round(scale_consistency, 4),
+            "rhythm_stability": round(rhythm_stability, 4),
+            "pitch_range": round(pitch_range, 4),
+            "repetition_score": round(repetition_score, 4),
+            "total": round(total, 4),
+        }
+
+    def _score_scale_consistency(self, tokens: list[str]) -> float:
+        """Ratio of pitch tokens that fall within the active chord's scale."""
+        total_pitches = 0
+        in_scale_pitches = 0
+        # Track current chord context (forward scan: ChordRoot_ then ChordQual_)
+        current_root_pc: int | None = None
+        current_quality: str | None = None
+        pending_root: str | None = None
+
+        for tok in tokens:
+            # Track chord changes (factored format: Root emitted first, Qual second)
+            if tok.startswith("ChordRoot_"):
+                pending_root = tok[len("ChordRoot_"):]
+            elif tok.startswith("ChordQual_") and pending_root is not None:
+                qual = tok[len("ChordQual_"):]
+                if pending_root in _ROOT_PC and qual in _SCALE_INTERVALS:
+                    current_root_pc = _ROOT_PC[pending_root]
+                    current_quality = qual
+                pending_root = None
+            else:
+                # Legacy combined chord token
+                parsed = _parse_chord_token(tok)
+                if parsed is not None:
+                    current_root_pc, current_quality = parsed
+
+            # Score pitch tokens
+            if tok.startswith("Pitch_"):
+                try:
+                    midi_pitch = int(tok[len("Pitch_"):])
+                except ValueError:
+                    continue
+                total_pitches += 1
+                if current_root_pc is not None and current_quality is not None:
+                    allowed = _allowed_pitch_classes(current_root_pc, current_quality)
+                    if midi_pitch % 12 in allowed:
+                        in_scale_pitches += 1
+                else:
+                    # No chord context yet — count as in-scale
+                    in_scale_pitches += 1
+
+        if total_pitches == 0:
+            return 1.0
+        return in_scale_pitches / total_pitches
+
+    def _score_rhythm_stability(self, tokens: list[str]) -> float:
+        """Measure how regular the position token distribution is.
+
+        A fully uniform distribution (random) scores low; concentrated
+        positions (implying a rhythmic pattern) score high.
+        """
+        positions: list[int] = []
+        for tok in tokens:
+            if tok.startswith("Pos_"):
+                try:
+                    positions.append(int(tok[len("Pos_"):]))
+                except ValueError:
+                    continue
+
+        if len(positions) < 2:
+            return 1.0
+
+        # Use normalised entropy: 0 = one value only (max stability),
+        # 1 = uniform distribution (min stability).
+        counts = Counter(positions)
+        n = len(positions)
+        num_distinct = len(counts)
+        if num_distinct <= 1:
+            return 1.0
+
+        entropy = -sum((c / n) * math.log2(c / n) for c in counts.values())
+        max_entropy = math.log2(num_distinct)
+        if max_entropy == 0:
+            return 1.0
+
+        normalised = entropy / max_entropy
+        # Invert: low entropy = high stability
+        return 1.0 - normalised * 0.5  # scale so uniform → 0.5, not 0
+
+    def _score_pitch_range(self, tokens: list[str]) -> float:
+        """Score based on pitch range used.
+
+        Ideal range: 2-4 octaves (24-48 semitones) → 1.0.
+        < 1 octave (12 semitones) → reduced score.
+        > 5 octaves (60 semitones) → reduced score.
+        """
+        pitches: list[int] = []
+        for tok in tokens:
+            if tok.startswith("Pitch_"):
+                try:
+                    pitches.append(int(tok[len("Pitch_"):]))
+                except ValueError:
+                    continue
+
+        if len(pitches) < 2:
+            return 1.0
+
+        pitch_range = max(pitches) - min(pitches)
+
+        if pitch_range < 12:
+            # Less than 1 octave: linear ramp from 0.3 at range=0 to 0.8 at range=11
+            return 0.3 + 0.5 * (pitch_range / 12)
+        elif pitch_range <= 48:
+            # 1-4 octaves: ideal range
+            return 1.0
+        elif pitch_range <= 60:
+            # 4-5 octaves: slight penalty
+            return 1.0 - 0.3 * ((pitch_range - 48) / 12)
+        else:
+            # > 5 octaves: heavier penalty, floor at 0.3
+            return max(0.3, 0.7 - 0.2 * ((pitch_range - 60) / 12))
+
+    def _score_repetition(self, token_ids: list[int]) -> float:
+        """Score based on 4-gram repetition ratio.
+
+        0% repetition → 1.0.  50%+ repetition → 0.0.
+        Linear interpolation between.
+        """
+        n = 4
+        if len(token_ids) < n:
+            return 1.0
+
+        ngrams: list[tuple[int, ...]] = []
+        for i in range(len(token_ids) - n + 1):
+            ngrams.append(tuple(token_ids[i:i + n]))
+
+        total = len(ngrams)
+        unique = len(set(ngrams))
+        repetition_ratio = 1.0 - (unique / total)  # 0 = all unique, 1 = all same
+
+        # Map: 0% → 1.0,  50%+ → 0.0
+        score = max(0.0, 1.0 - repetition_ratio * 2.0)
+        return score
+
+    # ------------------------------------------------------------------
     # Generation API
     # ------------------------------------------------------------------
     def generate_variation(
@@ -496,6 +784,10 @@ class MidiGPTInference:
         no_repeat_ngram_size: int = 0,
         num_return_sequences: int = 1,
         use_kv_cache: bool = True,
+        use_beam_search: bool = False,
+        beam_width: int = 4,
+        length_penalty: float = 1.0,
+        score_and_rank: bool = False,
     ) -> list[dict] | list[list[dict]]:
         """Generate a MIDI variation.
 
@@ -523,6 +815,16 @@ class MidiGPTInference:
             use_kv_cache: Use KV cache for O(1) per-step decoding.
                 Default ``True``; set ``False`` for the legacy recompute
                 path (e.g. for debugging).
+            use_beam_search: Use beam search decoding instead of sampling.
+                Default ``False``.
+            beam_width: Number of beams for beam search decoding.
+                Only used when ``use_beam_search=True``.  Default ``4``.
+            length_penalty: Exponent for beam search length normalisation.
+                ``>1`` prefers longer sequences, ``<1`` shorter.  Default ``1.0``.
+            score_and_rank: When ``True``, generate ``num_return_sequences``
+                candidates via sampling, then rank them by
+                :meth:`score_sequence` (highest total score first).
+                Default ``False``.
 
         Returns:
             * ``num_return_sequences == 1``: list of note dicts.
@@ -550,37 +852,77 @@ class MidiGPTInference:
         start_time = time.time()
         variations: list[list[dict]] = []
 
-        for seq_idx in range(max(1, num_return_sequences)):
+        if use_beam_search:
+            # --- Beam search path ---
             input_tensor = torch.tensor(
-                [input_ids], dtype=torch.long, device=self.device
+                [input_ids], dtype=torch.long, device=self.device,
             )
-            with torch.no_grad():
-                output = self._generate_with_harmony(
-                    input_tensor,
-                    max_new_tokens=max_tokens,
-                    min_new_tokens=min_new_tokens,
-                    temperature=temperature,
-                    top_k=top_k,
-                    top_p=top_p,
-                    eos_id=self.vocab.eos_id,
-                    repetition_penalty=repetition_penalty,
-                    no_repeat_ngram_size=no_repeat_ngram_size,
-                    use_kv_cache=use_kv_cache,
+            beam_results = self.beam_search(
+                input_tensor,
+                max_tokens=max_tokens,
+                min_new_tokens=min_new_tokens,
+                beam_width=beam_width,
+                length_penalty=length_penalty,
+                chords=chords,
+            )
+            for seq, _score in beam_results:
+                variation_ids = seq[sep_pos:]
+                decoded_notes = self.decoder.decode_to_notes(variation_ids)
+                note_dicts = [
+                    {
+                        "pitch": n.pitch,
+                        "velocity": n.velocity,
+                        "start_tick": n.start_tick,
+                        "duration_tick": n.duration_tick,
+                        "track_type": n.track_type,
+                    }
+                    for n in decoded_notes
+                ]
+                variations.append(note_dicts)
+        else:
+            # --- Sampling path (original behaviour) ---
+            for seq_idx in range(max(1, num_return_sequences)):
+                input_tensor = torch.tensor(
+                    [input_ids], dtype=torch.long, device=self.device
                 )
+                with torch.no_grad():
+                    output = self._generate_with_harmony(
+                        input_tensor,
+                        max_new_tokens=max_tokens,
+                        min_new_tokens=min_new_tokens,
+                        temperature=temperature,
+                        top_k=top_k,
+                        top_p=top_p,
+                        eos_id=self.vocab.eos_id,
+                        repetition_penalty=repetition_penalty,
+                        no_repeat_ngram_size=no_repeat_ngram_size,
+                        use_kv_cache=use_kv_cache,
+                    )
 
-            variation_ids = output[0].tolist()[sep_pos:]
-            decoded_notes = self.decoder.decode_to_notes(variation_ids)
-            note_dicts = [
-                {
-                    "pitch": n.pitch,
-                    "velocity": n.velocity,
-                    "start_tick": n.start_tick,
-                    "duration_tick": n.duration_tick,
-                    "track_type": n.track_type,
-                }
-                for n in decoded_notes
-            ]
-            variations.append(note_dicts)
+                variation_ids = output[0].tolist()[sep_pos:]
+                decoded_notes = self.decoder.decode_to_notes(variation_ids)
+                note_dicts = [
+                    {
+                        "pitch": n.pitch,
+                        "velocity": n.velocity,
+                        "start_tick": n.start_tick,
+                        "duration_tick": n.duration_tick,
+                        "track_type": n.track_type,
+                    }
+                    for n in decoded_notes
+                ]
+                variations.append(note_dicts)
+
+        # --- Self-consistency scoring & ranking ---
+        if score_and_rank and len(variations) > 1:
+            scored: list[tuple[list[dict], float]] = []
+            for var_notes in variations:
+                # Re-encode notes to token IDs for scoring
+                var_token_ids = self.encoder.encode_notes(var_notes, meta=meta, chords=chords)
+                scores = self.score_sequence(var_token_ids)
+                scored.append((var_notes, scores["total"]))
+            scored.sort(key=lambda x: x[1], reverse=True)
+            variations = [v for v, _s in scored]
 
         elapsed = time.time() - start_time
         total_notes = sum(len(v) for v in variations)
@@ -589,7 +931,7 @@ class MidiGPTInference:
             f"{total_notes} notes total in {elapsed:.2f}s"
         )
 
-        if num_return_sequences <= 1:
+        if num_return_sequences <= 1 and not use_beam_search:
             return variations[0]
         return variations
 

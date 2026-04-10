@@ -15,6 +15,7 @@
 
 class TrackProcessor;
 class SynthEngine;
+class PluginHost;
 
 //==============================================================================
 /**
@@ -74,6 +75,10 @@ public:
     void setMetronomeEnabled (bool enabled);
     bool isMetronomeEnabled() const;
 
+    //==========================================================================
+    // Plugin hosting (VST3/CLAP)
+    PluginHost* getPluginHost() const  { return pluginHost.get(); }
+
 private:
     double sampleRate      = 44100.0;
     int    samplesPerBlock  = 512;
@@ -94,6 +99,7 @@ private:
 
     std::vector<std::shared_ptr<TrackProcessor>> tracks;
     std::unique_ptr<SynthEngine> synthEngine;
+    std::unique_ptr<PluginHost>  pluginHost;
     juce::MidiOutput* midiOutput = nullptr;
 
     juce::CriticalSection lock;

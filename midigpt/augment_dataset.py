@@ -205,6 +205,23 @@ def time_stretch(
 
 
 # ──────────────────────────────────────────────────────────────────
+# 5. Track Shuffle
+# ──────────────────────────────────────────────────────────────────
+def track_shuffle(
+    pm: pretty_midi.PrettyMIDI,
+    rng: random.Random,
+) -> pretty_midi.PrettyMIDI:
+    """Randomly reorder instrument tracks.
+
+    The tokenizer encodes tracks sequentially, so shuffling teaches the model
+    that track order is arbitrary — any instrument can appear first.
+    """
+    new_pm = copy.deepcopy(pm)
+    rng.shuffle(new_pm.instruments)
+    return new_pm
+
+
+# ──────────────────────────────────────────────────────────────────
 # Combined augmentation for one file
 # ──────────────────────────────────────────────────────────────────
 def augment_file(
@@ -214,6 +231,7 @@ def augment_file(
     n_dropout: int = 3,
     vel_jitter_ratio: float = 0.10,
     time_stretch_ratio: float = 0.05,
+    n_track_shuffle: int = 2,
     seed: int = 42,
 ) -> list[dict]:
     """Generate augmented versions of a single MIDI file.
@@ -298,6 +316,27 @@ def augment_file(
                     "error": str(e),
                 })
 
+    # ── Track Shuffle ──
+    if n_track_shuffle > 0 and len(pm.instruments) >= 2:
+        for shuf_idx in range(n_track_shuffle):
+            try:
+                shuffled = track_shuffle(pm, rng)
+                out_name = f"{stem}_tshuffle{shuf_idx}.mid"
+                out_path = output_dir / out_name
+                shuffled.write(str(out_path))
+                results.append({
+                    "status": "ok",
+                    "type": "track_shuffle",
+                    "index": shuf_idx,
+                    "file": str(out_path),
+                })
+            except Exception as e:
+                results.append({
+                    "status": "error",
+                    "type": "track_shuffle",
+                    "error": str(e),
+                })
+
     # ── Velocity Jitter ──
     if vel_jitter_ratio > 0:
         try:
@@ -358,6 +397,8 @@ def main():
                         help="Velocity jitter ratio (0.10 = +-10%%, 0=skip)")
     parser.add_argument("--time_stretch", type=float, default=0.05,
                         help="Time stretch ratio (0.05 = +-5%%, 0=skip)")
+    parser.add_argument("--track_shuffle", type=int, default=2,
+                        help="Number of track shuffle variations per file (0=skip)")
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed for reproducibility")
     parser.add_argument("--workers", type=int, default=1,
@@ -381,6 +422,7 @@ def main():
     print(f"Track dropout: {args.dropout} variations/file")
     print(f"Velocity jitter: +-{args.vel_jitter*100:.0f}%")
     print(f"Time stretch: +-{args.time_stretch*100:.0f}%")
+    print(f"Track shuffle: {args.track_shuffle} variations/file")
     print(f"Output: {output_dir}")
     print("=" * 60)
 
@@ -400,6 +442,7 @@ def main():
             n_dropout=args.dropout,
             vel_jitter_ratio=args.vel_jitter,
             time_stretch_ratio=args.time_stretch,
+            n_track_shuffle=args.track_shuffle,
             seed=file_seed,
         )
 

@@ -10,11 +10,13 @@
 #include "AudioEngine.h"
 #include "TrackProcessor.h"
 #include "SynthEngine.h"
+#include "PluginHost.h"
 
 //==============================================================================
 AudioEngine::AudioEngine()
 {
     synthEngine = std::make_unique<SynthEngine>();
+    pluginHost  = std::make_unique<PluginHost>();
 }
 
 AudioEngine::~AudioEngine()

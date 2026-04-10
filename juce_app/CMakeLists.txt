@@ -29,6 +29,8 @@ target_sources(MidiAIWorkstation PRIVATE
     Source/Core/TrackProcessor.h
     Source/Core/SynthEngine.cpp
     Source/Core/SynthEngine.h
+    Source/Core/PluginHost.cpp
+    Source/Core/PluginHost.h
 
     # UI
     Source/UI/MainWindow.cpp
