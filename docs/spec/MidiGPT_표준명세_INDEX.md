@@ -2,7 +2,7 @@
 
 > MidiGPT MIDI AI 엔진의 기능별 표준 명세 문서 모음
 > 작성 기준: BalloonFlow_Doc 표준 양식
-> 최종 갱신: 2026-04-07
+> 최종 갱신: 2026-04-10
 
 ---
 
@@ -59,3 +59,8 @@
 ## 갱신 이력
 - 2026-04-07: 초판 작성, Phase 1 안전 항목 구현 반영
   - KV 캐시, 반복 패널티, n-gram 차단, EMA 추가
+- 2026-04-08: 버그리포트 6건 + Q4 수정
+  - 추론 엔진: min_new_tokens, max_tokens 기본값 변경
+  - 학습: DPO quantile fallback, data_dir 기본값/자동 탐색
+  - 앱: Windows UTF-8 인코딩 강제 (13곳)
+- 2026-04-10: 전체 명세 동기화 갱신

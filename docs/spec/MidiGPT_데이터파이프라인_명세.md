@@ -80,13 +80,18 @@ Ableton/midi_raw/  # MAESTRO 등 외부 데이터셋
 
 ### 출력 구조
 ```
-midigpt_data/
+midigpt_pipeline/          # pipeline.py 기본 work_dir
 ├── tokenized/
-│   ├── song_001.npy
-│   ├── song_002.npy
-│   └── ...
-└── metadata.json
+│   ├── tokens/            # 실제 .npy 저장 위치
+│   │   ├── song_001.npy
+│   │   ├── song_002.npy
+│   │   └── ...
+│   └── metadata.json
+└── augmented/             # 증강 중간 결과
 ```
+
+> ⚠️ `train_pretrain.py`의 `--data_dir` 기본값이 `./midigpt_pipeline/tokenized`로 설정되어 있어
+> pipeline 실행 후 별도 경로 지정 없이 바로 학습 가능 (2026-04-08)
 
 ### 메타데이터
 ```python
@@ -102,6 +107,11 @@ ChordEvent(root="C", quality="maj7", bass="C", function="tonic", start_beat=0.0,
 
 ### `MidiDataset(mode="pretrain", block_size=2048)`
 - `.npy` 파일 자동 로드
+- **자동 경로 탐색** (2026-04-08): `_load_pretrain`이 다음 3개 경로를 순서대로 탐색
+  1. `{data_dir}/tokens/` — 정상 레이아웃
+  2. `{data_dir}/` — data_dir이 토큰 폴더 자체일 때
+  3. `{data_dir}/tokenized/tokens/` — pipeline work_dir 직접 패스
+- 못 찾으면 탐색한 경로 + 해결 방법을 포함한 에러 메시지 출력
 - 시퀀스 → block_size 슬라이딩 청크 분할
 - `__getitem__` → `{"input_ids", "labels"}` 딕셔너리
 

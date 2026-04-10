@@ -89,6 +89,26 @@ inference = MidiGPTInference(InferenceConfig(
 
 ### Phase 1 추가 ✅
 
+#### 최소 생성 길이 (min_new_tokens) — 2026-04-08 추가
+**코드 위치**: `engine.py:_generate_with_harmony`
+
+EOS 토큰 조기 종료를 방지하기 위해 도입. 과적합된 모델이 학습 시퀀스 끝의
+EOS 패턴을 외워서 5~10 토큰 만에 종료하는 문제를 해결한다.
+
+**동작 규칙**:
+- `step < min_new_tokens` 동안 EOS 토큰의 logit을 `-inf`로 강제
+- HuggingFace transformers의 동일 패턴 적용
+- 지정된 step 이후부터는 정상적으로 EOS 샘플링 허용
+
+| 파라미터 | 기본 | 권장 범위 |
+|---------|------|---------|
+| `min_new_tokens` | 256 | 128~512 |
+| `max_tokens` | 1024 (기존 512) | 512~2048 |
+
+**효과**: 생성 결과물이 최소 256 토큰 이상 보장. 1KB/5초 → 5~15KB/30초~1분으로 복구.
+
+⚠️ `min_new_tokens=0`으로 설정하면 이전 동작과 동일 (EOS 즉시 종료).
+
 #### 반복 패널티 (Repetition Penalty)
 **코드 위치**: `engine.py:154-185`
 
@@ -140,7 +160,8 @@ result = inference.generate_variation(
     midi_path="input.mid",            # 또는 notes=[...]
     meta=SongMeta(key="C", style="jazz", section="chorus", tempo=120),
     chords=[ChordEvent("C", "maj7", ...), ...],
-    max_tokens=512,
+    max_tokens=1024,                    # 기본값 512→1024 (2026-04-08)
+    min_new_tokens=256,                  # ✅ EOS 조기종료 방지 (2026-04-08)
     temperature=0.9,
     top_k=50,
     top_p=0.95,
@@ -196,6 +217,7 @@ result = inference.generate_variation(
 - [x] 모델 미로드 시 `RuntimeError("Model not loaded")`
 - [x] `midi_path`/`notes` 둘 다 미제공 시 `ValueError`
 - [x] EOS 자동 stop
+- [x] min_new_tokens 미달 시 EOS logit 억제 (2026-04-08)
 - [x] block_size 초과 시 cache 재초기화 (overflow 회복)
 
 ### 출력
@@ -214,6 +236,7 @@ result = inference.generate_variation(
 | 변경 | 등급 |
 |------|------|
 | 새 샘플러 옵션 추가 (Phase 1) | 🟢 안전 |
+| min_new_tokens / max_tokens 기본값 변경 | 🟢 안전 (0 으로 복원 가능) |
 | KV cache on/off | 🟢 안전 |
 | 화성 마스킹 on/off | 🟢 안전 |
 | Vocab 변경 | 🔴 모델 + 데이터 폐기 |

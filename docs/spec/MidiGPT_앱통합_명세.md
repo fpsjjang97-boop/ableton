@@ -120,6 +120,23 @@ result = agent.transcribe_and_vary(
 - 손글씨/저해상도 인식률 낮음
 - 다른 악기는 SMT의 다른 체크포인트 필요
 
+### Windows 호환성 — UTF-8 인코딩 강제 ✅ 2026-04-08
+
+한국어 Windows (CP949 기본 코드페이지) 에서 `open()` 호출 시 인코딩 mismatch로
+`UnicodeDecodeError` 가 발생하는 문제 일괄 수정.
+
+**적용 파일** (텍스트 모드 `open()` 에 `encoding='utf-8'` 명시):
+| 에이전트 | 수정 라인 |
+|---------|----------|
+| `reviewer.py` | 292, 299, 303, 322 |
+| `manager.py` | 49, 55, 67, 108, 118, 274 |
+| `orchestrator.py` | 77, 283, 292 |
+| `composer.py` | 286 |
+| `ableton_bridge.py` | 259 |
+| `music_transformer.py` | 38, 256, 323, 406 |
+| `tools/generate_sinco.py` | 106, 468 |
+| `midigpt/training/train_pretrain.py` | 216, 258 |
+
 ### 동작 흐름
 ```
 사용자 요청 → Manager → Orchestrator
@@ -174,11 +191,14 @@ MidiGPTInference.generate_variation()
 JUCE UI에 표시 / 재생
 ```
 
-### Phase 1 추가 옵션 노출
+### Phase 1 + BUG fix 추가 옵션 노출
 사용자 UI에서 직접 조절 가능 (권장):
 - `repetition_penalty` (1.0~1.3 슬라이더)
 - `no_repeat_ngram_size` (0~6 정수)
 - `num_return_sequences` (1~8 후보)
+- `min_new_tokens` (0~512 정수, 기본 256) ✅ 2026-04-08
+- `max_tokens` (256~2048 정수, 기본 1024) ✅ 2026-04-08
+- `temperature` (0.1~2.0, 기본 1.2) ✅ 2026-04-08
 - KV cache는 항상 ON (기본값)
 
 ---

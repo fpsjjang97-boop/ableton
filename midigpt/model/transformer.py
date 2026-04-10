@@ -274,6 +274,7 @@ class MidiGPT(nn.Module):
         idx: torch.Tensor,
         targets: Optional[torch.Tensor] = None,
         past_kv_list: Optional[list[Tuple[torch.Tensor, torch.Tensor]]] = None,
+        loss_mask: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], list[Tuple[torch.Tensor, torch.Tensor]]]:
         """Forward pass with optional KV cache.
 
@@ -283,6 +284,9 @@ class MidiGPT(nn.Module):
             targets: Target token IDs for loss computation, shape (B, T).
             past_kv_list: Per-layer KV cache from a previous forward call.
                           Length must equal ``n_layer``.
+            loss_mask: Optional bool tensor, shape (B, T). True = compute loss,
+                       False = ignore. Used to mask meta tokens (Key_, Style_, etc.)
+                       so the model focuses on predicting notes.
 
         Returns:
             (logits, loss, present_kv_list)
@@ -320,11 +324,21 @@ class MidiGPT(nn.Module):
         # Compute logits
         if targets is not None:
             logits = self.lm_head(x)
-            loss = F.cross_entropy(
-                logits.view(-1, logits.size(-1)),
-                targets.view(-1),
-                ignore_index=0,  # ignore <PAD> token (id=0)
-            )
+            if loss_mask is not None:
+                # Mask meta tokens: set masked target positions to PAD (ignore_index=0)
+                masked_targets = targets.clone()
+                masked_targets[~loss_mask] = 0  # PAD id = ignore_index
+                loss = F.cross_entropy(
+                    logits.view(-1, logits.size(-1)),
+                    masked_targets.view(-1),
+                    ignore_index=0,
+                )
+            else:
+                loss = F.cross_entropy(
+                    logits.view(-1, logits.size(-1)),
+                    targets.view(-1),
+                    ignore_index=0,  # ignore <PAD> token (id=0)
+                )
         else:
             # Inference: only compute logits for last position
             logits = self.lm_head(x[:, -1:, :])

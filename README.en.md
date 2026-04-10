@@ -67,6 +67,8 @@ The full design lives under [docs/spec/](docs/spec/) (Korean, BalloonFlow standa
 - ✅ Harmonic constraint masking (out-of-scale pitches blocked)
 - ✅ LoRA hot-swap
 - ✅ EMA checkpoint *(Phase 1)*
+- ✅ `min_new_tokens` — prevents premature EOS termination *(2026-04-08)*
+- ✅ DPO quantile fallback — auto percentile split when scores cluster *(2026-04-08)*
 
 ### 🎵 Music Capabilities
 - ✅ Chord analysis (24 qualities, slash chords, harmonic function labels)
@@ -119,14 +121,16 @@ inf = MidiGPTInference(InferenceConfig(
     lora_paths={"jazz": "./loras/jazz.pt"},
 ))
 
-# Phase 1 additions
+# Phase 1 + bug-fix additions
 variations = inf.generate_variation(
     midi_path="input.mid",
     meta=SongMeta(key="C", style="jazz", section="chorus", tempo=120),
-    num_return_sequences=3,         # 3 candidate variations
-    repetition_penalty=1.1,         # avoid pathological loops
-    no_repeat_ngram_size=4,         # block 4-gram repetition
-    use_kv_cache=True,              # O(N) decoding
+    max_tokens=1024,                    # default 1024 (was 512)
+    min_new_tokens=256,                 # prevents premature EOS
+    num_return_sequences=3,             # 3 candidate variations
+    repetition_penalty=1.1,             # avoid pathological loops
+    no_repeat_ngram_size=4,             # block 4-gram repetition
+    use_kv_cache=True,                  # O(N) decoding
 )
 ```
 
@@ -231,6 +235,10 @@ Developer: feed into DPO → improved model
 - ✅ EMA checkpoint
 - ✅ Harmonic constraint masking
 - ✅ LoRA hot-swap
+- ✅ `min_new_tokens` EOS early-termination prevention (2026-04-08)
+- ✅ DPO quantile fallback (2026-04-08)
+- ✅ Token path auto-detection (2026-04-08)
+- ✅ Windows UTF-8 encoding enforcement (2026-04-08)
 
 ### Phase 2 — Data scaling ← **current**
 - 104 → 2,000+ goal

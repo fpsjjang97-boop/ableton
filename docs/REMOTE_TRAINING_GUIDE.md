@@ -3,7 +3,7 @@
 > 이 문서는 친구/협력자의 GPU 머신에서 MidiGPT를 처음부터 학습하고
 > 자가 강화학습 사이클까지 돌리는 전체 절차를 한국어로 정리한 것입니다.
 >
-> 작성: 2026-04-07
+> 작성: 2026-04-07 | 갱신: 2026-04-10
 > 대상 독자: GPU 있는 친구 (Python 경험 있음)
 
 ---
@@ -22,7 +22,7 @@ midigpt_ema.pt
        ↓
    자동 리뷰  →  reviews/*.json   (스케일/벨로시티/리듬/엔트로피 룰 기반)
        ↓
-   DPO 페어 빌드 → midigpt/dpo_pairs/*.json   (chosen ≥80, rejected <60)
+   DPO 페어 빌드 → midigpt/dpo_pairs/*.json   (chosen ≥80, rejected <60; 쏠리면 quantile fallback)
        ↓
    DPO 학습  →  lora_checkpoints/   (강화된 LoRA 어댑터)
        ↓
@@ -197,10 +197,12 @@ python scripts/run_self_improvement_loop.py \
 # 디버깅 — 처음 N개 곡만
 --limit 10
 
-# 샘플링 옵션 (Phase 1 추가)
---temperature 0.9
+# 샘플링 옵션 (Phase 1 + 2026-04-08 추가)
+--temperature 1.2               # 기본 0.9→1.2 (화성 마스크가 off-scale 차단)
 --repetition_penalty 1.1
 --no_repeat_ngram_size 4
+--min_new_tokens 256            # ✅ EOS 조기종료 방지 (기본 256)
+--max_tokens 1024               # 기본 512→1024
 
 # DPO 학습 옵션
 --dpo_epochs 3
@@ -307,9 +309,10 @@ python -m midigpt.training.train_pretrain \
 
 ### Q3. DPO 학습 시 페어가 0개
 - `output/`에 변주가 충분히 있는지
-- reviewer 점수가 모두 60~80 사이에 몰려 있으면 페어 분리 안 됨
-- `--variants_per_song`을 5~10으로 늘려서 다양한 결과 만들기
-- 또는 `midigpt/build_dpo_pairs.py` 의 `CHOSEN_THRESHOLD`/`REJECTED_THRESHOLD` 조정
+- ~~reviewer 점수가 모두 60~80 사이에 몰려 있으면 페어 분리 안 됨~~ → **2026-04-08 해결됨**
+- **quantile fallback** 도입: 고정 임계값(80/60)으로 안 되면 상위 30%/하위 30% 자동 분위 분할
+- 로그에 `Categorisation strategy: quantile_fallback` 이 나오면 정상 동작
+- 그래도 0이면 점수차가 5점 미만으로 변주 품질 차이가 너무 적은 것 → `--variants_per_song`을 5~10으로 늘리기
 
 ### Q4. reviewer가 느림
 - 반복문이라 멀티프로세스 추가 가능 (TODO). 현재는 그냥 기다리세요.

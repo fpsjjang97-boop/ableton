@@ -153,6 +153,11 @@ def train(args):
     print(f"Checkpoints: {checkpoint_dir}")
     print("=" * 60)
 
+    # Pre-compute meta token ID set for loss masking
+    meta_ids = VOCAB.meta_token_ids if args.loss_mask_meta else frozenset()
+    if meta_ids:
+        print(f"Loss masking: {len(meta_ids)} meta token IDs masked (Key/Style/Sec/Tempo/InstFam)")
+
     global_step = 0
     best_val_loss = float("inf")
     patience_counter = 0
@@ -167,6 +172,13 @@ def train(args):
             input_ids = batch["input_ids"].to(device)
             labels = batch["labels"].to(device)
 
+            # Build loss mask: True = compute loss, False = ignore
+            loss_mask = None
+            if meta_ids:
+                loss_mask = torch.ones_like(labels, dtype=torch.bool)
+                for mid in meta_ids:
+                    loss_mask &= (labels != mid)
+
             # Learning rate schedule
             lr = get_lr(global_step, warmup_steps, total_steps, args.max_lr, args.min_lr)
             for param_group in optimizer.param_groups:
@@ -174,7 +186,7 @@ def train(args):
 
             # Forward pass with mixed precision
             with torch.amp.autocast(device_type=device.type, dtype=autocast_dtype, enabled=use_amp):
-                logits, loss, _ = model(input_ids, targets=labels)
+                logits, loss, _ = model(input_ids, targets=labels, loss_mask=loss_mask)
                 loss = loss / args.grad_accum
 
             # Backward
@@ -350,6 +362,9 @@ def main():
     parser.add_argument("--save_every", type=int, default=2, help="Save checkpoint every N epochs")
     parser.add_argument("--early_stop_patience", type=int, default=5,
                         help="Stop training after N epochs without val loss improvement (0=disable)")
+    parser.add_argument("--loss_mask_meta", action="store_true", default=False,
+                        help="Mask loss on meta tokens (Key/Style/Sec/Tempo/InstFam) "
+                             "so the model focuses on note prediction.")
     parser.add_argument("--ema", action="store_true", default=False,
                         help="Maintain an EMA copy of the weights for stabler "
                              "evaluation/inference (Phase 1, default off).")

@@ -67,6 +67,8 @@
 - ✅ 화성 제약 마스킹 (코드 스케일 외 음 차단)
 - ✅ LoRA 핫스왑
 - ✅ EMA 체크포인트 (Phase 1)
+- ✅ `min_new_tokens` EOS 조기종료 방지 (2026-04-08)
+- ✅ DPO quantile fallback — 점수 쏠림 시 자동 분위 분할 (2026-04-08)
 
 ### 🎵 음악 기능
 - ✅ 코드 분석 (24개 quality, 슬래시 코드, 함수 라벨)
@@ -123,10 +125,12 @@ inf = MidiGPTInference(InferenceConfig(
 variations = inf.generate_variation(
     midi_path="input.mid",
     meta=SongMeta(key="C", style="jazz", section="chorus", tempo=120),
-    num_return_sequences=3,         # 3개 후보 생성
-    repetition_penalty=1.1,         # 모티프 무한 반복 방지
-    no_repeat_ngram_size=4,         # 4-gram 차단
-    use_kv_cache=True,              # O(N) 추론
+    max_tokens=1024,                    # 기본 1024 (Phase 1: 512)
+    min_new_tokens=256,                 # ✅ EOS 조기종료 방지
+    num_return_sequences=3,             # 3개 후보 생성
+    repetition_penalty=1.1,             # 모티프 무한 반복 방지
+    no_repeat_ngram_size=4,             # 4-gram 차단
+    use_kv_cache=True,                  # O(N) 추론
 )
 ```
 
@@ -231,6 +235,10 @@ repo/
 - ✅ EMA 체크포인트
 - ✅ 화성 제약 마스킹
 - ✅ LoRA 핫스왑
+- ✅ `min_new_tokens` EOS 조기종료 방지 (2026-04-08)
+- ✅ DPO quantile fallback (2026-04-08)
+- ✅ 토큰 경로 자동 탐색 (2026-04-08)
+- ✅ Windows UTF-8 인코딩 강제 (2026-04-08)
 
 ### Phase 2 — 데이터 수집 ← **현재**
 - 104곡 → 목표 2,000곡+

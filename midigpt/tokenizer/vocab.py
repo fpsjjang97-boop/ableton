@@ -371,6 +371,27 @@ class MidiVocab:
         """악기 패밀리 → 토큰 ID."""
         return self._token2id.get(f"InstFam_{family}", self.unk_id)
 
+    # ------------------------------------------------------------------
+    # Meta token set (for loss masking)
+    # ------------------------------------------------------------------
+    _META_PREFIXES = ("Key_", "Style_", "Sec_", "Tempo_", "InstFam_")
+
+    @property
+    def meta_token_ids(self) -> frozenset[int]:
+        """Return IDs of structure/meta tokens that should be loss-masked.
+
+        Includes: Key_*, Style_*, Sec_*, Tempo_*, InstFam_*
+        These tokens carry conditioning info but don't represent musical content.
+        Masking their loss lets the model focus on predicting notes.
+        """
+        if not hasattr(self, "_meta_ids_cache"):
+            ids = set()
+            for tok, tid in self._token2id.items():
+                if any(tok.startswith(p) for p in self._META_PREFIXES):
+                    ids.add(tid)
+            self._meta_ids_cache = frozenset(ids)
+        return self._meta_ids_cache
+
     def __contains__(self, token: str) -> bool:
         return token in self._token2id
 

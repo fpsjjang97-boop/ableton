@@ -43,7 +43,7 @@
 - [ ] 리뷰 2000쌍 돌파 시 Base 모델 확장 검토 (50M→100M)
 
 ## 현재 완료된 항목
-- [x] 토큰화 시스템 (vocab 672개, encoder, decoder)
+- [x] 토큰화 시스템 (vocab 448개, encoder, decoder)
 - [x] 50M Transformer 아키텍처 (12L/12H/576D, RoPE+SwiGLU+RMSNorm)
 - [x] Dataset/DataLoader (pretrain/sft/dpo 3모드)
 - [x] Pre-training 학습 스크립트
@@ -52,3 +52,18 @@
 - [x] LoRA 구현 (적용/저장/로드/머지)
 - [x] 추론 엔진 (자동 디바이스 감지, LoRA 핫스왑)
 - [x] 배치 토큰화 스크립트
+- [x] KV cache 가속 추론 (Phase 1, 2026-04-07)
+- [x] Repetition Penalty / No-Repeat N-gram (Phase 1, 2026-04-07)
+- [x] Multi-Sample num_return_sequences (Phase 1, 2026-04-07)
+- [x] EMA 체크포인트 (Phase 1, 2026-04-07)
+- [x] 화성 제약 마스킹 (Phase 1, 2026-04-07)
+- [x] min_new_tokens EOS 조기종료 방지 (2026-04-08)
+- [x] DPO quantile fallback (2026-04-08)
+- [x] 토큰 경로 자동 탐색 — 3-path fallback (2026-04-08)
+- [x] Windows UTF-8 인코딩 강제 — 에이전트 13곳 (2026-04-08)
+- [x] requirements.txt ASCII 정리 (2026-04-08)
+- [x] Sheet2MIDI 에이전트 — SMT++ OMR 통합 (2026-04-07)
+- [x] Audio2MIDI 에이전트 — Demucs + Basic Pitch
+- [x] 멀티 에이전트 시스템 (Composer/Manager/Reviewer/Orchestrator)
+- [x] JUCE C++ 프론트엔드
+- [x] 자가 강화학습 사이클 스크립트 (run_self_improvement_loop.py)

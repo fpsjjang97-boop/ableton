@@ -1,5 +1,6 @@
 """
-MIDI Data Augmentation Script — Key Transposition + Track Dropout.
+MIDI Data Augmentation Script — Key Transposition + Track Dropout
+                               + Velocity Jitter + Time Stretch.
 
 Generates augmented copies of MIDI files to increase training data.
 
@@ -9,6 +10,8 @@ Usage:
         --output_dir ./midi_data_augmented \
         --transpose all \
         --dropout 3 \
+        --vel_jitter 0.10 \
+        --time_stretch 0.05 \
         --workers 4
 
 Augmentation strategies:
@@ -21,6 +24,14 @@ Augmentation strategies:
        - N = number of dropout variations per file
        - Always keeps at least one harmonic + one other track
        - 0 = skip dropout
+
+    3. Velocity Jitter (2026-04-10): Randomly perturb note velocities ±N%
+       - Default ±10%. Clamp to 1-127. Preserves musical dynamics contour.
+       - 0.0 = skip
+
+    4. Time Stretch (2026-04-10): Scale note timing by ±N%
+       - Default ±5%. Stretches start/end/duration uniformly.
+       - 0.0 = skip
 """
 from __future__ import annotations
 
@@ -151,6 +162,49 @@ def dropout_midi(
 
 
 # ──────────────────────────────────────────────────────────────────
+# 3. Velocity Jitter
+# ──────────────────────────────────────────────────────────────────
+def velocity_jitter(
+    pm: pretty_midi.PrettyMIDI,
+    rng: random.Random,
+    ratio: float = 0.10,
+) -> pretty_midi.PrettyMIDI:
+    """Randomly perturb note velocities by ±ratio (e.g. 0.10 = ±10%).
+
+    Clamps to 1-127. Preserves relative dynamics contour.
+    """
+    new_pm = copy.deepcopy(pm)
+    for inst in new_pm.instruments:
+        for note in inst.notes:
+            jitter = rng.uniform(-ratio, ratio)
+            new_vel = int(note.velocity * (1.0 + jitter))
+            note.velocity = max(1, min(127, new_vel))
+    return new_pm
+
+
+# ──────────────────────────────────────────────────────────────────
+# 4. Time Stretch
+# ──────────────────────────────────────────────────────────────────
+def time_stretch(
+    pm: pretty_midi.PrettyMIDI,
+    rng: random.Random,
+    ratio: float = 0.05,
+) -> pretty_midi.PrettyMIDI:
+    """Scale all note start/end times by a random factor in [1-ratio, 1+ratio].
+
+    E.g. ratio=0.05 → stretch factor between 0.95 and 1.05.
+    Tempo markers are NOT adjusted — this creates subtle timing variation.
+    """
+    factor = rng.uniform(1.0 - ratio, 1.0 + ratio)
+    new_pm = copy.deepcopy(pm)
+    for inst in new_pm.instruments:
+        for note in inst.notes:
+            note.start = max(0.0, note.start * factor)
+            note.end = max(note.start + 0.001, note.end * factor)
+    return new_pm
+
+
+# ──────────────────────────────────────────────────────────────────
 # Combined augmentation for one file
 # ──────────────────────────────────────────────────────────────────
 def augment_file(
@@ -158,6 +212,8 @@ def augment_file(
     output_dir: Path,
     transpose_mode: str = "all",
     n_dropout: int = 3,
+    vel_jitter_ratio: float = 0.10,
+    time_stretch_ratio: float = 0.05,
     seed: int = 42,
 ) -> list[dict]:
     """Generate augmented versions of a single MIDI file.
@@ -242,6 +298,46 @@ def augment_file(
                     "error": str(e),
                 })
 
+    # ── Velocity Jitter ──
+    if vel_jitter_ratio > 0:
+        try:
+            jittered = velocity_jitter(pm, rng, vel_jitter_ratio)
+            out_name = f"{stem}_veljit.mid"
+            out_path = output_dir / out_name
+            jittered.write(str(out_path))
+            results.append({
+                "status": "ok",
+                "type": "velocity_jitter",
+                "ratio": vel_jitter_ratio,
+                "file": str(out_path),
+            })
+        except Exception as e:
+            results.append({
+                "status": "error",
+                "type": "velocity_jitter",
+                "error": str(e),
+            })
+
+    # ── Time Stretch ──
+    if time_stretch_ratio > 0:
+        try:
+            stretched = time_stretch(pm, rng, time_stretch_ratio)
+            out_name = f"{stem}_tstretch.mid"
+            out_path = output_dir / out_name
+            stretched.write(str(out_path))
+            results.append({
+                "status": "ok",
+                "type": "time_stretch",
+                "ratio": time_stretch_ratio,
+                "file": str(out_path),
+            })
+        except Exception as e:
+            results.append({
+                "status": "error",
+                "type": "time_stretch",
+                "error": str(e),
+            })
+
     return results
 
 
@@ -258,6 +354,10 @@ def main():
                         help="Transposition mode: 'all' (11 keys), '6' (random 6), 'none'")
     parser.add_argument("--dropout", type=int, default=3,
                         help="Number of track dropout variations per file (0=skip)")
+    parser.add_argument("--vel_jitter", type=float, default=0.10,
+                        help="Velocity jitter ratio (0.10 = +-10%%, 0=skip)")
+    parser.add_argument("--time_stretch", type=float, default=0.05,
+                        help="Time stretch ratio (0.05 = +-5%%, 0=skip)")
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed for reproducibility")
     parser.add_argument("--workers", type=int, default=1,
@@ -279,6 +379,8 @@ def main():
     print(f"Found {len(midi_files)} MIDI files")
     print(f"Transpose: {args.transpose}")
     print(f"Track dropout: {args.dropout} variations/file")
+    print(f"Velocity jitter: +-{args.vel_jitter*100:.0f}%")
+    print(f"Time stretch: +-{args.time_stretch*100:.0f}%")
     print(f"Output: {output_dir}")
     print("=" * 60)
 
@@ -296,6 +398,8 @@ def main():
             output_dir=output_dir,
             transpose_mode=args.transpose,
             n_dropout=args.dropout,
+            vel_jitter_ratio=args.vel_jitter,
+            time_stretch_ratio=args.time_stretch,
             seed=file_seed,
         )
 
