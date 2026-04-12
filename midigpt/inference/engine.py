@@ -265,7 +265,7 @@ class MidiGPTInference:
             if torch.cuda.is_available():
                 gpu_name = torch.cuda.get_device_name(0)
                 vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
-                print(f"MidiGPT: Using GPU — {gpu_name} ({vram_gb:.1f}GB)")
+                print(f"MidiGPT: Using GPU - {gpu_name} ({vram_gb:.1f}GB)")
                 return torch.device("cuda")
             else:
                 print("MidiGPT: Using CPU (no GPU detected)")
@@ -312,12 +312,27 @@ class MidiGPTInference:
             print(f"MidiGPT: LoRA '{name}' not found at {path}")
             return
 
-        lora_config = LoRAConfig(r=16, alpha=32, target_modules=["q_proj", "v_proj", "o_proj"])
+        # Try to read LoRA config from checkpoint; fall back to model defaults
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+        if isinstance(checkpoint, dict) and "lora_config" in checkpoint:
+            saved_cfg = checkpoint["lora_config"]
+            lora_config = LoRAConfig(
+                r=saved_cfg.get("r", self.model_config.lora_rank),
+                alpha=saved_cfg.get("alpha", saved_cfg.get("r", 32) * 2),
+                target_modules=saved_cfg.get("target_modules",
+                                             self.model_config.lora_target_modules),
+            )
+        else:
+            lora_config = LoRAConfig(
+                r=self.model_config.lora_rank,
+                alpha=self.model_config.lora_rank * 2,
+                target_modules=self.model_config.lora_target_modules,
+            )
         apply_lora(self.model, lora_config)
         load_lora(self.model, path)
         self._active_lora = name
         self.model.eval()
-        print(f"MidiGPT: LoRA '{name}' loaded")
+        print(f"MidiGPT: LoRA '{name}' loaded (r={lora_config.r})")
 
     # ------------------------------------------------------------------
     # Harmonic constraint helpers

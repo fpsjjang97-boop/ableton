@@ -54,10 +54,16 @@ except ImportError:
 
 # GM Program → track type (same as encoder.py / midi_embedding.py)
 def classify_program(program: int, is_drum: bool) -> str:
+    """Classify GM program to track type.
+    Must match TRACK_TYPES in tokenizer/vocab.py exactly."""
     if is_drum:
         return "drums"
     if 0 <= program <= 7:
-        return "keys"
+        return "accomp"       # was "keys" -- unified with encoder
+    if 8 <= program <= 15:
+        return "accomp"       # chromatic percussion
+    if 16 <= program <= 23:
+        return "accomp"       # organ
     if 24 <= program <= 31:
         return "guitar"
     if 32 <= program <= 39:
@@ -68,8 +74,18 @@ def classify_program(program: int, is_drum: bool) -> str:
         return "brass"
     if 64 <= program <= 79:
         return "woodwind"
-    if 80 <= program <= 95:
-        return "synth"
+    if 80 <= program <= 87:
+        return "lead"         # was "synth" -- unified with encoder
+    if 88 <= program <= 95:
+        return "pad"          # synth pads
+    if 96 <= program <= 103:
+        return "fx"           # synth effects
+    if 104 <= program <= 111:
+        return "other"        # ethnic
+    if 112 <= program <= 119:
+        return "other"        # percussive
+    if 120 <= program <= 127:
+        return "fx"           # sound effects
     return "other"
 
 

@@ -234,12 +234,25 @@ class MidiDecoder:
         for note in notes:
             track_groups.setdefault(note.track_type, []).append(note)
 
+        # Track type -> default GM program number
+        _TRACK_PROGRAM = {
+            "melody": 0, "accomp": 0, "bass": 32, "drums": 0,
+            "pad": 89, "lead": 80, "arp": 46, "other": 0,
+            "strings": 48, "brass": 61, "woodwind": 73,
+            "vocal": 54, "guitar": 25, "fx": 98,
+        }
+
         for track_name, track_notes in track_groups.items():
             track = mido.MidiTrack()
             mid.tracks.append(track)
 
             # Track name
             track.append(mido.MetaMessage('track_name', name=track_name, time=0))
+
+            # Program change (skip for drums)
+            if track_name != "drums":
+                program = _TRACK_PROGRAM.get(track_name, 0)
+                track.append(mido.Message('program_change', program=program, time=0))
 
             # Tempo (first track only)
             if track_name == list(track_groups.keys())[0]:

@@ -14,7 +14,7 @@ class MidiGPTConfig:
     Parameters:   ~50M
     """
     # Vocabulary
-    vocab_size: int = 448          # ~420 tokens + padding (after chord compression)
+    vocab_size: int = 527          # v2.0 expanded vocab (was 448 pre-Cubase15 expansion)
 
     # Transformer dimensions (tuned for ~50M parameters)
     n_layer: int = 12              # number of transformer blocks
@@ -48,8 +48,8 @@ class MidiGPTConfig:
         """Estimate total parameter count."""
         # Embedding: vocab_size * n_embd
         emb = self.vocab_size * self.n_embd
-        # Position embedding: block_size * n_embd
-        pos = self.block_size * self.n_embd
+        # RoPE: no learnable position embeddings (computed on-the-fly)
+        pos = 0
 
         # Per transformer block:
         #   Attention: 4 * n_embd^2 (Q, K, V, O projections)

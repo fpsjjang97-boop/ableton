@@ -1,68 +1,94 @@
-# MidiGPT VST3 Plugin — Clean Room
+# MidiGPT DAW — Standalone JUCE Application
 #
-# Based on JUCE official CMake template for audio plugins.
+# Self-contained DAW with built-in MidiGPT LLM integration.
+# NOT a plugin — this IS the host. Can load external VST3/CLAP plugins.
+#
 # References:
-#   https://github.com/juce-framework/JUCE/blob/master/examples/CMake/AudioPlugin/CMakeLists.txt
-#   https://juce.com/learn/tutorials/juce-cmake-repository-usage
+#   https://github.com/juce-framework/JUCE/blob/master/examples/CMake/GuiApp/CMakeLists.txt
+#   https://docs.juce.com/master/tutorial_create_projucer_basic_plugin.html
 #
-# NO references to Cubase, Steinberg proprietary code, or Ghidra output.
+# NO references to Cubase binaries or Ghidra output.
 
 cmake_minimum_required(VERSION 3.22)
 
-project(MidiGPTPlugin VERSION 0.1.0)
+project(MidiGPTDAW VERSION 0.1.0)
 
 # -----------------------------------------------------------------------------
 # JUCE dependency
 # -----------------------------------------------------------------------------
-# Option A (recommended): add JUCE as a git submodule at external/JUCE
-#   git submodule add https://github.com/juce-framework/JUCE external/JUCE
-# Option B: use find_package(JUCE) if JUCE is installed system-wide
 add_subdirectory(external/JUCE EXCLUDE_FROM_ALL)
 
 # -----------------------------------------------------------------------------
-# Plugin target
+# Application target
 # -----------------------------------------------------------------------------
-juce_add_plugin(MidiGPTPlugin
-    COMPANY_NAME                "MidiGPT"
-    IS_SYNTH                    FALSE
-    NEEDS_MIDI_INPUT            TRUE
-    NEEDS_MIDI_OUTPUT           TRUE
-    IS_MIDI_EFFECT              TRUE        # MIDI-in, MIDI-out plugin (no audio processing)
-    EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-    COPY_PLUGIN_AFTER_BUILD     TRUE        # auto-copy to user plugin folder
-    PLUGIN_MANUFACTURER_CODE    MGpt        # 4-char code (unique)
-    PLUGIN_CODE                 MgPl        # 4-char code (unique)
-    FORMATS                     VST3 Standalone
-    PRODUCT_NAME                "MidiGPT"
+juce_add_gui_app(MidiGPTDAW
+    PRODUCT_NAME            "MidiGPT"
+    COMPANY_NAME            "MidiGPT"
+    BUNDLE_ID               "com.midigpt.daw"
+    ICON_BIG                ""
+    ICON_SMALL              ""
+    NEEDS_CURL              FALSE
+    NEEDS_WEB_BROWSER       FALSE
 )
 
 # -----------------------------------------------------------------------------
 # Sources
 # -----------------------------------------------------------------------------
-target_sources(MidiGPTPlugin PRIVATE
-    Source/PluginProcessor.h
-    Source/PluginProcessor.cpp
-    Source/PluginEditor.h
-    Source/PluginEditor.cpp
-    Source/AIBridge.h
-    Source/AIBridge.cpp
+target_sources(MidiGPTDAW PRIVATE
+    # Entry point
+    Source/Main.cpp
+    Source/MainWindow.h
+    Source/MainWindow.cpp
+
+    # Core engine
+    Source/Core/AudioEngine.h
+    Source/Core/AudioEngine.cpp
+    Source/Core/MidiEngine.h
+    Source/Core/MidiEngine.cpp
+    Source/Core/SynthEngine.h
+    Source/Core/SynthEngine.cpp
+    Source/Core/TrackModel.h
+    Source/Core/TrackModel.cpp
+
+    # UI components
+    Source/UI/LookAndFeel.h
+    Source/UI/LookAndFeel.cpp
+    Source/UI/TransportBar.h
+    Source/UI/TransportBar.cpp
+    Source/UI/ArrangementView.h
+    Source/UI/ArrangementView.cpp
+    Source/UI/PianoRoll.h
+    Source/UI/PianoRoll.cpp
+    Source/UI/MixerPanel.h
+    Source/UI/MixerPanel.cpp
+
+    # AI integration
+    Source/AI/AIBridge.h
+    Source/AI/AIBridge.cpp
+    Source/AI/AIPanel.h
+    Source/AI/AIPanel.cpp
 )
 
 # -----------------------------------------------------------------------------
-# Compile definitions — JUCE standard flags
+# Compile definitions
 # -----------------------------------------------------------------------------
-target_compile_definitions(MidiGPTPlugin PUBLIC
+target_compile_definitions(MidiGPTDAW PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
-    JUCE_VST3_CAN_REPLACE_VST2=0
+    JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:MidiGPTDAW,JUCE_PRODUCT_NAME>"
+    JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:MidiGPTDAW,JUCE_VERSION>"
+    JUCE_PLUGINHOST_VST3=1
+    JUCE_PLUGINHOST_LV2=0
 )
 
 # -----------------------------------------------------------------------------
 # JUCE modules
 # -----------------------------------------------------------------------------
-target_link_libraries(MidiGPTPlugin PRIVATE
+target_link_libraries(MidiGPTDAW PRIVATE
     juce::juce_audio_utils
     juce::juce_audio_processors
+    juce::juce_audio_formats
+    juce::juce_audio_devices
     juce::juce_gui_extra
     juce::juce_dsp
     juce::juce_recommended_config_flags
@@ -73,4 +99,4 @@ target_link_libraries(MidiGPTPlugin PRIVATE
 # -----------------------------------------------------------------------------
 # C++ standard
 # -----------------------------------------------------------------------------
-target_compile_features(MidiGPTPlugin PRIVATE cxx_std_17)
+target_compile_features(MidiGPTDAW PRIVATE cxx_std_17)

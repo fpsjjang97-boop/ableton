@@ -136,9 +136,10 @@ async def generate(
     """
     _ensure_loaded()
 
-    # --- Save uploaded MIDI to a temporary file (pretty_midi needs a path) --
-    tmp_in = REPO_ROOT / "_tmp_plugin_input.mid"
-    tmp_out = REPO_ROOT / "_tmp_plugin_output.mid"
+    # --- Save uploaded MIDI to a unique temporary file (thread-safe) -------
+    import tempfile as _tmpmod
+    tmp_in = Path(_tmpmod.mktemp(suffix="_in.mid", dir=str(REPO_ROOT)))
+    tmp_out = Path(_tmpmod.mktemp(suffix="_out.mid", dir=str(REPO_ROOT)))
     try:
         data = await midi.read()
         tmp_in.write_bytes(data)
@@ -208,11 +209,12 @@ def generate_json(req: GenerateJsonRequest):
     """
     _ensure_loaded()
 
-    tmp_in  = REPO_ROOT / "_tmp_plugin_input.mid"
-    tmp_out = REPO_ROOT / "_tmp_plugin_output.mid"
+    import tempfile as _tmpmod
+    tmp_in  = Path(_tmpmod.mktemp(suffix="_in.mid", dir=str(REPO_ROOT)))
+    tmp_out = Path(_tmpmod.mktemp(suffix="_out.mid", dir=str(REPO_ROOT)))
 
     try:
-        # Decode base64 MIDI → write to temp file for pretty_midi
+        # Decode base64 MIDI -> write to temp file for pretty_midi
         try:
             midi_bytes = _b64.b64decode(req.midi_base64)
         except Exception as e:

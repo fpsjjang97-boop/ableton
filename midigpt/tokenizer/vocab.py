@@ -1,5 +1,5 @@
 """
-MidiGPT Vocabulary — ~448 tokens for hierarchical MIDI tokenization.
+MidiGPT Vocabulary — 527 tokens for hierarchical MIDI tokenization.
 
 Layer 3 (Structure):  Key, Style, Section, Tempo
 Layer 2 (Harmony):    ChordRoot, ChordQual, Chord_NC, Bass, Function
