@@ -1,0 +1,175 @@
+================================================================
+  MidiGPT 2차 테스트 버그 리포트
+  작성: 작곡가 테스터 (비개발자)
+  테스트 환경: Windows 10, RTX 4080, Python 3.11.9
+  날짜: 2026-04-08 (1차 패치 이후 재테스트)
+================================================================
+
+[2차 테스트 개요]
+- 1차 리포트 전달 후 git pull (cbd9137 → 5b7949a)
+- 수정된 파일 16개 확인 완료
+- 동일한 절차로 전체 파이프라인 재실행
+
+실행 순서:
+  1. git pull
+  2. rmdir /s /q midigpt_pipeline
+  3. rmdir /s /q reviews
+  4. python -m midigpt.pipeline --midi_dir ./midi_data --epochs 1
+  5. python -m midigpt.training.train_pretrain --data_dir ./midigpt_pipeline/tokenized --epochs 10 --batch_size 16 --ema --ema_decay 0.999
+  6. python scripts/run_self_improvement_loop.py --base_model ./checkpoints/midigpt_ema.pt --cycles 3 --variants_per_song 3
+
+
+================================================================
+  [수정 확인된 항목] — 1차 리포트 반영 확인
+================================================================
+
+BUG 1 (경로 불일치)      ✅ 수정 확인
+BUG 2 (requirements.txt 인코딩) ✅ 수정 확인
+BUG 3 (build_dpo_pairs.py 인코딩) ✅ 수정 확인 (그러나 하단 신규 버그 참고)
+BUG 4 (EOS 조기 종료)    △ 부분 수정 (하단 참고)
+BUG 5 (EOS 근본 원인)    △ 부분 수정 (하단 참고)
+BUG 6 (accomp 트랙)      ❌ 수정 안 됨 — 2차에서도 동일하게 재현됨 (하단 참고)
+
+
+================================================================
+  [신규 버그] — 2차 테스트에서 새로 발견
+================================================================
+
+---[NEW BUG 1] reviewer.py — JSON 파일 인코딩 오류 (강화학습 중단)---
+- 강화학습 1사이클 Step 2 (리뷰 단계)에서 에러 발생 후 완전 중단
+- 3사이클 중 1사이클도 완료되지 못함
+
+  에러 메시지:
+    Traceback (most recent call last):
+      File "scripts\run_self_improvement_loop.py", line 408, in main
+        step_review(cycle)
+      File "scripts\run_self_improvement_loop.py", line 195, in step_review
+        pending = reviewer.list_pending()
+      File "agents\reviewer.py", line 323, in list_pending
+        meta = json.load(f)
+    UnicodeDecodeError: 'utf-8' codec can't decode byte 0xb7 in position 1067
+
+  원인:
+    build_dpo_pairs.py 인코딩은 수정했지만
+    agents/reviewer.py 323번째 줄 json.load(f) 에서
+    동일한 인코딩 문제가 남아있음
+
+  해결 방법:
+    agents/reviewer.py line 323 근처
+    open() 호출 시 encoding 파라미터 추가 필요
+
+    수정 전: with open(path) as f:
+    수정 후: with open(path, encoding='utf-8') as f:
+             또는: with open(path, encoding='cp949') as f:
+
+    → build_dpo_pairs.py 수정한 것과 동일한 방식으로 처리
+
+
+---[NEW BUG 2] 생성 MIDI 파일 크기 여전히 비정상 (부분 개선)---
+- engine.py 수정 후 1KB → 2KB로 늘어났으나 여전히 비정상적으로 작음
+- 학습 데이터 평균: 10KB 이상
+- 생성 결과물: 여전히 약 2KB 수준
+
+  현재 상태:
+    1차 테스트: ~1KB
+    2차 테스트: ~2KB  ← 개선됨, 하지만 아직 부족
+    목표:       10KB 이상 (학습 데이터 수준)
+
+  추가 조치 필요:
+    - inference/engine.py 에서 min_new_tokens 파라미터 강제 설정
+    - EOS 토큰 완전 억제(suppression) 로직 추가
+    - max_new_tokens 값 상향 조정
+
+
+---[NEW BUG 3] 생성 MIDI가 여전히 음악이 아님 (DAW 직접 청취 확인)---
+- 강화학습 1사이클 도중 생성된 MIDI 파일을 DAW에서 직접 열어서 확인함
+- 결과: 음악적 구조가 전혀 없음. 노트들의 단순 나열 수준
+- 1차 테스트와 동일한 증상으로, engine.py 수정 효과가 실질적으로 없는 것으로 판단됨
+
+  증상:
+    - 파일 크기: ~2KB (학습 데이터 10KB+ 대비 여전히 너무 작음)
+    - 길이: 수 초 수준 (정상: 30초~2분 이상이어야 함)
+    - 내용: 멜로디/리듬 구조 없음, 노트 수 극소
+    - 학습 데이터 스타일(City Pop, J-Rock 등) 전혀 반영 안 됨
+
+  테스터 의견:
+    "과적합이라면 원본이랑 비슷한 결과물이라도 나와야 하는데 그것도 아님.
+     학습은 됐는데 생성 자체가 근본적으로 안 되는 것 같음.
+     engine.py의 EOS 조기 종료 문제가 아직 완전히 해결이 안 된 것으로 보임."
+
+
+---[NEW BUG 4] accomp 트랙 문제 — 패치 후에도 여전히 재현됨---
+- encoder.py 수정됐다고 했지만 2차 생성 파일에서도 'accomp' 트랙이 동일하게 존재함
+- 원본 학습 데이터 54개 MIDI 어디에도 'accomp' 트랙명은 없음
+- 패치가 실제로 이 문제를 해결한 건지 의심됨
+
+  2차 테스트 생성 파일 확인 결과:
+    트랙명: accomp / drums / bass / melody / pad
+    원본 악기명(E.PIANO, SYNTHBASS, VIOLIN 등) 복원 안 됨
+    1차 테스트와 완전히 동일한 상태
+
+  요청 사항:
+    - encoder.py 수정 내용이 실제로 accomp fallback 로직을 바꾼 건지 확인 필요
+    - accomp/drums/bass 카테고리 분류가 의도된 설계인지,
+      아니면 원본 악기명이 복원돼야 정상인지 명확히 알려줘
+
+
+================================================================
+  [학습 결과 비교]
+================================================================
+
+  1차 학습 결과:
+    Train Loss: 0.1271 / Val Loss: 2.7823
+    Warmup: 16 steps
+
+  2차 학습 결과 (패치 후):
+    Train Loss: 0.1170 / Val Loss: 2.7553  ← 소폭 개선 ✅
+    Warmup: 160 steps  ← 개선됨 ✅
+    총 시간: 0.3시간 (약 18분)
+
+  참고:
+    Train/Val Loss 격차(약 2.6)가 여전히 큼 → 과적합 징후
+    데이터 54곡으로는 구조적 한계 있음
+    근본 해결책은 학습 데이터 확보 (목표: 2000곡)
+
+
+================================================================
+  [우선순위별 수정 요청]
+================================================================
+
+  🔴 긴급 (강화학습 자체가 불가능한 상태)
+    1. agents/reviewer.py 인코딩 오류 수정 (NEW BUG 1)
+       → 이게 해결돼야 사이클이 돌아감
+
+  🟡 중요 (수정 후에도 품질이 낮은 상태)
+    2. inference/engine.py EOS 억제 강화 (NEW BUG 2)
+       → 2KB짜리 파일로는 음악 품질 평가가 불가능
+
+  🔴 긴급 (생성 자체가 안 되는 수준)
+    3. inference/engine.py EOS 억제 완전 해결 (NEW BUG 3)
+       → 2KB / 수 초짜리 파일로는 음악으로 평가 자체가 불가능
+       → 부분 수정으로는 부족, min_new_tokens 강제 설정 등 추가 조치 필요
+
+  🟡 중요 (패치 효과 없음)
+    4. accomp 트랙 문제 재확인 (NEW BUG 4)
+       → encoder.py 수정했다고 했는데 2차에서도 동일하게 재현됨
+       → 수정 내용이 이 문제를 실제로 다루는지 확인 필요
+
+
+================================================================
+  [전체 실행 흐름 요약 - 2차]
+================================================================
+
+1. git pull → 16개 파일 수정 확인 ✅
+2. pipeline 재실행 → 660파일, 5,229,006 토큰 ✅
+3. train_pretrain 10 epochs
+   → Train Loss: 0.1170 / Val Loss: 2.7553 ✅
+   → EMA 체크포인트 저장 완료 ✅
+4. run_self_improvement_loop --cycles 3
+   → 162개 변주 생성 완료 ✅ (1427초)
+   → 리뷰 단계에서 reviewer.py 인코딩 오류로 중단 ❌
+   → 강화학습(DPO) 미실행 ❌
+
+================================================================
+  END OF REPORT (2차)
+================================================================

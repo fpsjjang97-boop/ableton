@@ -56,3 +56,44 @@ Troubleshooter
 .vscode/
 .idea/
 *.swp
+
+# Commercial software — NEVER commit. Protects repo from IP contamination.
+# Reference materials (Cubase, other DAWs) must stay in separate directories
+# outside this repo (e.g. D:/Cubase/).
+*.7z
+*.iso
+*.dmg
+*.msi
+Cubase*
+Steinberg*
+cubase_*
+steinberg_*
+# Decompilation output
+*.ghidra
+*.gpr
+ghidra_projects/
+
+# JUCE framework — cloned locally, not part of this repo
+juce_daw_clean/external/
+juce_daw_clean/build/
+juce_daw_clean/Builds/
+
+# Quarantined legacy JUCE app (Ghidra-derived, do not touch)
+juce_app_quarantine/
+
+# Audit / temp outputs
+audit_after_fix.csv
+_tmp_plugin_*.mid
+
+# Training / server run logs and ephemeral state
+pipeline_run.log
+pipeline_pid.txt
+server_run.log
+server_generated*.mid
+midigpt_pipeline/
+reviews/
+output/
+
+# Claude Code local state (user-specific, do not share)
+.claude/settings.local.json
+.claude/worktrees/
