@@ -17,6 +17,7 @@ except ImportError:
 from .vocab import (
     MidiVocab, VOCAB, NOTE_NAMES, CHORD_QUALITIES,
     NUM_POSITIONS, PITCH_MIN, PITCH_MAX, NUM_VELOCITIES,
+    NUM_CC_EXPRESSION, NUM_CC_MODULATION, NUM_PITCH_BEND,
 )
 
 
@@ -136,6 +137,15 @@ class MidiDecoder:
                tok.startswith("ChordRoot_") or tok.startswith("ChordQual_") or \
                tok.startswith("Bass_") or tok.startswith("Func_") or \
                tok.startswith("Dyn_") or tok.startswith("Art_"):
+                i += 1
+                continue
+
+            # Skip expressive tokens (recognised but not mapped to note events)
+            # These are valid model output — not "unknown" — but represent
+            # CC/PitchBend/Pedal data that doesn't affect note decoding.
+            if tok.startswith("Expr_") or tok.startswith("Mod_") or \
+               tok.startswith("Pedal_") or tok.startswith("PB_") or \
+               tok.startswith("InstFam_"):
                 i += 1
                 continue
 

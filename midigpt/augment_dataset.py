@@ -81,9 +81,9 @@ def classify_program(program: int, is_drum: bool) -> str:
     if 96 <= program <= 103:
         return "fx"           # synth effects
     if 104 <= program <= 111:
-        return "other"        # ethnic
+        return "strings"      # ethnic (sitar, banjo, koto → closest: strings)
     if 112 <= program <= 119:
-        return "other"        # percussive
+        return "drums"        # percussive
     if 120 <= program <= 127:
         return "fx"           # sound effects
     return "other"
@@ -138,7 +138,7 @@ def dropout_midi(
     if len(groups) <= min_groups:
         return None  # Can't drop anything meaningful
 
-    harmonic_types = {"keys", "guitar", "strings", "bass", "brass", "woodwind", "synth"}
+    harmonic_types = {"accomp", "guitar", "strings", "bass", "brass", "woodwind", "lead", "pad"}
     harmonic_groups = [g for g in groups if g in harmonic_types]
 
     if not harmonic_groups:

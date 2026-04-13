@@ -457,6 +457,13 @@ class MidiGPTInference:
             if min_new_tokens > 0 and step < min_new_tokens:
                 logits[:, eos_id] = float("-inf")
 
+            # ----- Always suppress PAD token during generation -----
+            # PAD (id=0) is a training artifact (sequence padding). The model
+            # should never emit it during inference. Without this, the model
+            # can fill min_new_tokens quota with PAD tokens that decode to
+            # nothing, producing nearly-empty MIDI output.
+            logits[:, self.vocab.pad_id] = float("-inf")
+
             # Apply temperature
             logits = logits / temperature
 
@@ -860,8 +867,12 @@ class MidiGPTInference:
         if input_ids and input_ids[-1] == self.vocab.eos_id:
             input_ids = input_ids[:-1]
 
-        # Add SEP token to signal "now generate variation"
-        input_ids.append(self.vocab.sep_id)
+        # When a LoRA adapter is active (SFT-trained), the model has learned
+        # the ``input <SEP> output`` format.  For a bare pre-trained model
+        # the SEP token was never seen during training, so we simply let it
+        # continue the sequence (autoregressive continuation).
+        if self._active_lora is not None:
+            input_ids.append(self.vocab.sep_id)
         sep_pos = len(input_ids)
 
         start_time = time.time()
@@ -975,7 +986,10 @@ class MidiGPTInference:
         input_ids = self.encoder.encode_file(midi_path, meta=meta, chords=chords)
         if input_ids and input_ids[-1] == self.vocab.eos_id:
             input_ids = input_ids[:-1]
-        input_ids.append(self.vocab.sep_id)
+
+        # Only add SEP when SFT-trained LoRA is active (see generate_variation)
+        if self._active_lora is not None:
+            input_ids.append(self.vocab.sep_id)
 
         input_tensor = torch.tensor([input_ids], dtype=torch.long, device=self.device)
 

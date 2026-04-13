@@ -14,7 +14,7 @@ class MidiGPTConfig:
     Parameters:   ~50M
     """
     # Vocabulary
-    vocab_size: int = 527          # v2.0 expanded vocab (was 448 pre-Cubase15 expansion)
+    vocab_size: int = 527          # v2.0 expanded vocab (Cubase15 확장, 33 articulations)
 
     # Transformer dimensions (tuned for ~50M parameters)
     n_layer: int = 12              # number of transformer blocks
