@@ -85,6 +85,12 @@ def train_sft(args):
     # Optimizer (only LoRA parameters)
     optimizer = torch.optim.AdamW(lora_params, lr=args.lr, weight_decay=0.01)
 
+    # Mixed precision — without GradScaler, fp16 gradients underflow and the
+    # model silently fails to learn. Mirrors train_pretrain.py.
+    use_amp = device.type == "cuda"
+    scaler = torch.amp.GradScaler(enabled=use_amp)
+    autocast_dtype = torch.float16 if use_amp else torch.float32
+
     # Training
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -102,20 +108,25 @@ def train_sft(args):
             input_ids = batch["input_ids"].to(device)
             labels = batch["labels"].to(device)
 
-            with torch.amp.autocast(device_type=device.type, dtype=torch.float16, enabled=device.type == "cuda"):
+            with torch.amp.autocast(device_type=device.type, dtype=autocast_dtype, enabled=use_amp):
                 _, loss, _ = model(input_ids, targets=labels)
+                # Normalize by grad_accum so effective LR is independent of it.
+                loss = loss / args.grad_accum
 
-            loss.backward()
+            scaler.scale(loss).backward()
 
             if (batch_idx + 1) % args.grad_accum == 0 or (batch_idx + 1) == len(loader):
+                scaler.unscale_(optimizer)
                 nn.utils.clip_grad_norm_(lora_params, 1.0)
-                optimizer.step()
+                scaler.step(optimizer)
+                scaler.update()
                 optimizer.zero_grad(set_to_none=True)
 
-            epoch_loss += loss.item()
+            batch_loss = loss.item() * args.grad_accum
+            epoch_loss += batch_loss
 
             if (batch_idx + 1) % 10 == 0:
-                print(f"  Epoch {epoch+1} | Batch {batch_idx+1}/{len(loader)} | Loss {loss.item():.4f}")
+                print(f"  Epoch {epoch+1} | Batch {batch_idx+1}/{len(loader)} | Loss {batch_loss:.4f}")
 
         avg_loss = epoch_loss / max(len(loader), 1)
         elapsed = time.time() - start_time
