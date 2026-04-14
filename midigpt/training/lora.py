@@ -50,9 +50,14 @@ class LoRALinear(nn.Module):
         in_features = original.in_features
         out_features = original.out_features
 
+        # Match device/dtype of the (possibly already-moved) base layer so LoRA
+        # params don't end up on CPU when the model is on GPU.
+        device = original.weight.device
+        dtype = original.weight.dtype
+
         # LoRA matrices
-        self.lora_A = nn.Parameter(torch.empty(r, in_features))
-        self.lora_B = nn.Parameter(torch.zeros(out_features, r))
+        self.lora_A = nn.Parameter(torch.empty(r, in_features, device=device, dtype=dtype))
+        self.lora_B = nn.Parameter(torch.zeros(out_features, r, device=device, dtype=dtype))
         self.lora_dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
         # Initialize A with Kaiming, B with zeros (so LoRA starts as identity)
@@ -72,10 +77,14 @@ class LoRALinear(nn.Module):
 
     def merge(self) -> nn.Linear:
         """Merge LoRA weights into original for inference (no overhead)."""
+        device = self.original.weight.device
+        dtype = self.original.weight.dtype
         merged = nn.Linear(
             self.original.in_features,
             self.original.out_features,
             bias=self.original.bias is not None,
+            device=device,
+            dtype=dtype,
         )
         merged.weight.data = (
             self.original.weight.data +
