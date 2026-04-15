@@ -1,0 +1,250 @@
+================================================================
+MidiGPT 5차 베타 리포트 — 개발자 회신
+대상: 테스터(유환) | 날짜: 2026-04-15
+================================================================
+
+먼저, "이전에는 음악이라는 것 자체에 대한 이해도가 떨어졌지만
+이제는 음악을 만든다는 느낌을 받는다" 는 평가 감사드립니다.
+4차까지와 비교해 체감 품질이 전환점에 들어섰다는 신호로 받아들이고,
+남아있는 3대 이슈를 근본 원인까지 내려가서 수정했습니다.
+
+요약하면, **리포트에 적힌 표면적 원인과 실제 근본 원인이 달랐고**,
+표면만 고치면 같은 패턴이 다른 곳에서 재발할 구조였습니다. 이번
+대응에서는 개별 버그 수정과 함께 **재발 방지용 규약 체계**를
+병행 구축했습니다.
+
+
+================================================================
+[1순위 BLOCKING] SFT DataLoader KeyError — 수정 완료
+================================================================
+
+■ 리포트 설명
+  dataset.py 와 build_sft_pairs.py 간 키 이름 불일치.
+
+■ 실제 근본 원인
+  두 파일 모두 "input"/"output" 키를 사용하고 있었고, 키는
+  일치했습니다. 진짜 범인은:
+
+  - build_sft_pairs.py 가 SFT 페어와 같은 디렉토리에
+    summary.json 을 저장
+  - dataset.py _load_sft 가 glob("*.json") 으로 디렉토리 내
+    모든 JSON을 로드
+  - summary.json 에는 "input" 키가 없음 → pair["input"] KeyError
+
+  표면적으로는 "키 이름 불일치" 로 보이지만, 사실은
+  "메타 파일이 loader 의 glob 패턴에 섞여 들어간" 문제였습니다.
+
+■ 수정 내용 (midigpt/data/dataset.py, 커밋 83ed3a1)
+  이중 방어 도입:
+
+  (1) Glob 패턴을 좁힘
+      sft_*.json / dpo_*.json 으로만 매치
+      → summary.json, 메타, 로그 파일이 섞여도 1차 차단
+
+  (2) 스키마 검증 후 skip
+      필수 키("input"/"output", DPO는 "prompt"/"chosen"/"rejected")
+      가 없는 JSON 은 KeyError 가 아니라 skip + warn + count
+      → 향후 다른 메타 파일이 들어와도 파이프라인이 죽지 않음
+
+  (3) 구체 예외만 catch
+      json.JSONDecodeError 만 잡아서 malformed JSON 을 skip
+      (광범위 except 로 원인 은폐하는 안티패턴 방지)
+
+■ 영향
+  기존 체크포인트 호환 (재학습 불필요).
+  기존 SFT 페어 파일(sft_0000.json 형식)도 그대로 사용 가능.
+  바로 SFT LoRA 학습 재개 가능합니다.
+
+
+================================================================
+[2순위] accomp 트랙 쏠림 — 4가지 원인 전부 수정 완료
+================================================================
+
+■ 리포트 내용
+  트랙 분류가 accomp 하나에 집중됨. 지속 미해결.
+  트랙명 기반 분류가 작동하는지 / 미등록 트랙명 처리 정책을
+  확인해달라는 요청.
+
+■ 실제 근본 원인 (4가지가 복합 작용)
+  테스터 MIDI 31개 트랙명을 _classify_track 로직에 대입하며
+  전수 조사한 결과:
+
+  (1) BASSOON → bass 로 오분류 [표면 버그]
+      "bass" substring 매치가 "bassoon" 에도 걸림.
+      실제로 bassoon 은 woodwind.
+
+  (2) STRING (단수) → 매치 실패 [표면 버그]
+      코드가 "strings" 복수형과 "string_" prefix 만 체크하고
+      "string" 단수형은 누락. 테스터 트랙명 "STRING" 이 매치 실패.
+
+  (3) TIMPANI → 매치 실패 [표면 버그]
+      타악기 키워드 목록(drum/perc/kick/snare/hihat/cymbal/tom)
+      에 timpani 가 없음.
+
+  (4) ★ 진짜 근본 원인 ★
+      테스터 MIDI 는 program number 를 지정하지 않음 → 기본값 0.
+      이름 매치가 실패한 모든 트랙이 프로그램 기반 fallback 으로
+      내려가고, 거기서 "0 <= prog <= 7 → Piano family → accomp"
+      로 수렴.
+
+      즉, (2)(3) 같은 이름 매치 누락이 생길 때마다 해당 트랙이
+      조용히 accomp 로 흘러들어가고 있었습니다. 이게 "accomp 쏠림"
+      의 구조적 원인이었습니다.
+
+■ 수정 내용 (midigpt/tokenizer/encoder.py, 커밋 29a3e87)
+
+  (1) bass substring 체크에서 bassoon 도 제외
+      "bass" in name AND "brass" not in name AND "bassoon" not in name
+      → BASSOON 은 woodwind 키워드로 내려가서 정상 분류
+
+  (2) strings 키워드에 "string" 단수형 추가
+
+  (3) drum 키워드에 timpani, mallet 추가
+
+  (4) ★ 근본 수정 ★
+      이름이 비어있지 않고 program == 0 이면, program 기반
+      fallback 을 건너뛰고 register 기반 fallback 으로 내려감.
+      이유: MIDI 기본값 0 은 "Acoustic Grand Piano" 가 아니라
+      "미지정" 을 의미할 가능성이 더 높음 (유환님 MIDI 가 정확히
+      이 경우).
+
+      예외: 이름이 아예 빈 legacy GM MIDI 는 기존대로 program
+      fallback 사용 (program 이 유일한 힌트이므로).
+
+■ 31개 트랙명 전수 매핑 (수정 후)
+  DRUM, BASSDRUM, SNARE, CYMBAL, TIMPANI       → drums
+  BASS, C.BASS, SYNTHBASS                      → bass
+  PIANO                                        → accomp
+  E.GUITAR, A.GUITAR, E.GUITAR MUTE,
+    A.GUITAR MUTE                              → guitar
+  STRING, VIOLIN1, VIOLIN2, VIOLA, CELLO       → strings
+  BRASS, TRUMPET, F.HORN, TROMBONE, TUBA       → brass
+  WOODWIND, FLUTE, OBOE, CLARINET, BASSOON     → woodwind
+  SYNTHLEAD, SYNTHPLUCK                        → lead
+  SYNTHPAD                                     → pad
+
+  이 매핑 전수가 test_classifier.py 의 회귀 테스트로 들어갔습니다
+  (test_5th_report_track_names). 앞으로 같은 실수는 테스트에서
+  걸립니다.
+
+■ ★중요★ 영향
+  토크나이저 분포가 바뀌므로 기존 체크포인트는 비호환입니다.
+  **재토크나이징 + 재학습이 필요**합니다.
+  커밋 메시지 본문에 "BREAKING: retokenize + retrain required"
+  명시되어 있습니다.
+
+■ 하나 확인 부탁
+  "C.BASS" 를 현재 bass 로 매핑했습니다. 의미상 콘트라베이스
+  (strings) 일 수도 있어 보이는데, 어느 쪽이 원하신 분류인지
+  알려주시면 반영하겠습니다. (일렉베이스 계열이면 현재가 맞고,
+  오케스트라 콘트라베이스면 strings 로 옮겨야 함)
+
+
+================================================================
+[3순위] 노트 공백 구간 — 조사만 완료, 수정은 SFT 후 재평가
+================================================================
+
+■ 리포트 내용
+  생성된 MIDI 의 음이 비어있는 구간이 중간중간 발생.
+  토크나이저 time delta 처리 또는 EOS suppression 이 원인으로
+  추정.
+
+■ 조사 결과
+
+  (a) 토크나이저 인코딩/디코딩 점검
+      - 인코더는 빈 bar 를 건너뛸 수 있음 (현재 코드)
+      - 단, Bar_{N} 을 "절대 인덱스" 로 쓰기 때문에 디코더 복원은
+        정확 (current_bar * ticks_per_bar + current_pos * ...).
+        즉, 인코드/디코드 round-trip 은 시간 위치를 잃지 않음.
+      - → 학습 데이터 자체의 공백은 이 경로에서 생기지 않음.
+
+  (b) 생성(inference) 시 시퀀스 구조 위반이 원인으로 추정
+      - 디코더는 Pos → Pitch → Vel → Dur 순서를 기대
+      - 모델이 순서를 어기면 (예: Pos 다음에 Pos 가 또 나오면)
+        첫 노트는 버려짐 (current_pitch is None)
+      - 모델이 Bar_3 다음에 Bar_5 로 점프하면 중간 두 마디는 공백
+      - → 이건 "학습 분포를 모델이 완전히 따라하지 못함" 문제
+      - SFT 는 정확히 이 시퀀스 컨벤션을 강화 학습하는 단계.
+        SFT 완료 전에는 Bug 2 를 토크나이저 단계에서 고쳐야 할지
+        판단하기 이름.
+
+  (c) EOS suppression 로직 조사
+      - inference/engine.py 에 min_new_tokens 로 부분 적용된 상태
+      - 다만 서버 경로(inference_server.py) 와 테스트 경로
+        (test_generate.py) 양쪽에서 정책이 분산되어 있을 수 있음
+      - SFT 후 서버 경로에서 테스트 해 주시면 조기 종료 재발
+        여부를 정확히 판단 가능
+
+■ 따라서 권장 순서
+  1. 1순위 수정 덕분에 SFT 학습 재개 가능 → 먼저 SFT 진행
+  2. 2순위 수정 반영을 위해 재토크나이징 + pre-training 재실행
+     (병행 가능)
+  3. SFT 완료 후 Cubase 에서 생성 결과 재청취
+     - 노트 공백이 해소되면 (b) 가정이 맞았던 것
+     - 여전하면 EOS suppression 을 inference 전체 경로에
+       재점검 (개발자 추가 대응)
+
+
+================================================================
+[추가] 재발 방지용 개발 프로세스 구조 도입
+================================================================
+
+1~5차 리포트의 버그를 돌이켜보면 공통 패턴이 있었습니다:
+
+  - 스키마 불일치 (컴포넌트 경계)
+  - 묵시적 fallback (기본값이 에러를 삼킴)
+  - 정책 분산 (같은 로직이 여러 파일에 복붙되어 한 쪽만 고쳐짐)
+  - 경계 조건 누락 (Windows 인코딩, fp16 GradScaler, LoRA dtype)
+  - 체크포인트 호환성 표기 누락
+
+개별 버그만 고치면 같은 범주가 다른 곳에서 다시 터집니다. 그래서
+이번에 **작업 단계별 역할 축** 을 도입했습니다:
+
+  Design Composer → Main/Sub Coder → Reviewer
+
+- Design Composer: 변경 착수 전 "계약·실패 모드·영향 범위" 를
+  명시한 설계서 작성. 설계서 없이 구현 불가.
+- Main/Sub Coder: 설계서 기반 구현. 범위 밖 작업 금지.
+- Reviewer: 적대적 관점에서 diff 검토. 과거 버그 패턴(A~H) 대조
+  통과 못 하면 커밋 차단.
+
+산출물:
+  CLAUDE.md                     — 프로세스 규약
+  .claude/rules/                — 파일 스키마, fallback 정책,
+                                  Windows 호환, 커밋 규약,
+                                  버그 히스토리 (패턴 A~H)
+  .claude/agents/role-*.md      — 역할별 에이전트 명세 4개
+  .claude/skills/               — 체크리스트 3개
+
+특히 rules/05-bug-history.md 는 "회귀 금지 목록" 역할을 합니다.
+새 버그가 발견되면 해당 패턴에 사례를 추가하는 게 Reviewer 의
+의무로, 문서는 시간이 지날수록 강화됩니다.
+
+커밋 이력: 3ec3dfc (프로세스 구조) → 83ed3a1 (Bug 1) → 29a3e87 (Bug 3)
+
+
+================================================================
+정리 — 유환님이 확인 / 진행하실 일
+================================================================
+
+1. 최신 main 을 pull
+   git pull  (83ed3a1, 29a3e87 포함)
+
+2. SFT 학습 바로 재개 가능 (Bug 1 해제됨)
+   python -m midigpt.training.train_sft_lora ...
+
+3. Bug 3 의 변경은 재토크나이징 + 재학습을 요구합니다.
+   시간 비용상, 가능하면:
+   - 지금 진행 중인 SFT 를 먼저 완료해서 A/B 비교 기준 확보
+   - 그 뒤에 재토크나이즈 + pre-training 재실행
+   순서를 권장합니다.
+
+4. 재학습 후 Cubase 에서 생성 결과 재청취해 주시면, 노트 공백
+   (Bug 2) 의 실제 해소 여부를 판단할 수 있습니다.
+
+5. C.BASS 분류 방향(bass vs strings) 알려주세요.
+
+6. 새로 발견되시는 이슈는 이전처럼 txt 리포트로 주시면 됩니다.
+   이번 구조 덕분에 같은 범주의 버그는 줄어들 것으로 예상합니다.
+
+감사합니다.

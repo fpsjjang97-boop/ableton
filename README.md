@@ -439,6 +439,32 @@ repo/
 - ✅ DPO quantile fallback (2026-04-08)
 - ✅ 토큰 경로 자동 탐색 (2026-04-08)
 - ✅ Windows UTF-8 인코딩 강제 (2026-04-08)
+- ✅ fp16 GradScaler + grad_accum loss 스케일링 (2026-04-14)
+- ✅ LoRALinear base layer device/dtype 상속 (2026-04-14)
+- ✅ SFT loader 메타파일 glob 혼입 차단 + 스키마 검증 (2026-04-15)
+- ✅ `_classify_track` accomp 쏠림 4건 수정 — BASSOON / STRING 단수 / TIMPANI / program=0 근본 (2026-04-15) `BREAKING: retokenize + retrain`
+
+### 🛡️ 개발 프로세스 구조 (2026-04-15)
+
+반복되는 동종 버그 패턴을 끊기 위해 **작업 단계 역할 축** 도입:
+
+```
+Design Composer → Main/Sub Coder → Reviewer
+```
+
+- **도메인 agent** (`dev-ml`, `dev-juce`, `dev-integration`, `dev-test`, `dev-docs`, `persona-*`): *어느 코드 영역*
+- **역할 agent** (`role-design-composer`, `role-main-coder`, `role-sub-coder`, `role-reviewer`): *어느 작업 단계*
+
+두 축은 직교. 모든 변경은 설계서 → 구현 → 적대적 리뷰를 거친다.
+
+| 산출물 | 위치 | 용도 |
+|--------|------|------|
+| 루트 규약 | [`CLAUDE.md`](CLAUDE.md) | 프로세스 개요 |
+| 계약·정책 | [`.claude/rules/`](.claude/rules/) | 파일 스키마, fallback 정책, Windows 호환, 커밋 규약, **버그 히스토리 (패턴 A~H)** |
+| 역할 | [`.claude/agents/role-*.md`](.claude/agents/) | 단계별 에이전트 명세 |
+| 체크리스트 | [`.claude/skills/`](.claude/skills/) | pre-change / cross-boundary / bug-regression |
+
+`rules/05-bug-history.md` 는 Reviewer 필수 대조 대상. 새 버그 발견 시 패턴 추가가 의무화되어 문서가 시간에 따라 강화된다.
 
 ### Phase 2 — 데이터 수집 ← **현재**
 - 104곡 → 목표 2,000곡+
