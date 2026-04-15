@@ -365,17 +365,29 @@ class MidiEncoder:
             3. Average pitch register fallback (bass / melody).
             4. Default ``other``.
 
-        History (2026-04-09 fix, BUG 6 correction):
-            The previous version of this function mapped Guitar → accomp,
-            Strings → pad, Brass → lead, Reed/Pipe → melody — these were
-            inconsistent with ``vocab.TRACK_TYPES`` which already has
-            ``guitar``, ``strings``, ``brass``, ``woodwind``, ``vocal``.
-            Result: almost every non-drum track collapsed to 2-3 categories
-            (``accomp`` / ``pad`` / ``bass``), producing the "everything is
-            accomp" symptom reported in 2nd tester feedback. This is fixed
-            here. After applying this fix, re-tokenise the dataset and
-            retrain (previous checkpoints are incompatible with the new
-            distribution).
+        History:
+            2026-04-09 (BUG 6 correction):
+              Guitar → accomp, Strings → pad, Brass → lead, Reed/Pipe → melody
+              were collapsed to 2-3 categories; remapped to native categories.
+
+            2026-04-15 (5차 리포트 Bug 3, rules/05 패턴 B):
+              1) "BASSOON" → ``bass`` (substring of "bass"). Fixed: bass
+                 substring check excludes both "brass" and "bassoon".
+              2) "STRING" (singular) failed name match because only "strings"
+                 was listed. Fixed: added "string" singular keyword.
+              3) "TIMPANI" had no percussion keyword. Fixed: added timpani,
+                 mallet.
+              4) Root cause of accomp 쏠림: MIDI files without explicit
+                 program numbers get inst.program == 0, which previously
+                 matched ``0-7 → accomp`` (Piano family). Tester MIDI had
+                 explicit track names but no program numbers, so any name
+                 that missed the keyword table silently drifted to accomp.
+                 Fixed: when program == 0 AND name is non-empty, treat
+                 program as "unspecified" and skip program-based fallback;
+                 go straight to register-based fallback.
+
+            BREAKING: retokenize + retrain required after this change
+            (rules/04-commit-discipline.md, rules/05 패턴 F).
         """
         name_lower = inst.name.lower() if inst.name else ""
 
@@ -384,20 +396,25 @@ class MidiEncoder:
         # -------------------------------------------------------------
         # Drums (defensive — caller already short-circuits inst.is_drum)
         if any(k in name_lower for k in
-               ("drum", "perc", "kick", "snare", "hihat", "cymbal", "tom")):
+               ("drum", "perc", "kick", "snare", "hihat", "cymbal", "tom",
+                "timpani", "mallet")):
             return "drums"
 
-        # Bass (check before "brass" which contains "bass" — we guard below)
-        if "bass" in name_lower and "brass" not in name_lower:
+        # Bass — must guard substring collisions with "brass" and "bassoon"
+        if ("bass" in name_lower
+                and "brass" not in name_lower
+                and "bassoon" not in name_lower):
             return "bass"
 
         # Vocal
         if any(k in name_lower for k in ("vocal", "voice", "vox", "choir")):
             return "vocal"
 
-        # Strings family
+        # Strings family (accept both singular "string" and plural "strings";
+        # "string_" kept for legacy track names with an underscore suffix)
         if any(k in name_lower for k in
-               ("violin", "viola", "cello", "contrabass", "strings", "string_")):
+               ("violin", "viola", "cello", "contrabass",
+                "strings", "string", "string_")):
             return "strings"
 
         # Brass family
@@ -444,26 +461,35 @@ class MidiEncoder:
         # -------------------------------------------------------------
         # 2. GM program-number detection (priority 2)
         #    General MIDI program ranges → semantically closest TRACK_TYPE.
-        #    Previously several ranges were wrongly collapsed to accomp /
-        #    pad / lead / melody — those are corrected here.
+        #
+        #    IMPORTANT (rules/02-fallback-policy.md, 패턴 B):
+        #    program == 0 is the MIDI default, often meaning "unspecified"
+        #    rather than "Acoustic Grand Piano". If the track name is
+        #    non-empty and did not match any keyword above, treating
+        #    program=0 as Piano family silently drifts every such track to
+        #    ``accomp`` — the 5차 accomp 쏠림 symptom. So when a name is
+        #    present, skip program-based fallback on program=0 and let
+        #    register-based fallback take over.
         # -------------------------------------------------------------
         prog = inst.program
-        if 0 <= prog <= 7:      return "accomp"    # Piano family
-        if 8 <= prog <= 15:     return "accomp"    # Chromatic perc (celesta, vibes, marimba)
-        if 16 <= prog <= 23:    return "accomp"    # Organ family
-        if 24 <= prog <= 31:    return "guitar"    # Guitar family  (was: accomp)
-        if 32 <= prog <= 39:    return "bass"      # Bass family
-        if 40 <= prog <= 47:    return "strings"   # Solo strings   (was: — / fell-through)
-        if 48 <= prog <= 55:    return "strings"   # Ensemble strings (was: pad)
-        if 56 <= prog <= 63:    return "brass"     # Brass family   (was: lead)
-        if 64 <= prog <= 71:    return "woodwind"  # Reed           (was: melody)
-        if 72 <= prog <= 79:    return "woodwind"  # Pipe / flute   (was: melody)
-        if 80 <= prog <= 87:    return "lead"      # Synth lead
-        if 88 <= prog <= 95:    return "pad"       # Synth pad
-        if 96 <= prog <= 103:   return "fx"        # Synth effects
-        if 104 <= prog <= 111:  return "strings"   # Ethnic (sitar, banjo, koto → closest)
-        if 112 <= prog <= 119:  return "drums"     # Percussive
-        if 120 <= prog <= 127:  return "fx"        # Sound effects
+        name_present = bool(name_lower)
+        if not (name_present and prog == 0):
+            if 0 <= prog <= 7:      return "accomp"    # Piano family
+            if 8 <= prog <= 15:     return "accomp"    # Chromatic perc (celesta, vibes, marimba)
+            if 16 <= prog <= 23:    return "accomp"    # Organ family
+            if 24 <= prog <= 31:    return "guitar"    # Guitar family
+            if 32 <= prog <= 39:    return "bass"      # Bass family
+            if 40 <= prog <= 47:    return "strings"   # Solo strings
+            if 48 <= prog <= 55:    return "strings"   # Ensemble strings
+            if 56 <= prog <= 63:    return "brass"     # Brass family
+            if 64 <= prog <= 71:    return "woodwind"  # Reed
+            if 72 <= prog <= 79:    return "woodwind"  # Pipe / flute
+            if 80 <= prog <= 87:    return "lead"      # Synth lead
+            if 88 <= prog <= 95:    return "pad"       # Synth pad
+            if 96 <= prog <= 103:   return "fx"        # Synth effects
+            if 104 <= prog <= 111:  return "strings"   # Ethnic (sitar, banjo, koto → closest)
+            if 112 <= prog <= 119:  return "drums"     # Percussive
+            if 120 <= prog <= 127:  return "fx"        # Sound effects
 
         # -------------------------------------------------------------
         # 3. Register-based fallback (priority 3)

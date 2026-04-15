@@ -229,6 +229,91 @@ def test_all_categories_reachable(encoder, result, verbose):
             print(f"  [OK  ] All 13 primary categories reachable")
 
 
+def test_5th_report_track_names(encoder, result, verbose):
+    """5차 리포트(2026-04-15) 테스터가 명시한 31개 트랙명.
+
+    테스터 MIDI 는 program number 를 지정하지 않아 기본값 0 이 들어온다.
+    이 상태에서 이름 기반 매치로만 정확히 분류되어야 한다 (rules/05 패턴 B
+    — program=0 은 "미지정" 으로 간주하여 Piano family fallback 하지 않음).
+    """
+    print("\n[TEST 5] 5차 리포트 31개 트랙명 (program=0, 이름 기반 매치)")
+
+    # Format: (track_name, expected_category)
+    cases = [
+        # Drums
+        ("DRUM",         "drums"),
+        ("BASSDRUM",     "drums"),
+        ("SNARE",        "drums"),
+        ("CYMBAL",       "drums"),
+        ("TIMPANI",      "drums"),
+        # Bass
+        ("BASS",         "bass"),
+        ("C.BASS",       "bass"),
+        ("SYNTHBASS",    "bass"),
+        # Keys → accomp
+        ("PIANO",        "accomp"),
+        # Guitar
+        ("E.GUITAR",     "guitar"),
+        ("A.GUITAR",     "guitar"),
+        ("E.GUITAR MUTE","guitar"),
+        ("A.GUITAR MUTE","guitar"),
+        # Strings
+        ("STRING",       "strings"),
+        ("VIOLIN1",      "strings"),
+        ("VIOLIN2",      "strings"),
+        ("VIOLA",        "strings"),
+        ("CELLO",        "strings"),
+        # Brass
+        ("BRASS",        "brass"),
+        ("TRUMPET",      "brass"),
+        ("F.HORN",       "brass"),
+        ("TROMBONE",     "brass"),
+        ("TUBA",         "brass"),
+        # Woodwind
+        ("WOODWIND",     "woodwind"),
+        ("FLUTE",        "woodwind"),
+        ("OBOE",         "woodwind"),
+        ("CLARINET",     "woodwind"),
+        ("BASSOON",      "woodwind"),   # was incorrectly classified as "bass"
+        # Synth
+        ("SYNTHLEAD",    "lead"),
+        ("SYNTHPLUCK",   "lead"),
+        ("SYNTHPAD",     "pad"),
+    ]
+
+    for name, expected in cases:
+        inst = _mock_instrument(name=name, program=0)
+        actual = encoder._classify_track(inst)
+        result.check(f"'{name}' (prog=0)", actual, expected, verbose)
+
+
+def test_program_zero_name_present_skips_program_fallback(encoder, result, verbose):
+    """program=0 + 비어있지 않은 이름 + 이름 매치 실패 → program fallback 건너뜀.
+
+    rules/05 패턴 B 의 근본 방어. accomp 쏠림 방지.
+    """
+    print("\n[TEST 6] program=0 + 이름 있음 + 매치 실패 → accomp 로 가지 않음")
+
+    # 이름은 있지만 키워드 테이블에 없는 가상의 케이스.
+    # register fallback 이 bass (< 48) 로 가야 함.
+    inst = _mock_instrument(name="UNKNOWN_INSTRUMENT_ABC", program=0, avg_pitch=40)
+    cat = encoder._classify_track(inst)
+    result.check("unmatched name + program=0 + low avg pitch",
+                 cat, "bass", verbose)
+
+    # register fallback 범위 밖(중간) 이면 other.
+    inst = _mock_instrument(name="UNKNOWN_INSTRUMENT_ABC", program=0, avg_pitch=60)
+    cat = encoder._classify_track(inst)
+    result.check("unmatched name + program=0 + mid avg pitch",
+                 cat, "other", verbose)
+
+    # 이름이 비어있으면 program=0 은 "미지정" 판단 불가 → program fallback 사용 (accomp).
+    inst = _mock_instrument(name="", program=0)
+    cat = encoder._classify_track(inst)
+    result.check("empty name + program=0 (must still use program fallback)",
+                 cat, "accomp", verbose)
+
+
 def test_accomp_ratio_sanity(encoder, result, verbose):
     """Given a diverse set of tracks, accomp should NOT dominate.
 
@@ -289,6 +374,8 @@ def main():
     test_real_world_track_names(encoder, result, args.verbose)
     test_gm_program_ranges(encoder, result, args.verbose)
     test_all_categories_reachable(encoder, result, args.verbose)
+    test_5th_report_track_names(encoder, result, args.verbose)
+    test_program_zero_name_present_skips_program_fallback(encoder, result, args.verbose)
     test_accomp_ratio_sanity(encoder, result, args.verbose)
 
     print()
