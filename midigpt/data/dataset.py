@@ -102,30 +102,77 @@ class MidiDataset(Dataset):
                 self.chunks.append((file_idx, start))
 
     def _load_sft(self):
-        """Load SFT paired data from JSON files."""
+        """Load SFT paired data from JSON files.
+
+        Two-layer defense against metadata files (e.g., ``summary.json``)
+        sharing the output directory (rules/05-bug-history.md — 패턴 A):
+          1. Glob pattern restricted to ``sft_*.json`` (producer convention).
+          2. Schema validation: entries missing "input"/"output" are skipped
+             with a warning rather than raising KeyError downstream.
+        """
         self.sft_pairs: list[dict] = []
         sft_dir = self.data_dir / "sft"
 
         if not sft_dir.exists():
             raise FileNotFoundError(f"SFT directory not found: {sft_dir}")
 
-        for json_file in sorted(sft_dir.glob("*.json")):
-            with open(json_file, "r", encoding="utf-8") as f:
-                pair = json.load(f)
-                self.sft_pairs.append(pair)
+        skipped_schema = 0
+        skipped_parse = 0
+        for json_file in sorted(sft_dir.glob("sft_*.json")):
+            try:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    pair = json.load(f)
+            except json.JSONDecodeError as e:
+                skipped_parse += 1
+                print(f"  [WARN] SFT skip (malformed JSON) {json_file.name}: {e}")
+                continue
+
+            if not (isinstance(pair, dict)
+                    and "input" in pair and "output" in pair):
+                skipped_schema += 1
+                print(f"  [WARN] SFT skip (missing input/output) {json_file.name}")
+                continue
+
+            self.sft_pairs.append(pair)
+
+        if skipped_schema or skipped_parse:
+            print(f"  [INFO] SFT load: {len(self.sft_pairs)} ok, "
+                  f"{skipped_schema} schema-invalid, {skipped_parse} malformed")
 
     def _load_dpo(self):
-        """Load DPO preference data from JSON files."""
+        """Load DPO preference data from JSON files.
+
+        Same defense as _load_sft (rules/05-bug-history.md — 패턴 A).
+        """
         self.dpo_triples: list[dict] = []
         dpo_dir = self.data_dir / "dpo"
 
         if not dpo_dir.exists():
             raise FileNotFoundError(f"DPO directory not found: {dpo_dir}")
 
-        for json_file in sorted(dpo_dir.glob("*.json")):
-            with open(json_file, "r", encoding="utf-8") as f:
-                triple = json.load(f)
-                self.dpo_triples.append(triple)
+        required = ("prompt", "chosen", "rejected")
+        skipped_schema = 0
+        skipped_parse = 0
+        for json_file in sorted(dpo_dir.glob("dpo_*.json")):
+            try:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    triple = json.load(f)
+            except json.JSONDecodeError as e:
+                skipped_parse += 1
+                print(f"  [WARN] DPO skip (malformed JSON) {json_file.name}: {e}")
+                continue
+
+            if not (isinstance(triple, dict)
+                    and all(k in triple for k in required)):
+                skipped_schema += 1
+                print(f"  [WARN] DPO skip (missing {required}) {json_file.name}")
+                continue
+
+            self.dpo_triples.append(triple)
+
+        if skipped_schema or skipped_parse:
+            print(f"  [INFO] DPO load: {len(self.dpo_triples)} ok, "
+                  f"{skipped_schema} schema-invalid, {skipped_parse} malformed")
 
     # ------------------------------------------------------------------
     # Dataset interface
