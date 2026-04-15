@@ -36,6 +36,7 @@ private:
     juce::ComboBox keySelector;
     juce::ComboBox scaleSelector;
     juce::ComboBox snapSelector;
+    juce::ComboBox countInSelector;  // Z3 — 0..4 bars
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TransportBar)
 };

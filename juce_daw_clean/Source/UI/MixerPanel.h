@@ -8,6 +8,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <array>
 #include "../Core/AudioEngine.h"
 
 class MixerPanel : public juce::Component,
@@ -36,6 +37,14 @@ private:
         std::unique_ptr<juce::Label>      nameLabel;
         std::unique_ptr<juce::Label>      dbLabel;
 
+        // V2/W2 — up to 2 send slots per strip
+        struct SendSlot
+        {
+            std::unique_ptr<juce::ComboBox> busCombo;
+            std::unique_ptr<juce::Slider>   level;
+        };
+        std::array<SendSlot, 2> sends;
+
         juce::Colour trackColour;
 
         // VU meter state
@@ -44,12 +53,19 @@ private:
     };
 
     std::vector<ChannelStrip> strips;
+    std::vector<ChannelStrip> busStrips;   // T4 — mixer strips for user buses
     ChannelStrip masterStrip;
 
+    juce::TextButton addBusButton { "+ Bus" };
+
     void rebuildStrips();
+    void buildBusStrip(ChannelStrip& cs, int busId);
     void drawVuMeter(juce::Graphics& g, int x, int y, int w, int h, float level, float peak);
+    void mouseDown(const juce::MouseEvent& e) override;   // X5
+    void showBusContextMenu(int busId);                   // X5
 
     static constexpr int stripWidth  = 80;
+    static constexpr int busWidth    = 80;
     static constexpr int masterWidth = 100;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MixerPanel)

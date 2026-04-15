@@ -67,6 +67,38 @@ target_sources(MidiGPTDAW PRIVATE
     Source/AI/AIBridge.cpp
     Source/AI/AIPanel.h
     Source/AI/AIPanel.cpp
+
+    # Plugin hosting (F2/F3)
+    Source/Plugin/PluginHost.h
+    Source/Plugin/PluginHost.cpp
+    Source/Plugin/PluginBrowser.h
+    Source/Plugin/PluginBrowser.cpp
+    Source/Plugin/PluginEditorWindow.h
+    Source/Plugin/PluginEditorWindow.cpp
+    Source/Plugin/TrackPluginChain.h
+
+    # Audio (F5/F6)
+    Source/Audio/AudioClip.h
+    Source/Audio/OfflineRenderer.h
+    Source/Audio/OfflineRenderer.cpp
+
+    # Routing (F7)
+    Source/Core/Bus.h
+
+    # Automation (F4 + S5)
+    Source/Automation/AutomationLane.h
+    Source/Automation/AutomationEditor.h
+    Source/Automation/AutomationEditor.cpp
+
+    # Commands / Undo (V1)
+    Source/Command/EditCommands.h
+    Source/Command/EditCommands.cpp
+
+    # New editors (F8/F9)
+    Source/UI/CCLane.h
+    Source/UI/CCLane.cpp
+    Source/UI/StepSeqView.h
+    Source/UI/StepSeqView.cpp
 )
 
 # -----------------------------------------------------------------------------

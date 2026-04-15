@@ -5,6 +5,7 @@
  */
 
 #include "PianoRoll.h"
+#include "../Command/EditCommands.h"
 
 PianoRoll::PianoRoll()
 {
@@ -41,6 +42,17 @@ void PianoRoll::paint(juce::Graphics& g)
     drawPianoKeys(g);
     drawHeader(g);
     drawVelocityBar(g);
+
+    // Y1 — recording overlay
+    if (isRecording && isRecording())
+    {
+        g.setColour(juce::Colour(0x30FF0000));
+        g.fillRect(0, 0, getWidth(), getHeight());
+        g.setColour(juce::Colour(0xFFFF4444));
+        g.setFont(14.0f);
+        g.drawText("REC — editing locked", getLocalBounds().reduced(12),
+                   juce::Justification::topRight);
+    }
 }
 
 void PianoRoll::drawHeader(juce::Graphics& g)
@@ -270,6 +282,34 @@ void PianoRoll::deleteSelected()
 {
     if (!currentClip) return;
     auto& seq = currentClip->sequence;
+
+    // W1 — snapshot selected notes for undo, then perform via UndoManager
+    if (undoManager != nullptr && ! selectedIndices.empty())
+    {
+        std::vector<DeleteNotesCmd::NoteSnap> snaps;
+        for (int idx : selectedIndices)
+        {
+            if (idx < 0 || idx >= seq.getNumEvents()) continue;
+            auto* evt = seq.getEventPointer(idx);
+            if (! evt->message.isNoteOn()) continue;
+            DeleteNotesCmd::NoteSnap s;
+            s.pitch = evt->message.getNoteNumber();
+            s.vel   = evt->message.getVelocity();
+            s.ch    = evt->message.getChannel();
+            s.start = evt->message.getTimeStamp();
+            s.dur   = evt->noteOffObject
+                       ? evt->noteOffObject->message.getTimeStamp() - s.start
+                       : 0.25;
+            snaps.push_back(s);
+        }
+        undoManager->beginNewTransaction("Delete notes");
+        undoManager->perform(new DeleteNotesCmd(currentClip, std::move(snaps)));
+        selectedIndices.clear();
+        repaint();
+        if (onNotesChanged) onNotesChanged();
+        return;
+    }
+
     std::sort(selectedIndices.begin(), selectedIndices.end(), std::greater<int>());
     for (int idx : selectedIndices)
     {
@@ -291,6 +331,10 @@ void PianoRoll::deleteSelected()
 // ---------------------------------------------------------------------------
 void PianoRoll::mouseDown(const juce::MouseEvent& e)
 {
+    // Y1 — block edits while recording (read-only preview). Velocity bar,
+    // note draw/select/erase all disabled. Playhead continues to update.
+    if (isRecording && isRecording()) return;
+
     float mx = (float)e.x, my = (float)e.y;
 
     // Velocity bar
@@ -311,6 +355,22 @@ void PianoRoll::mouseDown(const juce::MouseEvent& e)
             dragMode = VelocityEdit;
             dragNoteIdx = closest;
             selectedIndices = { closest };
+
+            // Z2 — snapshot for undo
+            velBefore.clear();
+            auto* e0 = seq.getEventPointer(closest);
+            if (e0 != nullptr && e0->message.isNoteOn())
+            {
+                NoteBefore nb;
+                nb.pitch = e0->message.getNoteNumber();
+                nb.ch    = e0->message.getChannel();
+                nb.vel   = e0->message.getVelocity();
+                nb.start = e0->message.getTimeStamp();
+                nb.dur   = e0->noteOffObject
+                    ? e0->noteOffObject->message.getTimeStamp() - nb.start
+                    : 0.25;
+                velBefore.push_back(nb);
+            }
 
             float velNorm = juce::jlimit(0.0f, 1.0f,
                 1.0f - (my - gridAreaBottom()) / (float)velocityBarH);
@@ -355,6 +415,22 @@ void PianoRoll::mouseDown(const juce::MouseEvent& e)
                 selectedIndices = { foundIdx };
                 dragMode = ResizeNote;
                 dragNoteIdx = foundIdx;
+
+                // Y2 — snapshot for undo
+                moveBefore.clear();
+                auto* e2 = currentClip->sequence.getEventPointer(foundIdx);
+                if (e2 != nullptr && e2->message.isNoteOn())
+                {
+                    NoteBefore nb;
+                    nb.pitch = e2->message.getNoteNumber();
+                    nb.ch    = e2->message.getChannel();
+                    nb.vel   = e2->message.getVelocity();
+                    nb.start = e2->message.getTimeStamp();
+                    nb.dur   = e2->noteOffObject
+                        ? e2->noteOffObject->message.getTimeStamp() - nb.start
+                        : 0.25;
+                    moveBefore.push_back(nb);
+                }
             }
             else
             {
@@ -367,6 +443,23 @@ void PianoRoll::mouseDown(const juce::MouseEvent& e)
                 origPositions.clear();
                 auto* evt = currentClip->sequence.getEventPointer(foundIdx);
                 origPositions.push_back({ evt->message.getTimeStamp(), evt->message.getNoteNumber() });
+
+                // Y2 — full snapshot for undo
+                moveBefore.clear();
+                for (int idx : selectedIndices)
+                {
+                    auto* e2 = currentClip->sequence.getEventPointer(idx);
+                    if (e2 == nullptr || ! e2->message.isNoteOn()) continue;
+                    NoteBefore nb;
+                    nb.pitch = e2->message.getNoteNumber();
+                    nb.ch    = e2->message.getChannel();
+                    nb.vel   = e2->message.getVelocity();
+                    nb.start = e2->message.getTimeStamp();
+                    nb.dur   = e2->noteOffObject
+                        ? e2->noteOffObject->message.getTimeStamp() - nb.start
+                        : 0.25;
+                    moveBefore.push_back(nb);
+                }
             }
         }
         else if (currentClip)
@@ -549,9 +642,179 @@ void PianoRoll::mouseDrag(const juce::MouseEvent& e)
 
 void PianoRoll::mouseUp(const juce::MouseEvent&)
 {
-    if (dragMode == MoveNote || dragMode == ResizeNote || dragMode == DrawNote)
+    // X2 — wrap DrawNote completion in an undoable action.
+    // Strategy: remove the preview note that was placed during mouseDown/drag
+    // and re-insert it via AddNoteCmd so undo/redo works symmetrically.
+    if (dragMode == DrawNote && undoManager != nullptr && currentClip != nullptr
+        && dragNoteIdx >= 0 && dragNoteIdx < currentClip->sequence.getNumEvents())
+    {
+        auto& seq = currentClip->sequence;
+        auto* evt = seq.getEventPointer(dragNoteIdx);
+        if (evt != nullptr && evt->message.isNoteOn())
+        {
+            const int pitch  = evt->message.getNoteNumber();
+            const int vel    = evt->message.getVelocity();
+            const int ch     = evt->message.getChannel();
+            const double start = evt->message.getTimeStamp();
+            const double dur   = evt->noteOffObject
+                ? evt->noteOffObject->message.getTimeStamp() - start
+                : snapBeats;
+
+            // Remove preview (both on and off)
+            if (evt->noteOffObject)
+            {
+                int offIdx = seq.getIndexOf(evt->noteOffObject);
+                if (offIdx >= 0) seq.deleteEvent(offIdx, false);
+            }
+            seq.deleteEvent(seq.getIndexOf(evt), false);
+            seq.updateMatchedPairs();
+
+            undoManager->beginNewTransaction("Draw note");
+            undoManager->perform(new AddNoteCmd(currentClip, pitch, vel, start, dur, ch));
+        }
+    }
+
+    // Y2 — Move/Resize undo: pair before-state with after-state and record
+    if ((dragMode == MoveNote || dragMode == ResizeNote)
+        && undoManager != nullptr && currentClip != nullptr
+        && ! moveBefore.empty())
+    {
+        auto& seq = currentClip->sequence;
+        std::vector<MoveNotesCmd::Change> changes;
+        changes.reserve(moveBefore.size());
+
+        // AA1 — consumed set to prevent a single after-note being matched
+        // to multiple before-notes when velocity/channel collide.
+        std::vector<bool> consumed(seq.getNumEvents(), false);
+
+        for (auto& nb : moveBefore)
+        {
+            int bestIdx = -1;
+            double bestDelta = 1e9;
+            for (int i = 0; i < seq.getNumEvents(); ++i)
+            {
+                if (consumed[i]) continue;
+                auto* e2 = seq.getEventPointer(i);
+                if (! e2->message.isNoteOn()) continue;
+                if (e2->message.getVelocity() != nb.vel) continue;
+                if (e2->message.getChannel()  != nb.ch)  continue;
+                const int    afterPitch = e2->message.getNoteNumber();
+                const double afterStart = e2->message.getTimeStamp();
+                if (std::abs(afterPitch - nb.pitch) > 24) continue;
+                if (std::abs(afterStart - nb.start) > 32.0) continue;
+                const double d = std::abs(afterStart - nb.start)
+                               + std::abs((double)(afterPitch - nb.pitch));
+                if (d < bestDelta) { bestDelta = d; bestIdx = i; }
+            }
+            if (bestIdx < 0) continue;
+            consumed[bestIdx] = true;
+
+            auto* e2 = seq.getEventPointer(bestIdx);
+            MoveNotesCmd::Change ch;
+            ch.beforePitch = nb.pitch;
+            ch.beforeStart = nb.start;
+            ch.beforeDur   = nb.dur;
+            ch.afterPitch  = e2->message.getNoteNumber();
+            ch.afterStart  = e2->message.getTimeStamp();
+            ch.afterDur    = e2->noteOffObject
+                ? e2->noteOffObject->message.getTimeStamp() - ch.afterStart
+                : nb.dur;
+            ch.channel  = nb.ch;
+            ch.velocity = nb.vel;
+            changes.push_back(ch);
+        }
+
+        // Skip recording if nothing actually changed (pure click)
+        bool anyChange = false;
+        for (auto& c : changes)
+            if (c.beforePitch != c.afterPitch
+             || std::abs(c.beforeStart - c.afterStart) > 1e-6
+             || std::abs(c.beforeDur   - c.afterDur)   > 1e-6)
+            { anyChange = true; break; }
+
+        if (anyChange)
+        {
+            undoManager->beginNewTransaction(dragMode == MoveNote ? "Move notes" : "Resize note");
+            // Revert to before-state, then perform forward; ensures perform/undo symmetry.
+            // (Apply reverse of changes now so perform() brings us back to after-state.)
+            for (auto& c : changes)
+            {
+                // Revert afterState to beforeState in-place so perform() re-applies
+                auto tmpPitch = c.afterPitch;
+                auto tmpStart = c.afterStart;
+                auto tmpDur   = c.afterDur;
+                for (int i = 0; i < seq.getNumEvents(); ++i)
+                {
+                    auto* e2 = seq.getEventPointer(i);
+                    if (! e2->message.isNoteOn()) continue;
+                    if (e2->message.getNoteNumber() != tmpPitch) continue;
+                    if (std::abs(e2->message.getTimeStamp() - tmpStart) > 1e-6) continue;
+
+                    auto newOn = juce::MidiMessage::noteOn(c.channel, c.beforePitch, (juce::uint8)c.velocity);
+                    newOn.setTimeStamp(c.beforeStart);
+                    e2->message = newOn;
+                    if (e2->noteOffObject)
+                    {
+                        auto newOff = juce::MidiMessage::noteOff(c.channel, c.beforePitch);
+                        newOff.setTimeStamp(c.beforeStart + c.beforeDur);
+                        e2->noteOffObject->message = newOff;
+                    }
+                    break;
+                }
+            }
+            seq.updateMatchedPairs();
+            undoManager->perform(new MoveNotesCmd(currentClip, std::move(changes)));
+        }
+
+        moveBefore.clear();
+    }
+
+    // Z2 — velocity drag undo
+    if (dragMode == VelocityEdit && undoManager != nullptr && currentClip != nullptr
+        && ! velBefore.empty())
+    {
+        auto& seq = currentClip->sequence;
+        std::vector<ChangeVelocityCmd::VelChange> vchanges;
+        for (auto& nb : velBefore)
+        {
+            for (int i = 0; i < seq.getNumEvents(); ++i)
+            {
+                auto* e2 = seq.getEventPointer(i);
+                if (! e2->message.isNoteOn()) continue;
+                if (e2->message.getNoteNumber() != nb.pitch) continue;
+                if (std::abs(e2->message.getTimeStamp() - nb.start) > 1e-6) continue;
+                const int afterVel = e2->message.getVelocity();
+                if (afterVel != nb.vel)
+                    vchanges.push_back({ nb.pitch, nb.start, nb.vel, afterVel, nb.ch });
+                break;
+            }
+        }
+        if (! vchanges.empty())
+        {
+            // Revert to before, then perform to re-apply after.
+            for (auto& v : vchanges)
+                for (int i = 0; i < seq.getNumEvents(); ++i)
+                {
+                    auto* e2 = seq.getEventPointer(i);
+                    if (! e2->message.isNoteOn()) continue;
+                    if (e2->message.getNoteNumber() != v.pitch) continue;
+                    if (std::abs(e2->message.getTimeStamp() - v.start) > 1e-6) continue;
+                    auto m = juce::MidiMessage::noteOn(v.ch, v.pitch, (juce::uint8)v.beforeVel);
+                    m.setTimeStamp(v.start);
+                    e2->message = m;
+                    break;
+                }
+            undoManager->beginNewTransaction("Velocity");
+            undoManager->perform(new ChangeVelocityCmd(currentClip, std::move(vchanges)));
+        }
+        velBefore.clear();
+    }
+
+    if (dragMode == MoveNote || dragMode == ResizeNote || dragMode == DrawNote
+        || dragMode == VelocityEdit)
         if (onNotesChanged) onNotesChanged();
     dragMode = None;
+    dragNoteIdx = -1;
     dragNoteIdx = -1;
     origPositions.clear();
     repaint();
@@ -685,7 +948,70 @@ bool PianoRoll::keyPressed(const juce::KeyPress& key, juce::Component*)
         return true;
     }
 
+    // Quantize: Q = full strength, Shift+Q = soft (50%)
+    if (key == juce::KeyPress('q'))
+    {
+        const double strength = key.getModifiers().isShiftDown() ? 0.5 : 1.0;
+        quantizeNotes(strength);
+        return true;
+    }
+
     return false;
+}
+
+void PianoRoll::quantizeNotes(double strength)
+{
+    if (currentClip == nullptr)         return;
+    if (snapBeats <= 0.0)               return;
+    strength = juce::jlimit(0.0, 1.0, strength);
+    if (strength <= 0.0)                return;
+
+    auto& seq = currentClip->sequence;
+
+    // Determine target indices: selected if any, otherwise all note-on events.
+    std::vector<int> targets;
+    if (!selectedIndices.empty())
+    {
+        targets.reserve(selectedIndices.size());
+        for (int idx : selectedIndices)
+            if (idx >= 0 && idx < seq.getNumEvents())
+                targets.push_back(idx);
+    }
+    else
+    {
+        for (int i = 0; i < seq.getNumEvents(); ++i)
+            if (seq.getEventPointer(i)->message.isNoteOn())
+                targets.push_back(i);
+    }
+
+    if (targets.empty()) return;
+
+    int moved = 0;
+    for (int idx : targets)
+    {
+        auto* evt = seq.getEventPointer(idx);
+        if (evt == nullptr || ! evt->message.isNoteOn()) continue;
+
+        const double original = evt->message.getTimeStamp();
+        const double snapped  = snapBeat(original);
+        const double newStart = original + (snapped - original) * strength;
+        const double delta    = newStart - original;
+        if (std::abs(delta) < 1.0e-9) continue;
+
+        evt->message.setTimeStamp(newStart);
+        if (evt->noteOffObject != nullptr)
+        {
+            const double offTime = evt->noteOffObject->message.getTimeStamp();
+            evt->noteOffObject->message.setTimeStamp(offTime + delta);
+        }
+        ++moved;
+    }
+
+    if (moved == 0) return;
+
+    seq.updateMatchedPairs();
+    repaint();
+    if (onNotesChanged) onNotesChanged();
 }
 
 void PianoRoll::timerCallback()

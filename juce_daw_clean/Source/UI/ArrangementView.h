@@ -29,6 +29,17 @@ public:
     std::function<void(MidiClip*)> onClipSelected;
     std::function<void()> onTrackListChanged;
 
+    // U7 — selected track tracking (PluginBrowser / future)
+    int getSelectedTrackId() const { return selectedTrackId; }
+
+    // W1 — UndoManager injection
+    void setUndoManager(juce::UndoManager* um) { undoManager = um; }
+    // Z1 — recording predicate (blocks mouseDown edits while true)
+    void setRecordingPredicate(std::function<bool()> p) { isRecording = std::move(p); }
+
+    void mouseDrag(const juce::MouseEvent& e) override;
+    void mouseUp(const juce::MouseEvent& e) override;
+
 private:
     AudioEngine& audioEngine;
 
@@ -38,6 +49,21 @@ private:
     float beatsVisible { 64.0f };
     float scrollXBeats { 0.0f };
     int scrollYPixels { 0 };
+
+    int selectedTrackId { -1 };                   // U7
+    juce::UndoManager* undoManager { nullptr };    // W1
+    std::function<bool()> isRecording;              // Z1
+
+    // U1 — inline automation lane editing state
+    int   autoDragTrackIdx { -1 };
+    int   autoDragPointIdx { -1 };
+    float autoLaneHPx { 12.0f };
+
+    // X3 — audio clip trim drag state
+    enum class TrimMode { None, Left, Right };
+    TrimMode trimMode { TrimMode::None };
+    int      trimTrackIdx { -1 };
+    int      trimClipIdx  { -1 };
 
     float beatToX(double beat) const;
     double xToBeat(float x) const;

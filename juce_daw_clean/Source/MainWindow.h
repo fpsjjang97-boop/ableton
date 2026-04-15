@@ -8,13 +8,17 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_data_structures/juce_data_structures.h>
 #include "Core/AudioEngine.h"
 #include "UI/LookAndFeel.h"
 #include "UI/TransportBar.h"
 #include "UI/ArrangementView.h"
 #include "UI/PianoRoll.h"
 #include "UI/MixerPanel.h"
+#include "UI/CCLane.h"
+#include "UI/StepSeqView.h"
 #include "AI/AIPanel.h"
+#include "Plugin/PluginHost.h"
 
 class MainWindow : public juce::DocumentWindow
 {
@@ -69,17 +73,33 @@ private:
         // Project I/O
         void saveProject();
         void saveProjectAs();
-        void loadProject();
+        void loadProject();                    // dialog
+        void loadProjectFromFile(const juce::File& file); // AA2 — direct
         void exportMidi();
+        void exportMidiStems();                 // AA5
         void newProject();
+
+        // Audio I/O (F5/F6)
+        void importAudioFile();
+        void renderToWav();
+
+        // Plugins (F2)
+        void openPluginBrowser();
+
+    public:
+        juce::UndoManager undoManager; // V1 — accessible to child components
+        int autoSaveMinutes { 5 };      // Y4 — 0 = disabled
 
     private:
         AudioEngine audioEngine;
+        PluginHost  pluginHost;
 
         juce::MenuBarComponent menuBar;
         TransportBar      transportBar;
         ArrangementView   arrangementView;
         PianoRoll         pianoRoll;
+        CCLane            ccLane;
+        StepSeqView       stepSeqView;
         MixerPanel        mixerPanel;
         AIPanel           aiPanel;
         StatusBar         statusBar;
@@ -88,7 +108,12 @@ private:
 
         juce::File currentProjectFile;
 
+        // Z5 — most recent project files (max 10)
+        juce::Array<juce::File> recentFiles;
+        void pushRecent(const juce::File& f);
+
         void loadMidiFile(const juce::File& file);
+        void loadAudioFile(const juce::File& file);
     };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)

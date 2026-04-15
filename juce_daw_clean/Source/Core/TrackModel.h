@@ -13,11 +13,33 @@
 #include <vector>
 #include <memory>
 
+#include "../Audio/AudioClip.h"
+#include "../Automation/AutomationLane.h"
+
 struct MidiClip
 {
     double startBeat { 0.0 };
     double lengthBeats { 4.0 };
     juce::MidiMessageSequence sequence;
+};
+
+/** PluginSlot — *metadata only*. The actual AudioPluginInstance lives in
+ *  a separate container owned by AudioEngine (Sprint 2) so that Track
+ *  remains copy/move-trivial and TrackModel's std::vector<Track> resize
+ *  semantics do not break.
+ *
+ *  pluginUid is PluginDescription::createIdentifierString() — the single
+ *  source of truth for plugin identity (rules/05 패턴 H).
+ *
+ *  state is the binary state blob from AudioPluginInstance::getStateInformation,
+ *  serialised in the project file. Empty on a freshly added plugin.
+ */
+struct PluginSlot
+{
+    juce::String displayName;       // human-readable, e.g. "TAL-Reverb-4"
+    juce::String pluginUid;          // PluginDescription identifier
+    bool         bypass { false };
+    juce::MemoryBlock state;          // saved plugin state (binary)
 };
 
 struct Track
@@ -34,7 +56,32 @@ struct Track
 
     int midiChannel { 1 };     // 1-16
 
+    // AA6 — folder track hierarchy. parentTrackId == -1 means top-level.
+    // A track with any child is a "folder track" (by convention);
+    // rendering indents its children in the arrangement view.
+    int  parentTrackId { -1 };
+    bool isFolder      { false };
+    bool collapsed     { false }; // BB1 — hide children in arrangement when true
+
     std::vector<MidiClip> clips;
+
+    /** Audio clips (F5). Empty for MIDI-only tracks. */
+    std::vector<AudioClip> audioClips;
+
+    /** Routing target. 0 = master bus (default). User buses ≥ 1 (see Bus.h). */
+    int outputBusId { 0 };
+
+    /** U3 — Sends (post-fader). level 0..1, busId is send destination. */
+    struct Send { int busId { 0 }; float level { 0.0f }; };
+    std::vector<Send> sends;
+
+    /** FX chain *metadata*. Actual AudioPluginInstance objects live in
+     *  AudioEngine's TrackPluginChain keyed by Track::id. */
+    std::vector<PluginSlot> plugins;
+
+    /** Automation envelopes targeting this track's parameters or its
+     *  plugin parameters. See AutomationLane::paramId convention. */
+    std::vector<AutomationLane> automation;
 
     /** Flatten all clips into a single sequence for playback. */
     juce::MidiMessageSequence flattenForPlayback() const

@@ -20,6 +20,12 @@ public:
     void setClip(MidiClip* clip) { currentClip = clip; repaint(); }
     MidiClip* getClip() const    { return currentClip; }
 
+    // W1 — UndoManager injection (non-owning)
+    void setUndoManager(juce::UndoManager* um) { undoManager = um; }
+
+    // Y1 — lock edits while recording (predicate injection)
+    void setRecordingPredicate(std::function<bool()> pred) { isRecording = std::move(pred); }
+
     void setPlayheadBeat(double beat) { playheadBeat = beat; }
 
     void paint(juce::Graphics& g) override;
@@ -39,6 +45,19 @@ public:
     void setTool(Tool t) { currentTool = t; repaint(); }
     Tool getTool() const { return currentTool; }
 
+    /** Quantize note start positions to the current snap grid.
+     *  strength 1.0 = full snap, 0.5 = halfway, 0.0 = no-op (idempotent).
+     *  If selectedIndices is non-empty only those notes are moved; otherwise
+     *  every note in the clip. Note durations are preserved (note-off shifts
+     *  by the same delta as note-on). Destructive — copy clip externally if
+     *  undo is required. */
+    void quantizeNotes(double strength = 1.0);
+
+    /** Active snap grid in beats (1.0 = quarter, 0.25 = sixteenth, ...).
+     *  Quantize and draw operations both use this value. */
+    void setSnapBeats(double s) { if (s > 0.0) { snapBeats = s; repaint(); } }
+    double getSnapBeats() const { return snapBeats; }
+
 private:
     MidiClip* currentClip { nullptr };
     Tool currentTool { DrawTool };
@@ -55,6 +74,9 @@ private:
     float scrollY { 0.0f };
     double snapBeats { 0.25 };
 
+    juce::UndoManager* undoManager { nullptr }; // W1
+    std::function<bool()> isRecording;           // Y1
+
     enum DragMode { None, DrawNote, MoveNote, ResizeNote, RubberBand, VelocityEdit };
     DragMode dragMode { None };
     int dragNoteIdx { -1 };
@@ -66,6 +88,13 @@ private:
 
     struct OrigPos { double beat; int noteNum; };
     std::vector<OrigPos> origPositions;
+
+    // Y2 — full snapshot for Move/Resize undo
+    struct NoteBefore { int pitch, ch, vel; double start, dur; };
+    std::vector<NoteBefore> moveBefore;
+
+    // Z2 — velocity drag snapshot
+    std::vector<NoteBefore> velBefore;
 
     std::vector<int> selectedIndices;
 

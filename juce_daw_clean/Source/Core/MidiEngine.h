@@ -10,6 +10,7 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "TrackModel.h"
+#include <map>
 
 class MidiEngine
 {
@@ -20,8 +21,34 @@ public:
 
     // Transport
     void setTempo(double bpm)          { tempo = bpm; }
-    double getTempo() const            { return tempo; }
+    double getTempo() const            { return tempoAt(positionBeats); } // BB5
     void setTimeSignature(int num, int den) { tsNum = num; tsDen = den; }
+
+    // BB5 — tempo map (beat → bpm). Empty map = constant `tempo`.
+    void addTempoChange(double atBeat, double bpm) { tempoMap[atBeat] = bpm; }
+    void clearTempoMap() { tempoMap.clear(); }
+    const std::map<double, double>& getTempoMap() const { return tempoMap; }
+    double tempoAt(double beat) const
+    {
+        if (tempoMap.empty()) return tempo;
+        auto it = tempoMap.upper_bound(beat);
+        if (it == tempoMap.begin()) return tempo;
+        return (--it)->second;
+    }
+
+    // BB6 — time-signature map (beat → (num,den)). Empty = tsNum/tsDen fixed.
+    struct TimeSig { int num; int den; };
+    void addTimeSignatureChange(double atBeat, int num, int den)
+    { tsMap[atBeat] = { num, den }; }
+    void clearTimeSignatureMap() { tsMap.clear(); }
+    const std::map<double, TimeSig>& getTimeSignatureMap() const { return tsMap; }
+    TimeSig timeSigAt(double beat) const
+    {
+        if (tsMap.empty()) return { tsNum, tsDen };
+        auto it = tsMap.upper_bound(beat);
+        if (it == tsMap.begin()) return { tsNum, tsDen };
+        return (--it)->second;
+    }
 
     void setPlaying(bool shouldPlay)   { playing = shouldPlay; }
     bool isPlaying() const             { return playing; }
@@ -47,7 +74,9 @@ public:
         if (!playing || trackModel == nullptr || sampleRate <= 0.0)
             return;
 
-        double beatsPerSample = tempo / (60.0 * sampleRate);
+        // BB5 — use tempo at current position (tempo map aware)
+        const double effTempo = tempoAt(positionBeats);
+        double beatsPerSample = effTempo / (60.0 * sampleRate);
         double blockStartBeat = positionBeats;
         double blockEndBeat = positionBeats + numSamples * beatsPerSample;
 
@@ -91,6 +120,8 @@ private:
     TrackModel* trackModel { nullptr };
     double tempo { 120.0 };
     int tsNum { 4 }, tsDen { 4 };
+    std::map<double, double>   tempoMap;  // BB5
+    std::map<double, TimeSig>  tsMap;     // BB6
 
     bool playing { false };
     double positionBeats { 0.0 };

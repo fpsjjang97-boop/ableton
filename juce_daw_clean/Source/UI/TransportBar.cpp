@@ -24,6 +24,18 @@ TransportBar::TransportBar(AudioEngine& engine)
     addAndMakeVisible(stopButton);
 
     recordButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFFC62828));
+    recordButton.setClickingTogglesState(true);
+    recordButton.onClick = [this] {
+        auto& tracks = audioEngine.getTrackModel().getTracks();
+        if (tracks.empty()) return;
+        auto& t = tracks.front();
+        t.armed = recordButton.getToggleState();
+        audioEngine.setRecordingTargetTrack(recordButton.getToggleState() ? t.id : -1);
+        // Y5 — arm record implies 1-bar count-in by default
+        audioEngine.setCountInBars(recordButton.getToggleState() ? 1 : 0);
+        if (recordButton.getToggleState() && ! audioEngine.isPlaying())
+            audioEngine.play();
+    };
     addAndMakeVisible(recordButton);
 
     loopButton.setClickingTogglesState(true);
@@ -31,6 +43,19 @@ TransportBar::TransportBar(AudioEngine& engine)
         audioEngine.getMidiEngine().setLooping(loopButton.getToggleState());
     };
     addAndMakeVisible(loopButton);
+
+    // Z3 — count-in selector
+    countInSelector.addItem("No count-in",  1);
+    countInSelector.addItem("1 bar pre",    2);
+    countInSelector.addItem("2 bars pre",   3);
+    countInSelector.addItem("4 bars pre",   5);
+    countInSelector.setSelectedId(2, juce::dontSendNotification);
+    countInSelector.onChange = [this] {
+        const int id = countInSelector.getSelectedId();
+        const int bars = (id == 1 ? 0 : id == 2 ? 1 : id == 3 ? 2 : 4);
+        audioEngine.setCountInBars(bars);
+    };
+    addAndMakeVisible(countInSelector);
 
     metroButton.setClickingTogglesState(true);
     metroButton.onClick = [this] {
@@ -126,6 +151,8 @@ void TransportBar::resized()
     loopButton.setBounds(area.removeFromLeft(44));
     area.removeFromLeft(2);
     metroButton.setBounds(area.removeFromLeft(48));
+    area.removeFromLeft(6);
+    countInSelector.setBounds(area.removeFromLeft(80));   // Z3
 }
 
 void TransportBar::timerCallback()
