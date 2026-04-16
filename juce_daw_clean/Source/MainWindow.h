@@ -42,6 +42,7 @@ private:
         juce::Label versionLabel { {}, "MidiGPT DAW v0.1.0" };
     };
 
+public: // VV2 — needs access from closeButtonPressed
     class MainContent : public juce::Component,
                         public juce::MenuBarModel,
                         public juce::FileDragAndDropTarget,
@@ -87,8 +88,14 @@ private:
         void openPluginBrowser();
 
     public:
+        bool isDirty() const { return projectDirty; } // VV2
         juce::UndoManager undoManager; // V1 — accessible to child components
         int autoSaveMinutes { 5 };      // Y4 — 0 = disabled
+
+        // GG6 — undo grouping: coalesce rapid edits into one transaction
+        void beginUndoGroup(const juce::String& name);
+        juce::int64 lastUndoGroupTime { 0 };
+        juce::String lastUndoGroupName;
 
     private:
         AudioEngine audioEngine;
@@ -107,6 +114,8 @@ private:
         juce::TabbedComponent bottomTabs { juce::TabbedButtonBar::TabsAtTop };
 
         juce::File currentProjectFile;
+        bool projectDirty { false }; // NN6
+        void markDirty();
 
         // Z5 — most recent project files (max 10)
         juce::Array<juce::File> recentFiles;
@@ -114,6 +123,11 @@ private:
 
         void loadMidiFile(const juce::File& file);
         void loadAudioFile(const juce::File& file);
+
+        // HH5 — crash recovery
+        void panicSave();
+        void checkCrashRecovery();
+        juce::File getCrashRecoveryFile() const;
     };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)

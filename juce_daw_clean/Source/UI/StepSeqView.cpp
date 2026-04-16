@@ -2,18 +2,33 @@
 
 StepSeqView::StepSeqView()
 {
+    // DD4 — step count selector
+    for (int n : { 8, 16, 24, 32, 48, 64 })
+        stepCountPicker.addItem(juce::String(n) + " steps", n);
+    stepCountPicker.setSelectedId(numSteps, juce::dontSendNotification);
+    stepCountPicker.onChange = [this] {
+        setStepCount(stepCountPicker.getSelectedId());
+    };
+    addAndMakeVisible(stepCountPicker);
+
     rebuild();
+}
+
+void StepSeqView::resized()
+{
+    stepCountPicker.setBounds(getWidth() - 110, 4, 100, 22);
 }
 
 void StepSeqView::rebuild()
 {
     grid.assign(numRows, std::vector<bool>(numSteps, false));
+    velocities.assign(numRows, std::vector<int>(numSteps, defaultVelocity)); // DD4
 
     if (currentClip == nullptr) return;
 
     const double stepBeats = currentClip->lengthBeats > 0.0
         ? currentClip->lengthBeats / numSteps
-        : 0.25; // default 16th notes if clip length unset
+        : 0.25;
 
     auto& seq = currentClip->sequence;
     for (int i = 0; i < seq.getNumEvents(); ++i)
@@ -25,6 +40,7 @@ void StepSeqView::rebuild()
         int step = (int)std::round(m.getTimeStamp() / stepBeats);
         if (step < 0 || step >= numSteps) continue;
         grid[row][step] = true;
+        velocities[row][step] = m.getVelocity(); // DD4
     }
 }
 
@@ -48,7 +64,11 @@ void StepSeqView::paint(juce::Graphics& g)
             const bool isBeatStart = (step % 4 == 0);
 
             if (grid[row][step])
-                g.setColour(juce::Colour(0xFF4CAF50));
+            {
+                // DD4 — velocity maps to brightness (0.3..1.0)
+                float bright = 0.3f + 0.7f * (float)velocities[row][step] / 127.0f;
+                g.setColour(juce::Colour(0xFF4CAF50).withMultipliedBrightness(bright));
+            }
             else
                 g.setColour(isBeatStart ? juce::Colour(0xFF2A2A2A)
                                         : juce::Colour(0xFF1A1A1A));
@@ -81,10 +101,41 @@ void StepSeqView::mouseDown(const juce::MouseEvent& e)
     if (step < 0 || step >= numSteps) return;
     if (row < 0  || row >= numRows)   return;
 
+    // DD4 — right-click + drag on active cell = velocity edit
+    if (e.mods.isRightButtonDown() && grid[row][step])
+    {
+        velocityDrag = true;
+        return;
+    }
+
     grid[row][step] = ! grid[row][step];
+    if (grid[row][step])
+        velocities[row][step] = defaultVelocity; // DD4
     writeBack();
     repaint();
     if (onChanged) onChanged();
+}
+
+// DD4 — vertical drag adjusts velocity of the clicked cell
+void StepSeqView::mouseDrag(const juce::MouseEvent& e)
+{
+    if (!velocityDrag || currentClip == nullptr) return;
+
+    const int cellW = juce::jmax(8, getWidth() / numSteps);
+    const int cellH = juce::jmax(8, getHeight() / numRows);
+    const int step = e.getMouseDownX() / cellW;
+    const int row  = e.getMouseDownY() / cellH;
+
+    if (step < 0 || step >= numSteps || row < 0 || row >= numRows) return;
+    if (!grid[row][step]) return;
+
+    // Map vertical drag distance to velocity change
+    int vel = juce::jlimit(1, 127,
+        velocities[row][step] - e.getDistanceFromDragStartY());
+    velocities[row][step] = vel;
+
+    writeBack();
+    repaint();
 }
 
 void StepSeqView::writeBack()
@@ -105,7 +156,7 @@ void StepSeqView::writeBack()
         {
             if (! grid[row][step]) continue;
             const double startBeat = step * stepBeats;
-            auto on  = juce::MidiMessage::noteOn(1, pitch, (juce::uint8)defaultVelocity);
+            auto on  = juce::MidiMessage::noteOn(1, pitch, (juce::uint8)velocities[row][step]); // DD4
             auto off = juce::MidiMessage::noteOff(1, pitch);
             on.setTimeStamp(startBeat);
             off.setTimeStamp(startBeat + stepBeats * 0.9); // gate ~90%

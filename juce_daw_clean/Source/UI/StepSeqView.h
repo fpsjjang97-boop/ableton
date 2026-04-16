@@ -29,7 +29,8 @@ public:
 
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& e) override;
-    void resized() override {}
+    void mouseDrag(const juce::MouseEvent& e) override; // DD4
+    void resized() override;
 
     std::function<void()> onChanged;
 
@@ -43,10 +44,15 @@ private:
 
     // Internal grid mirror — kept in sync with currentClip->sequence on rebuild
     std::vector<std::vector<bool>> grid; // [row][step]
+    std::vector<std::vector<int>>  velocities; // DD4 — [row][step] velocity 1-127
 
     void rebuild();
     void writeBack();   // Push grid back to currentClip->sequence
     void cellRect(int row, int step, juce::Rectangle<int>& out) const;
+
+    // DD4 — step count selector + velocity drag state
+    juce::ComboBox stepCountPicker;
+    bool velocityDrag { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StepSeqView)
 };

@@ -77,6 +77,18 @@ public:
                     inst->prepareToPlay(sampleRate, blockSize);
     }
 
+    /** FF2 — total latency in samples for a given track's plugin chain. */
+    int getTotalLatency(int trackId) const
+    {
+        auto it = chains.find(trackId);
+        if (it == chains.end()) return 0;
+        int total = 0;
+        for (auto& inst : it->second)
+            if (inst != nullptr)
+                total += inst->getLatencySamples();
+        return total;
+    }
+
     /** Process a single track's audio buffer through its plugin chain,
      *  honouring per-slot bypass from the Track's PluginSlot vector.
      *  midiBuf may be empty for pure FX. */

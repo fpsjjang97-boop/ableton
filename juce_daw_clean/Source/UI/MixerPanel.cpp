@@ -146,6 +146,22 @@ void MixerPanel::rebuildStrips()
         cs.dbLabel->setColour(juce::Label::textColourId, juce::Colour(0xFF909090));
         addAndMakeVisible(*cs.dbLabel);
 
+        // HH4 — FX bypass button (toggles bypass on first plugin slot)
+        if (! track.plugins.empty())
+        {
+            cs.fxBypassBtn = std::make_unique<juce::TextButton>("FX");
+            cs.fxBypassBtn->setClickingTogglesState(true);
+            cs.fxBypassBtn->setToggleState(! track.plugins[0].bypass, juce::dontSendNotification);
+            cs.fxBypassBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF2196F3));
+            cs.fxBypassBtn->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF333333));
+            cs.fxBypassBtn->onClick = [this, id = track.id, &btn = *cs.fxBypassBtn] {
+                auto* t = audioEngine.getTrackModel().getTrack(id);
+                if (t != nullptr && ! t->plugins.empty())
+                    t->plugins[0].bypass = ! btn.getToggleState();
+            };
+            addAndMakeVisible(*cs.fxBypassBtn);
+        }
+
         // V2/W2 — build up to 2 send slots
         for (int slot = 0; slot < 2; ++slot)
         {
@@ -295,14 +311,54 @@ void MixerPanel::drawVuMeter(juce::Graphics& g, int x, int y, int w, int h,
     }
 }
 
+// MM6 — scroll so a given track's strip is visible
+void MixerPanel::scrollToTrack(int trackId)
+{
+    for (size_t i = 0; i < strips.size(); ++i)
+    {
+        if (strips[i].trackId == trackId)
+        {
+            int targetX = (int)i * stripWidth;
+            if (targetX < scrollX || targetX + stripWidth > scrollX + getWidth())
+            {
+                scrollX = juce::jmax(0, targetX - getWidth() / 4);
+                resized();
+                repaint();
+            }
+            return;
+        }
+    }
+}
+
+// CC4 — total width of all strips combined
+int MixerPanel::totalContentWidth() const
+{
+    return (int)strips.size() * stripWidth
+         + (int)busStrips.size() * busWidth
+         + 70 + masterWidth + 20;
+}
+
+void MixerPanel::mouseWheelMove(const juce::MouseEvent&,
+                                 const juce::MouseWheelDetails& w)
+{
+    int maxScroll = juce::jmax(0, totalContentWidth() - getWidth());
+    scrollX = juce::jlimit(0, maxScroll,
+        scrollX - (int)(w.deltaY * 80));
+    resized();
+    repaint();
+}
+
 void MixerPanel::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colour(0xFF0E0E0E));
 
+    // CC4 — apply scroll offset
+    const int sx = -scrollX;
+
     // Strip dividers
     for (size_t i = 0; i <= strips.size(); ++i)
     {
-        int x = static_cast<int>(i) * stripWidth;
+        int x = static_cast<int>(i) * stripWidth + sx;
         g.setColour(juce::Colour(0xFF2A2A2A));
         g.drawVerticalLine(x, 0.0f, (float)getHeight());
     }
@@ -310,13 +366,13 @@ void MixerPanel::paint(juce::Graphics& g)
     // Track colour bars (3px at top)
     for (size_t i = 0; i < strips.size(); ++i)
     {
-        int x = static_cast<int>(i) * stripWidth;
+        int x = static_cast<int>(i) * stripWidth + sx;
         g.setColour(strips[i].trackColour);
         g.fillRect(x, 0, stripWidth, 3);
     }
 
     // T4 — bus area divider + colour bars
-    int busBaseX = (int)strips.size() * stripWidth;
+    int busBaseX = (int)strips.size() * stripWidth + sx;
     g.setColour(juce::Colour(0xFF333333));
     g.drawVerticalLine(busBaseX, 0.0f, (float)getHeight());
     for (size_t i = 0; i < busStrips.size(); ++i)
@@ -338,13 +394,29 @@ void MixerPanel::paint(juce::Graphics& g)
     // VU meters for each strip
     for (size_t i = 0; i < strips.size(); ++i)
     {
-        int x = static_cast<int>(i) * stripWidth;
+        int x = static_cast<int>(i) * stripWidth + sx;
         int faderRight = x + stripWidth - 4;
         int meterY = 80;
         int meterH = getHeight() - meterY - 20;
 
         drawVuMeter(g, faderRight - 12, meterY, 5, meterH, strips[i].vuL, strips[i].peakL);
         drawVuMeter(g, faderRight - 5, meterY, 5, meterH, strips[i].vuR, strips[i].peakR);
+    }
+
+    // TT1 — output bus label per strip
+    g.setFont(7.0f);
+    for (size_t i = 0; i < strips.size(); ++i)
+    {
+        auto* t = audioEngine.getTrackModel().getTrack(strips[i].trackId);
+        if (t == nullptr) continue;
+        int x = (int)i * stripWidth + sx;
+        juce::String busName = "Master";
+        if (t->outputBusId != 0)
+            if (auto* b = audioEngine.getBusModel().getBus(t->outputBusId))
+                busName = b->name;
+        g.setColour(juce::Colour(0xFF606060));
+        g.drawText(busName, x + 2, getHeight() - 28, stripWidth - 4, 10,
+                   juce::Justification::centred);
     }
 
     // Master VU (uses recomputed masterX from above)
@@ -360,9 +432,11 @@ void MixerPanel::paint(juce::Graphics& g)
 
 void MixerPanel::resized()
 {
+    const int sx = -scrollX; // CC4
+
     for (size_t i = 0; i < strips.size(); ++i)
     {
-        int x = static_cast<int>(i) * stripWidth + 4;
+        int x = static_cast<int>(i) * stripWidth + 4 + sx;
         int w = stripWidth - 8;
 
         strips[i].nameLabel->setBounds(x, 5, w, 16);
@@ -372,6 +446,10 @@ void MixerPanel::resized()
         int halfW = (w - 4) / 2;
         strips[i].muteBtn->setBounds(x, btnY, halfW, 20);
         strips[i].soloBtn->setBounds(x + halfW + 4, btnY, halfW, 20);
+
+        // HH4 — FX bypass button
+        if (strips[i].fxBypassBtn)
+            strips[i].fxBypassBtn->setBounds(x + w - 24, btnY, 24, 20);
 
         // V2/W2 — 2 send slots above the fader
         const int sendY = 86;
@@ -388,10 +466,12 @@ void MixerPanel::resized()
         strips[i].fader->setBounds(x + 4, faderY, w - 22, faderH);
 
         strips[i].dbLabel->setBounds(x, getHeight() - 16, w, 14);
+
+        // TT1 — draw output bus name below fader (in paint, not here)
     }
 
     // T4 — bus strips (between track strips and master)
-    int busBaseX = static_cast<int>(strips.size()) * stripWidth;
+    int busBaseX = static_cast<int>(strips.size()) * stripWidth + sx;
     for (size_t i = 0; i < busStrips.size(); ++i)
     {
         int x = busBaseX + (int)i * busWidth + 4;
@@ -426,10 +506,36 @@ void MixerPanel::resized()
 
 void MixerPanel::mouseDown(const juce::MouseEvent& e)
 {
+    // MM5 — left-click on VU meter area → reset peak hold
+    if (! e.mods.isRightButtonDown())
+    {
+        // Check if click is in master VU area
+        const int busBaseX = (int)strips.size() * stripWidth - scrollX;
+        const int masterX = busBaseX + (int)busStrips.size() * busWidth + 66;
+        if (e.x >= masterX)
+        {
+            masterStrip.peakL = 0.0f;
+            masterStrip.peakR = 0.0f;
+            return;
+        }
+        // Check track strip VU area
+        for (size_t i = 0; i < strips.size(); ++i)
+        {
+            int sx = (int)i * stripWidth - scrollX;
+            if (e.x >= sx && e.x < sx + stripWidth && e.y > 80)
+            {
+                strips[i].peakL = 0.0f;
+                strips[i].peakR = 0.0f;
+                return;
+            }
+        }
+        return;
+    }
+
     // X5 — right-click on a bus strip opens context menu
     if (! e.mods.isRightButtonDown()) return;
 
-    const int busBaseX = (int)strips.size() * stripWidth;
+    const int busBaseX = (int)strips.size() * stripWidth - scrollX; // CC4
     if (e.x < busBaseX) return;
 
     const int idx = (e.x - busBaseX) / busWidth;
@@ -496,6 +602,29 @@ void MixerPanel::timerCallback()
     masterStrip.vuR = masterStrip.vuR * 0.92f + audioEngine.getVuRight() * 0.08f;
     masterStrip.peakL = juce::jmax(masterStrip.peakL * 0.997f, audioEngine.getVuLeft());
     masterStrip.peakR = juce::jmax(masterStrip.peakR * 0.997f, audioEngine.getVuRight());
+
+    // LL3 + NN4 — sync M/S + fader from track model
+    for (auto& strip : strips)
+    {
+        auto* t = audioEngine.getTrackModel().getTrack(strip.trackId);
+        if (t != nullptr)
+        {
+            if (strip.muteBtn) strip.muteBtn->setToggleState(t->mute, juce::dontSendNotification);
+            if (strip.soloBtn) strip.soloBtn->setToggleState(t->solo, juce::dontSendNotification);
+            // OO4 — per-track VU
+            strip.vuL = strip.vuL * 0.9f + audioEngine.getTrackVuL(strip.trackId) * 0.1f;
+            strip.vuR = strip.vuR * 0.9f + audioEngine.getTrackVuR(strip.trackId) * 0.1f;
+            strip.peakL = juce::jmax(strip.peakL * 0.997f, audioEngine.getTrackVuL(strip.trackId));
+            strip.peakR = juce::jmax(strip.peakR * 0.997f, audioEngine.getTrackVuR(strip.trackId));
+            // NN4 — sync fader if not being dragged
+            if (strip.fader && ! strip.fader->isMouseButtonDown())
+            {
+                double db = juce::Decibels::gainToDecibels(t->volume, -60.0f);
+                if (std::abs(strip.fader->getValue() - db) > 0.2)
+                    strip.fader->setValue(db, juce::dontSendNotification);
+            }
+        }
+    }
 
     // Update dB labels
     for (auto& strip : strips)

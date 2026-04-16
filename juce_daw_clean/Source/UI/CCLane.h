@@ -24,10 +24,12 @@ public:
 
     void setClip(MidiClip* clip)         { currentClip = clip; repaint(); }
     void setRecordingPredicate(std::function<bool()> p) { isRecording = std::move(p); }
-    void setController(int ccNumber)      { ccNum = juce::jlimit(0, 127, ccNumber); repaint(); }
+    void setController(int ccNumber)      { ccNum = juce::jlimit(0, 127, ccNumber); ccPicker.setSelectedId(ccNum + 1, juce::dontSendNotification); repaint(); }
     void setBeatWidth(float bw)           { beatWidth = bw; repaint(); }
     void setScrollX(float sx)             { scrollX = sx; repaint(); }
     void setSnapBeats(double s)           { if (s > 0.0) snapBeats = s; }
+
+    void resized() override; // DD3
 
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& e) override;
@@ -56,6 +58,9 @@ private:
     }
 
     void addOrUpdatePoint(double beat, int value);
+
+    // DD3 — CC number picker combo
+    juce::ComboBox ccPicker;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CCLane)
 };

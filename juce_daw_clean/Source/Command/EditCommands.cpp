@@ -271,3 +271,54 @@ bool DeleteTrackCmd::undo()
     t.automation  = snapshot.automation;
     return true;
 }
+
+// DD6 — TrackPropertyCmd
+TrackPropertyCmd::TrackPropertyCmd(TrackModel& m, int tid, Prop p,
+                                   float bf, float af, bool bb, bool ab)
+    : model(m), trackId(tid), prop(p), beforeF(bf), afterF(af), beforeB(bb), afterB(ab)
+{}
+
+void TrackPropertyCmd::apply(float fval, bool bval)
+{
+    auto* t = model.getTrack(trackId);
+    if (t == nullptr) return;
+    switch (prop)
+    {
+        case Volume: t->volume = fval; break;
+        case Pan:    t->pan    = fval; break;
+        case Mute:   t->mute   = bval; break;
+        case Solo:   t->solo   = bval; break;
+    }
+}
+
+bool TrackPropertyCmd::perform()
+{
+    apply(afterF, afterB);
+    return true;
+}
+
+bool TrackPropertyCmd::undo()
+{
+    apply(beforeF, beforeB);
+    return true;
+}
+
+// EE4 — MoveClipCmd
+MoveClipCmd::MoveClipCmd(MidiClip* c, double bs, double bl, double as, double al)
+    : clip(c), beforeStart(bs), beforeLen(bl), afterStart(as), afterLen(al) {}
+
+bool MoveClipCmd::perform()
+{
+    if (clip == nullptr) return false;
+    clip->startBeat = afterStart;
+    clip->lengthBeats = afterLen;
+    return true;
+}
+
+bool MoveClipCmd::undo()
+{
+    if (clip == nullptr) return false;
+    clip->startBeat = beforeStart;
+    clip->lengthBeats = beforeLen;
+    return true;
+}

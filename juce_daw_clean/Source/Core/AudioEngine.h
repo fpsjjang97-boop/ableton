@@ -37,6 +37,12 @@ public:
     /** Y1 — true when a track is armed for record AND transport is playing. */
     bool isRecording() const { return recordingTrackId >= 0 && midiEngine.isPlaying(); }
 
+    // DD1 — audio input recording
+    void setAudioRecordingTrack(int trackId) { audioRecTrackId = trackId; }
+    int  getAudioRecordingTrack() const      { return audioRecTrackId; }
+    bool isAudioRecording() const            { return audioRecTrackId >= 0 && midiEngine.isPlaying(); }
+    void finalizeAudioRecording();  // call after stop to create AudioClip
+
     /** AA4 — Additional MIDI input port latency in milliseconds.
      *  Added to device driver latency when timestamping recorded events.
      *  Positive values shift events earlier in the timeline. */
@@ -79,6 +85,10 @@ public:
     float getPeakHoldLeft()  const { return peakHoldL; }
     float getPeakHoldRight() const { return peakHoldR; }
 
+    // OO4 — per-track VU levels
+    float getTrackVuL(int trackId) const { auto it = trackVuL.find(trackId); return it != trackVuL.end() ? it->second : 0.0f; }
+    float getTrackVuR(int trackId) const { auto it = trackVuR.find(trackId); return it != trackVuR.end() ? it->second : 0.0f; }
+
     // AudioIODeviceCallback
     void audioDeviceIOCallbackWithContext(const float* const* inputChannelData,
                                          int numInputChannels,
@@ -99,9 +109,10 @@ private:
 
     // S1 — per-track SynthEngine instances (avoid voice cross-talk)
     std::map<int, std::unique_ptr<SynthEngine>> trackSynths;
-    SynthEngine& getOrCreateTrackSynth(int trackId);
 
 public:
+    SynthEngine& getOrCreateTrackSynth(int trackId); // EE2 needs public access
+
     /** T1 — GUI-thread alloc of a track's SynthEngine. Call right after
      *  TrackModel::addTrack() so the audio thread never has to allocate. */
     void prebuildTrackSynth(int trackId);
@@ -135,6 +146,9 @@ private:
     int metronomeClickSample { 0 };
     bool metronomeIsDownbeat { false };
 
+    // OO4 — per-track VU state
+    std::map<int, float> trackVuL, trackVuR;
+
     // W6/X1 — MIDI input recording. Device-thread callback pushes into a
     // MidiMessageCollector; audio thread drains on each block and writes to
     // the current clip. This removes the device-thread race on
@@ -143,9 +157,21 @@ private:
     juce::MidiMessageCollector midiInputCollector;
     double midiInputLatencyMs { 0.0 }; // AA4
 
+    // DD1 — audio recording state
+    int audioRecTrackId { -1 };
+    juce::AudioBuffer<float> audioRecBuffer;  // accumulates input samples
+    int audioRecWritePos { 0 };
+    double audioRecStartBeat { 0.0 };
+
     // Test beep on play start
     int testBeepSamples { 0 };
     static constexpr int testBeepLength = 22050; // 0.5s at 44100
 
     void generateMetronomeClick(float* left, float* right, int numSamples);
+
+    // FF2 — PDC: per-track delay compensation buffers
+    std::map<int, juce::AudioBuffer<float>> pdcDelayBuffers;
+    std::map<int, int> pdcDelaySamples;
+    int maxPluginLatency { 0 };
+    void updatePDC();
 };

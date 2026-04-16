@@ -65,8 +65,27 @@ MainWindow::~MainWindow()
 
 void MainWindow::closeButtonPressed()
 {
+    // VV2 — confirm quit if dirty
+    auto* content = dynamic_cast<MainContent*>(getContentComponent());
+    if (content != nullptr && content->isDirty())
+    {
+        juce::AlertWindow::showAsync(
+            juce::MessageBoxOptions()
+                .withIconType(juce::MessageBoxIconType::QuestionIcon)
+                .withTitle("Quit")
+                .withMessage("Save changes before quitting?")
+                .withButton("Save").withButton("Quit").withButton("Cancel"),
+            [content](int r) {
+                if (r == 1) { content->saveProject(); juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
+                else if (r == 2) juce::JUCEApplication::getInstance()->systemRequestedQuit();
+            });
+        return;
+    }
     juce::JUCEApplication::getInstance()->systemRequestedQuit();
 }
+
+// Forward declaration — defined below near Project Save/Load section
+static juce::PropertiesFile& getAppProps();
 
 // =============================================================================
 // MainContent
@@ -115,20 +134,22 @@ MainWindow::MainContent::MainContent()
     bottomTabs.addTab("Mixer",      juce::Colour(0xFF1A1A1A), &mixerPanel, false);
     addAndMakeVisible(bottomTabs);
 
-    // Wire clip selection — feed all editors that show the active clip
+    // Wire clip selection + MM6 auto-scroll mixer
     arrangementView.onClipSelected = [this](MidiClip* clip)
     {
         pianoRoll.setClip(clip);
         ccLane.setClip(clip);
         stepSeqView.setClip(clip);
         bottomTabs.setCurrentTabIndex(0);
+        mixerPanel.scrollToTrack(arrangementView.getSelectedTrackId());
     };
 
-    // Wire track list changes
+    // Wire track list changes + NN6 dirty flag
     arrangementView.onTrackListChanged = [this]()
     {
         mixerPanel.refresh();
         arrangementView.repaint();
+        markDirty();
     };
 
     // Default track with empty clip
@@ -158,6 +179,9 @@ MainWindow::MainContent::MainContent()
         statusBar.setMessage("WARNING: No audio device detected! Go to Help > Audio Settings");
 
     setSize(1600, 900);
+
+    // HH5 — check for crash recovery on startup
+    checkCrashRecovery();
 }
 
 bool MainWindow::MainContent::keyPressed(const juce::KeyPress& key, juce::Component*)
@@ -166,10 +190,25 @@ bool MainWindow::MainContent::keyPressed(const juce::KeyPress& key, juce::Compon
     if (key == juce::KeyPress::spaceKey)
     {
         if (audioEngine.isPlaying())
+        {
+            arrangementView.setLastStopBeat(audioEngine.getPositionBeats()); // VV6
             audioEngine.stop();
+            // DD1 — finalize audio recording on stop
+            if (audioEngine.getAudioRecordingTrack() >= 0)
+            {
+                audioEngine.finalizeAudioRecording();
+                arrangementView.repaint();
+                statusBar.setMessage("Audio recording saved");
+            }
+        }
+        else if (audioEngine.getPositionBeats() > 0.001)
+        {
+            // QQ2 — second stop: return to start
+            audioEngine.rewind();
+            arrangementView.repaint();
+        }
         else
         {
-            audioEngine.rewind();
             audioEngine.play();
         }
         return true;
@@ -211,7 +250,260 @@ bool MainWindow::MainContent::keyPressed(const juce::KeyPress& key, juce::Compon
         return true;
     }
 
+    // MM1 — Delete key removes selected clips from JJ4 selection
+    if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey)
+    {
+        if (! arrangementView.selectedClips.empty())
+        {
+            auto& tracks = audioEngine.getTrackModel().getTracks();
+            for (auto* selClip : arrangementView.selectedClips)
+            {
+                for (auto& trk : tracks)
+                {
+                    trk.clips.erase(
+                        std::remove_if(trk.clips.begin(), trk.clips.end(),
+                            [selClip](const MidiClip& c) { return &c == selClip; }),
+                        trk.clips.end());
+                }
+            }
+            arrangementView.selectedClips.clear();
+            arrangementView.repaint();
+            statusBar.setMessage("Deleted selected clips");
+            return true;
+        }
+    }
+    // TT6 — Escape deselect all
+    if (key == juce::KeyPress::escapeKey)
+    {
+        arrangementView.selectedClips.clear();
+        arrangementView.repaint();
+        return true;
+    }
+    // RR3 — Ctrl+A select all clips
+    if (key == juce::KeyPress('a', juce::ModifierKeys::ctrlModifier, 0))
+    {
+        arrangementView.selectedClips.clear();
+        for (auto& trk : audioEngine.getTrackModel().getTracks())
+            for (auto& clip : trk.clips)
+                arrangementView.selectedClips.push_back(&clip);
+        arrangementView.repaint();
+        statusBar.setMessage("Selected " + juce::String((int)arrangementView.selectedClips.size()) + " clips");
+        return true;
+    }
+    // OO6 — Home/End navigation
+    if (key == juce::KeyPress::homeKey)
+    {
+        audioEngine.rewind();
+        arrangementView.repaint();
+        return true;
+    }
+    if (key == juce::KeyPress::endKey)
+    {
+        double maxBeat = 0.0;
+        for (auto& trk : audioEngine.getTrackModel().getTracks())
+            for (auto& c : trk.clips)
+                maxBeat = juce::jmax(maxBeat, c.startBeat + c.lengthBeats);
+        audioEngine.getMidiEngine().setPositionBeats(maxBeat);
+        arrangementView.repaint();
+        return true;
+    }
+    // OO1 — Ctrl+D duplicate selected clips in place
+    if (key == juce::KeyPress('d', juce::ModifierKeys::ctrlModifier, 0))
+    {
+        auto& tracks = audioEngine.getTrackModel().getTracks();
+        int duped = 0;
+        for (auto* sel : arrangementView.selectedClips)
+        {
+            if (sel == nullptr) continue;
+            for (auto& trk : tracks)
+            {
+                for (size_t ci = 0; ci < trk.clips.size(); ++ci)
+                {
+                    if (&trk.clips[ci] == sel)
+                    {
+                        auto copy = trk.clips[ci];
+                        copy.startBeat += copy.lengthBeats;
+                        trk.clips.push_back(std::move(copy));
+                        ++duped;
+                        break;
+                    }
+                }
+            }
+        }
+        if (duped > 0)
+        {
+            arrangementView.repaint();
+            markDirty();
+            statusBar.setMessage("Duplicated " + juce::String(duped) + " clip(s)");
+        }
+        return true;
+    }
+    // LL1 — Ctrl+C/V clip clipboard
+    if (key == juce::KeyPress('c', juce::ModifierKeys::ctrlModifier, 0))
+    {
+        auto& sel = arrangementView.selectedClips;
+        arrangementView.clipboardClips.clear();
+        for (auto* clip : sel)
+            if (clip != nullptr)
+                arrangementView.clipboardClips.push_back(*clip);
+        if (! arrangementView.clipboardClips.empty())
+            statusBar.setMessage("Copied " + juce::String((int)arrangementView.clipboardClips.size()) + " clip(s)");
+        return true;
+    }
+    if (key == juce::KeyPress('v', juce::ModifierKeys::ctrlModifier, 0))
+    {
+        if (arrangementView.clipboardClips.empty()) return true;
+        int selId = arrangementView.getSelectedTrackId();
+        auto* t = audioEngine.getTrackModel().getTrack(selId);
+        if (t == nullptr)
+        {
+            auto& tracks = audioEngine.getTrackModel().getTracks();
+            if (! tracks.empty()) t = &tracks.front();
+        }
+        if (t != nullptr)
+        {
+            double pos = audioEngine.getPositionBeats();
+            double firstStart = arrangementView.clipboardClips.front().startBeat; // B1
+            for (auto clip : arrangementView.clipboardClips)
+            {
+                clip.startBeat = pos + (clip.startBeat - firstStart);
+                t->clips.push_back(std::move(clip));
+            }
+            arrangementView.repaint();
+            statusBar.setMessage("Pasted " + juce::String((int)arrangementView.clipboardClips.size()) + " clip(s)");
+        }
+        return true;
+    }
+    // EE5 — Zoom presets: Ctrl+1 = 16 beats, Ctrl+2 = 64, Ctrl+3 = 128
+    if (key == juce::KeyPress('1', juce::ModifierKeys::ctrlModifier, 0))
+    { arrangementView.setZoomBeats(16.0f); return true; }
+    if (key == juce::KeyPress('2', juce::ModifierKeys::ctrlModifier, 0))
+    { arrangementView.setZoomBeats(64.0f); return true; }
+    if (key == juce::KeyPress('3', juce::ModifierKeys::ctrlModifier, 0))
+    { arrangementView.setZoomBeats(128.0f); return true; }
+    // GG5 — ? key = shortcut overlay
+    if (key == juce::KeyPress('/', juce::ModifierKeys::shiftModifier, '?')
+        || key == juce::KeyPress(juce::KeyPress::F1Key))
+    {
+        juce::String help;
+        help << "=== Keyboard Shortcuts ===\n\n"
+             << "Space         Play / Stop / Rewind\n"
+             << "Ctrl+S        Save project\n"
+             << "Ctrl+O        Open project\n"
+             << "Ctrl+N        New project\n"
+             << "Ctrl+T        Add track\n"
+             << "Ctrl+Z        Undo\n"
+             << "Ctrl+Y        Redo\n"
+             << "Ctrl+C/V      Copy / Paste clips\n"
+             << "Ctrl+D        Duplicate selected clips\n"
+             << "Ctrl+A        Select all clips\n"
+             << "Ctrl+0        Zoom to fit\n"
+             << "Ctrl+1/2/3    Zoom 16/64/128 beats\n"
+             << "Ctrl+L        Scroll to playhead\n"
+             << "Delete        Delete selected clips\n"
+             << "Home / End    Go to start / end\n"
+             << "F             Follow playhead toggle\n"
+             << "L             Loop toggle\n"
+             << "Shift+Ruler   Set loop region\n"
+             << "T             Tempo tap\n"
+             << "Q / Shift+Q   Quantize / Humanize\n"
+             << "Up/Down       Transpose (Shift=octave)\n"
+             << "F1 / ?        This help\n";
+
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::MessageBoxIconType::InfoIcon,
+            "Keyboard Shortcuts", help);
+        return true;
+    }
+    // GG4 — L key = toggle loop
+    if (key == juce::KeyPress('l') && ! key.getModifiers().isCtrlDown())
+    {
+        auto& me = audioEngine.getMidiEngine();
+        if (me.isLooping())
+        {
+            me.setLooping(false);
+            statusBar.setMessage("Loop OFF");
+        }
+        else
+        {
+            if (me.getLoopEnd() <= me.getLoopStart())
+                me.setLoopRegion(0.0, 16.0);
+            me.setLooping(true);
+            statusBar.setMessage("Loop ON (" +
+                juce::String(me.getLoopStart(), 1) + " - " +
+                juce::String(me.getLoopEnd(), 1) + " beats)");
+        }
+        arrangementView.repaint();
+        return true;
+    }
+    // QQ3 — Ctrl+L = scroll to playhead
+    if (key == juce::KeyPress('l', juce::ModifierKeys::ctrlModifier, 0))
+    {
+        double pos = audioEngine.getPositionBeats();
+        arrangementView.setZoomBeats(arrangementView.getBeatsVisible()); // keep zoom
+        // Center playhead in view
+        float newScroll = (float)(pos - arrangementView.getBeatsVisible() * 0.5);
+        arrangementView.setScrollX(juce::jmax(0.0f, newScroll));
+        return true;
+    }
+    // OO3 — Ctrl+0 = zoom to fit all content
+    if (key == juce::KeyPress('0', juce::ModifierKeys::ctrlModifier, 0))
+    {
+        double maxBeat = 16.0;
+        for (auto& trk : audioEngine.getTrackModel().getTracks())
+        {
+            for (auto& c : trk.clips)
+                maxBeat = juce::jmax(maxBeat, c.startBeat + c.lengthBeats);
+            for (auto& a : trk.audioClips)
+                maxBeat = juce::jmax(maxBeat, a.startBeat + a.lengthBeats);
+        }
+        arrangementView.setZoomBeats((float)(maxBeat + 4.0));
+        return true;
+    }
+    // FF6 — T key = tempo tap
+    if (key == juce::KeyPress('t') && ! key.getModifiers().isCtrlDown())
+    {
+        transportBar.handleTap();
+        return true;
+    }
+    // F key = toggle follow playhead
+    if (key == juce::KeyPress('f'))
+    {
+        static bool follow = true;
+        follow = !follow;
+        arrangementView.setFollowPlayhead(follow);
+        statusBar.setMessage(follow ? "Follow playhead ON" : "Follow playhead OFF");
+        return true;
+    }
+
     return false;
+}
+
+// NN6 — mark project as dirty (unsaved changes)
+void MainWindow::MainContent::markDirty()
+{
+    if (! projectDirty)
+    {
+        projectDirty = true;
+        // UU6 — filename + dirty indicator
+        juce::String title = "MidiGPT";
+        if (currentProjectFile != juce::File())
+            title += " - " + currentProjectFile.getFileNameWithoutExtension();
+        title += " *";
+        if (auto* w = findParentComponentOfClass<MainWindow>())
+            w->setName(title);
+    }
+}
+
+// GG6 — begin undo group: if same name and < 500ms since last, reuse transaction
+void MainWindow::MainContent::beginUndoGroup(const juce::String& name)
+{
+    auto now = juce::Time::getMillisecondCounter();
+    if (name == lastUndoGroupName && (now - lastUndoGroupTime) < 500)
+        return; // reuse current transaction
+    undoManager.beginNewTransaction(name);
+    lastUndoGroupName = name;
+    lastUndoGroupTime = now;
 }
 
 MainWindow::MainContent::~MainContent()
@@ -244,6 +536,14 @@ void MainWindow::MainContent::timerCallback()
                 statusBar.setMessage("Auto-saved " + currentProjectFile.getFileName());
             }
         }
+    }
+
+    // HH5 — panic save every ~2 min (independent of auto-save)
+    static int panicTicks = 0;
+    if (++panicTicks >= 30 * 120) // 2 min at 30fps
+    {
+        panicTicks = 0;
+        panicSave();
     }
 }
 
@@ -296,6 +596,7 @@ juce::PopupMenu MainWindow::MainContent::getMenuForIndex(int idx, const juce::St
             menu.addItem(109, "Export MIDI Stems...", true, false); // AA5
             menu.addItem(107, "Import Audio...",      true, false);
             menu.addItem(108, "Render to WAV...",     true, false);
+            menu.addItem(110, "Export Audio Stems...", true, false); // II6
             menu.addSeparator();
             {
                 // Z5 — recent files submenu (ids 170..179)
@@ -312,8 +613,10 @@ juce::PopupMenu MainWindow::MainContent::getMenuForIndex(int idx, const juce::St
             break;
 
         case 1: // Edit
-            menu.addItem(201, "Undo",  undoManager.canUndo(), false);
-            menu.addItem(202, "Redo",  undoManager.canRedo(), false);
+            menu.addItem(201, "Undo" + juce::String(undoManager.canUndo() ? ": " + undoManager.getUndoDescription() : ""),
+                          undoManager.canUndo(), false);
+            menu.addItem(202, "Redo" + juce::String(undoManager.canRedo() ? ": " + undoManager.getRedoDescription() : ""),
+                          undoManager.canRedo(), false);
             menu.addSeparator();
             menu.addItem(203, "Cut",               true, false);
             menu.addItem(204, "Copy",              true, false);
@@ -325,12 +628,29 @@ juce::PopupMenu MainWindow::MainContent::getMenuForIndex(int idx, const juce::St
         case 2: // Create
             menu.addItem(301, "Add MIDI Track",    true, false);
             menu.addItem(302, "Duplicate Clip",    true, false);
+            menu.addSeparator();
+            menu.addItem(303, audioEngine.isAudioRecording()
+                ? "Stop Audio Recording" : "Record Audio (selected track)",
+                true, audioEngine.isAudioRecording()); // DD1
+            menu.addSeparator();
+            menu.addItem(304, "Add Marker at Playhead...", true, false); // EE6
+            menu.addItem(305, "Clear All Markers",         true, false); // EE6
             break;
 
         case 3: // View
             menu.addItem(401, "Arrangement",       true, false);
             menu.addItem(402, "Mixer",             true, false);
             menu.addItem(403, "Piano Roll",        true, false);
+            menu.addSeparator();
+            { // QQ6 — snap selector
+                juce::PopupMenu snapMenu;
+                snapMenu.addItem(410, "Off",    true, false);
+                snapMenu.addItem(411, "1 Bar",  true, false);
+                snapMenu.addItem(412, "1 Beat", true, false);
+                snapMenu.addItem(413, "1/8",    true, false);
+                snapMenu.addItem(414, "1/16",   true, false);
+                menu.addSubMenu("Snap to Grid", snapMenu);
+            }
             break;
 
         case 4: // Plugins (F2 + U6 + BB3)
@@ -352,6 +672,9 @@ juce::PopupMenu MainWindow::MainContent::getMenuForIndex(int idx, const juce::St
             menu.addItem(602, "Audio Settings...",  true, false);
             menu.addItem(603, "Auto-save Interval...", true, false); // Y4
             menu.addItem(604, "MIDI Input Latency...", true, false); // AA4
+            menu.addSeparator();
+            menu.addItem(605, "Tempo Map Editor...",      true, false); // CC2
+            menu.addItem(606, "Time Signature Editor...", true, false); // CC3
             break;
     }
     return menu;
@@ -361,7 +684,22 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
 {
     switch (menuItemID)
     {
-        case 101: newProject(); break;
+        case 101: // VV1 — confirm if dirty
+            if (projectDirty)
+            {
+                juce::AlertWindow::showAsync(
+                    juce::MessageBoxOptions()
+                        .withIconType(juce::MessageBoxIconType::QuestionIcon)
+                        .withTitle("New Project")
+                        .withMessage("Save changes before creating a new project?")
+                        .withButton("Save").withButton("Don't Save").withButton("Cancel"),
+                    [this](int r) {
+                        if (r == 1) { saveProject(); newProject(); }
+                        else if (r == 2) newProject();
+                    });
+            }
+            else newProject();
+            break;
         case 102: loadProject(); break;
         case 103: saveProject(); break;
         case 104: saveProjectAs(); break;
@@ -383,6 +721,78 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
         case 109: exportMidiStems(); break; // AA5
         case 107: importAudioFile(); break;
         case 108: renderToWav(); break;
+        case 110: // II6 — export audio stems
+        {
+            auto chooser = std::make_shared<juce::FileChooser>(
+                "Export Audio Stems — choose folder", juce::File(), "*");
+            chooser->launchAsync(juce::FileBrowserComponent::openMode
+                                 | juce::FileBrowserComponent::canSelectDirectories,
+                [this, chooser](const juce::FileChooser& fc) {
+                    auto dir = fc.getResult();
+                    if (! dir.isDirectory()) dir = dir.getParentDirectory();
+                    if (! dir.isDirectory()) return;
+
+                    const double sr = 44100.0;
+                    double maxBeats = 16.0;
+                    for (auto& tr : audioEngine.getTrackModel().getTracks())
+                        for (auto& c : tr.clips)
+                            maxBeats = juce::jmax(maxBeats, c.startBeat + c.lengthBeats);
+
+                    int exported = 0;
+                    for (auto& track : audioEngine.getTrackModel().getTracks())
+                    {
+                        const int totalSamples = (int)(maxBeats / (audioEngine.getTempo() / 60.0) * sr);
+                        if (totalSamples <= 0) continue;
+
+                        juce::AudioBuffer<float> buf(2, totalSamples);
+                        buf.clear();
+
+                        auto& syn = audioEngine.getOrCreateTrackSynth(track.id);
+                        auto seq = track.flattenForPlayback();
+                        const double bps = audioEngine.getTempo() / 60.0;
+                        const int blk = 512;
+                        for (int pos = 0; pos < totalSamples; pos += blk)
+                        {
+                            const int nb = juce::jmin(blk, totalSamples - pos);
+                            const double bb = (double)pos / sr * bps;
+                            const double eb = (double)(pos + nb) / sr * bps;
+                            juce::MidiBuffer mb;
+                            for (int i = 0; i < seq.getNumEvents(); ++i)
+                            {
+                                auto* ev = seq.getEventPointer(i);
+                                double bt = ev->message.getTimeStamp();
+                                if (bt >= bb && bt < eb)
+                                    mb.addEvent(ev->message, juce::jlimit(0, nb-1, (int)((bt-bb)/bps*sr)));
+                            }
+                            juce::AudioBuffer<float> tmp(2, nb);
+                            tmp.clear();
+                            syn.renderBlock(tmp, mb);
+                            for (int ch = 0; ch < 2; ++ch)
+                                buf.copyFrom(ch, pos, tmp, ch, 0, nb);
+                        }
+
+                        auto safeName = track.name;
+                        for (auto& ch : "<>:\"/\\|?*") safeName = safeName.replaceCharacter(ch, '_');
+                        auto wavFile = dir.getChildFile(safeName + ".wav");
+
+                        juce::WavAudioFormat wav;
+                        auto fos = std::make_unique<juce::FileOutputStream>(wavFile);
+                        if (fos->openedOk())
+                        {
+                            std::unique_ptr<juce::AudioFormatWriter> w(
+                                wav.createWriterFor(fos.get(), sr, 2, 16, {}, 0));
+                            if (w != nullptr)
+                            {
+                                fos.release();
+                                w->writeFromAudioSampleBuffer(buf, 0, totalSamples);
+                                ++exported;
+                            }
+                        }
+                    }
+                    statusBar.setMessage("Exported " + juce::String(exported) + " audio stems");
+                });
+            break;
+        }
         case 201: // Undo
             if (undoManager.undo()) { mixerPanel.refresh(); arrangementView.repaint(); pianoRoll.repaint(); }
             break;
@@ -393,23 +803,42 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
             juce::JUCEApplication::getInstance()->systemRequestedQuit();
             break;
         case 701: openPluginBrowser(); break;
-        default:
-            // Z5 — recent file items (170..179)
-            if (menuItemID >= 170 && menuItemID < 180)
-            {
-                int idx = menuItemID - 170;
-                if (idx < recentFiles.size() && recentFiles[idx].existsAsFile())
-                    loadProjectFromFile(recentFiles[idx]); // AA2
-            }
-            break;
         case 702: openPluginBrowser(); break; // same dialog
-        case 705: // BB4 — save first-slot plugin preset (selected track)
+        case 705: // BB4 + CC5 — save plugin preset (slot picker if multiple)
         {
             const int selId = arrangementView.getSelectedTrackId();
             auto* t = audioEngine.getTrackModel().getTrack(selId);
             if (t == nullptr || t->plugins.empty())
             { statusBar.setMessage("No plugin on selected track"); break; }
-            auto* inst = audioEngine.getPluginChains().getPlugin(t->id, 0);
+
+            // CC5 — pick slot if multiple
+            int slotToUse = 0;
+            if (t->plugins.size() > 1)
+            {
+                juce::PopupMenu pm;
+                for (int s = 0; s < (int)t->plugins.size(); ++s)
+                    pm.addItem(s + 1, "[" + juce::String(s + 1) + "] " + t->plugins[(size_t)s].displayName);
+                pm.showMenuAsync(juce::PopupMenu::Options(),
+                    [this, t](int chosen) {
+                        if (chosen <= 0) return;
+                        int s = chosen - 1;
+                        auto* inst2 = audioEngine.getPluginChains().getPlugin(t->id, s);
+                        if (inst2 == nullptr) { statusBar.setMessage("Plugin not loaded"); return; }
+                        auto chooser2 = std::make_shared<juce::FileChooser>(
+                            "Save Preset", juce::File(), "*.vstpreset;*.bin");
+                        chooser2->launchAsync(juce::FileBrowserComponent::saveMode,
+                            [this, chooser2, inst2](const juce::FileChooser& fc) {
+                                auto f = fc.getResult();
+                                if (f == juce::File()) return;
+                                juce::MemoryBlock mb;
+                                inst2->getStateInformation(mb);
+                                if (f.replaceWithData(mb.getData(), mb.getSize()))
+                                    statusBar.setMessage("Saved preset: " + f.getFileName());
+                            });
+                    });
+                break;
+            }
+            auto* inst = audioEngine.getPluginChains().getPlugin(t->id, slotToUse);
             if (inst == nullptr) { statusBar.setMessage("Plugin not loaded"); break; }
 
             auto chooser = std::make_shared<juce::FileChooser>(
@@ -503,7 +932,7 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
                 });
             break;
         }
-        case 703: // U6 — open editor for first plugin on selected track
+        case 703: // U6 + CC5 — open editor for chosen plugin slot on selected track
         {
             const int selId = arrangementView.getSelectedTrackId();
             auto* t = audioEngine.getTrackModel().getTrack(selId);
@@ -517,10 +946,34 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
                 }
                 t = &tracks.front();
             }
-            if (auto* inst = audioEngine.getPluginChains().getPlugin(t->id, 0))
-                PluginEditorManager::instance().openFor(t->id, 0, *inst, t->plugins[0].displayName);
+
+            // CC5 — if only 1 slot, open directly; otherwise show picker
+            if (t->plugins.size() == 1)
+            {
+                if (auto* inst = audioEngine.getPluginChains().getPlugin(t->id, 0))
+                    PluginEditorManager::instance().openFor(t->id, 0, *inst, t->plugins[0].displayName);
+                else
+                    statusBar.setMessage("Plugin instance not loaded");
+            }
             else
-                statusBar.setMessage("Plugin instance not loaded");
+            {
+                juce::PopupMenu slotMenu;
+                for (int s = 0; s < (int)t->plugins.size(); ++s)
+                {
+                    auto& slot = t->plugins[(size_t)s];
+                    slotMenu.addItem(s + 1,
+                        "[" + juce::String(s + 1) + "] " + slot.displayName,
+                        audioEngine.getPluginChains().getPlugin(t->id, s) != nullptr);
+                }
+                slotMenu.showMenuAsync(juce::PopupMenu::Options(),
+                    [this, t](int chosen) {
+                        if (chosen <= 0) return;
+                        int s = chosen - 1;
+                        if (auto* inst = audioEngine.getPluginChains().getPlugin(t->id, s))
+                            PluginEditorManager::instance().openFor(
+                                t->id, s, *inst, t->plugins[(size_t)s].displayName);
+                    });
+            }
             break;
         }
         case 301: // Add Track
@@ -531,6 +984,58 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
             arrangementView.repaint();
             break;
         }
+        case 303: // DD1 — toggle audio recording on selected track
+        {
+            if (audioEngine.isAudioRecording())
+            {
+                audioEngine.stop();
+                audioEngine.finalizeAudioRecording();
+                arrangementView.repaint();
+                statusBar.setMessage("Audio recording saved");
+            }
+            else
+            {
+                const int selId = arrangementView.getSelectedTrackId();
+                if (selId < 0)
+                { statusBar.setMessage("Select a track first"); break; }
+                audioEngine.setAudioRecordingTrack(selId);
+                if (! audioEngine.isPlaying()) audioEngine.play();
+                statusBar.setMessage("Recording audio on track...");
+            }
+            break;
+        }
+        case 304: // EE6 — Add marker at playhead
+        {
+            auto* aw = new juce::AlertWindow("Add Marker", "Marker name:",
+                                              juce::MessageBoxIconType::NoIcon);
+            aw->addTextEditor("name", "Marker");
+            aw->addButton("OK", 1);
+            aw->addButton("Cancel", 0);
+            aw->enterModalState(true, juce::ModalCallbackFunction::create(
+                [this, aw](int r) {
+                    if (r == 1)
+                    {
+                        auto name = aw->getTextEditorContents("name");
+                        audioEngine.getMidiEngine().addMarker(
+                            audioEngine.getPositionBeats(), name);
+                        arrangementView.repaint();
+                        statusBar.setMessage("Marker added: " + name);
+                    }
+                    delete aw;
+                }), false);
+            break;
+        }
+        case 305: // EE6 — Clear all markers
+            audioEngine.getMidiEngine().clearMarkers();
+            arrangementView.repaint();
+            statusBar.setMessage("All markers cleared");
+            break;
+        // QQ6 — snap grid selection
+        case 410: arrangementView.setSnapBeats(0.0); statusBar.setMessage("Snap: Off"); break;
+        case 411: arrangementView.setSnapBeats(4.0); statusBar.setMessage("Snap: 1 Bar"); break;
+        case 412: arrangementView.setSnapBeats(1.0); statusBar.setMessage("Snap: 1 Beat"); break;
+        case 413: arrangementView.setSnapBeats(0.5); statusBar.setMessage("Snap: 1/8"); break;
+        case 414: arrangementView.setSnapBeats(0.25); statusBar.setMessage("Snap: 1/16"); break;
         case 402: // Mixer
             bottomTabs.setCurrentTabIndex(1);
             break;
@@ -583,6 +1088,122 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
                 }), false);
             break;
         }
+        case 605: // CC2 — Tempo Map Editor
+        {
+            auto* aw = new juce::AlertWindow(
+                "Tempo Map Editor",
+                "Enter tempo changes (one per line):\n"
+                "Format: beat bpm  (e.g. \"0 120\" means BPM 120 at beat 0)\n\n"
+                "Current map:",
+                juce::MessageBoxIconType::NoIcon);
+
+            // Populate with current data
+            juce::String current;
+            auto& tmap = audioEngine.getMidiEngine().getTempoMap();
+            if (tmap.empty())
+                current = "0 " + juce::String(audioEngine.getTempo(), 1);
+            else
+                for (auto& [b, bpm] : tmap)
+                    current += juce::String(b, 2) + " " + juce::String(bpm, 1) + "\n";
+
+            aw->addTextEditor("data", current.trim(), "", true);
+            aw->getTextEditor("data")->setMultiLine(true, false);
+            aw->getTextEditor("data")->setReturnKeyStartsNewLine(true);
+            aw->getTextEditor("data")->setSize(300, 120);
+            aw->addButton("Apply", 1);
+            aw->addButton("Clear All", 2);
+            aw->addButton("Cancel", 0);
+            aw->enterModalState(true, juce::ModalCallbackFunction::create(
+                [this, aw](int r) {
+                    if (r == 2) // Clear
+                    {
+                        audioEngine.getMidiEngine().clearTempoMap();
+                        statusBar.setMessage("Tempo map cleared (constant " +
+                            juce::String(audioEngine.getTempo(), 1) + " BPM)");
+                    }
+                    else if (r == 1) // Apply
+                    {
+                        audioEngine.getMidiEngine().clearTempoMap();
+                        auto text = aw->getTextEditorContents("data");
+                        juce::StringArray lines;
+                        lines.addLines(text);
+                        int count = 0;
+                        for (auto& line : lines)
+                        {
+                            auto parts = juce::StringArray::fromTokens(line.trim(), " \t", "");
+                            if (parts.size() >= 2)
+                            {
+                                double beat = parts[0].getDoubleValue();
+                                double bpm  = juce::jlimit(20.0, 300.0, parts[1].getDoubleValue());
+                                audioEngine.getMidiEngine().addTempoChange(beat, bpm);
+                                if (count == 0) audioEngine.setTempo(bpm);
+                                ++count;
+                            }
+                        }
+                        statusBar.setMessage("Tempo map: " + juce::String(count) + " change(s)");
+                    }
+                    delete aw;
+                }), false);
+            break;
+        }
+        case 606: // CC3 — Time Signature Editor
+        {
+            auto* aw = new juce::AlertWindow(
+                "Time Signature Editor",
+                "Enter time signature changes (one per line):\n"
+                "Format: beat num den  (e.g. \"0 4 4\" means 4/4 at beat 0)\n\n"
+                "Current map:",
+                juce::MessageBoxIconType::NoIcon);
+
+            juce::String current;
+            auto& tsmap = audioEngine.getMidiEngine().getTimeSignatureMap();
+            if (tsmap.empty())
+                current = "0 4 4";
+            else
+                for (auto& [b, sig] : tsmap)
+                    current += juce::String(b, 2) + " " + juce::String(sig.num)
+                               + " " + juce::String(sig.den) + "\n";
+
+            aw->addTextEditor("data", current.trim(), "", true);
+            aw->getTextEditor("data")->setMultiLine(true, false);
+            aw->getTextEditor("data")->setReturnKeyStartsNewLine(true);
+            aw->getTextEditor("data")->setSize(300, 120);
+            aw->addButton("Apply", 1);
+            aw->addButton("Clear All", 2);
+            aw->addButton("Cancel", 0);
+            aw->enterModalState(true, juce::ModalCallbackFunction::create(
+                [this, aw](int r) {
+                    if (r == 2)
+                    {
+                        audioEngine.getMidiEngine().clearTimeSignatureMap();
+                        statusBar.setMessage("Time signature map cleared (constant 4/4)");
+                    }
+                    else if (r == 1)
+                    {
+                        audioEngine.getMidiEngine().clearTimeSignatureMap();
+                        auto text = aw->getTextEditorContents("data");
+                        juce::StringArray lines;
+                        lines.addLines(text);
+                        int count = 0;
+                        for (auto& line : lines)
+                        {
+                            auto parts = juce::StringArray::fromTokens(line.trim(), " \t", "");
+                            if (parts.size() >= 3)
+                            {
+                                double beat = parts[0].getDoubleValue();
+                                int num = juce::jlimit(1, 32, parts[1].getIntValue());
+                                int den = juce::jlimit(1, 32, parts[2].getIntValue());
+                                audioEngine.getMidiEngine().addTimeSignatureChange(beat, num, den);
+                                if (count == 0) audioEngine.getMidiEngine().setTimeSignature(num, den);
+                                ++count;
+                            }
+                        }
+                        statusBar.setMessage("Time sig map: " + juce::String(count) + " change(s)");
+                    }
+                    delete aw;
+                }), false);
+            break;
+        }
         case 603: // Y4 — auto-save interval
         {
             auto* aw = new juce::AlertWindow(
@@ -607,6 +1228,13 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
             break;
         }
         default:
+            // Z5 — recent file items (170..179)
+            if (menuItemID >= 170 && menuItemID < 180)
+            {
+                int idx = menuItemID - 170;
+                if (idx < recentFiles.size() && recentFiles[idx].existsAsFile())
+                    loadProjectFromFile(recentFiles[idx]);
+            }
             break;
     }
 }
@@ -654,6 +1282,7 @@ void MainWindow::MainContent::loadMidiFile(const juce::File& file)
     double bpm = audioEngine.getTempo();
 
     int tracksAdded = 0;
+    int nextChannel = 1; // TT4 — auto-assign channels (skip 10=drums)
     for (int t = 0; t < midiFile.getNumTracks(); ++t)
     {
         auto* srcTrack = midiFile.getTrack(t);
@@ -667,6 +1296,24 @@ void MainWindow::MainContent::loadMidiFile(const juce::File& file)
 
         auto& newTrack = audioEngine.getTrackModel().addTrack(
             file.getFileNameWithoutExtension() + " [" + juce::String(t) + "]");
+
+        // VV5 — extract track name from MIDI meta event
+        for (int mi = 0; mi < srcTrack->getNumEvents(); ++mi)
+        {
+            auto& mm = srcTrack->getEventPointer(mi)->message;
+            if (mm.isTextMetaEvent() && mm.getMetaEventType() == 3) // Track Name
+            {
+                auto tname = mm.getTextFromTextMetaEvent();
+                if (tname.isNotEmpty())
+                { newTrack.name = tname; break; }
+            }
+        }
+
+        // TT4 — auto-assign MIDI channel
+        newTrack.midiChannel = nextChannel;
+        ++nextChannel;
+        if (nextChannel == 10) ++nextChannel; // skip drums
+        if (nextChannel > 16) nextChannel = 1;
 
         MidiClip clip;
         clip.startBeat = 0.0;
@@ -683,6 +1330,17 @@ void MainWindow::MainContent::loadMidiFile(const juce::File& file)
         for (int i = 0; i < clip.sequence.getNumEvents(); ++i)
             maxBeat = juce::jmax(maxBeat, clip.sequence.getEventPointer(i)->message.getTimeStamp());
         clip.lengthBeats = juce::jmax(4.0, std::ceil(maxBeat / 4.0) * 4.0);
+
+        // QQ5 — extract first program change from MIDI track → userProgram
+        for (int i = 0; i < srcTrack->getNumEvents(); ++i)
+        {
+            auto& pm = srcTrack->getEventPointer(i)->message;
+            if (pm.isProgramChange())
+            {
+                newTrack.userProgram = pm.getProgramChangeNumber();
+                break;
+            }
+        }
 
         newTrack.clips.push_back(std::move(clip));
         tracksAdded++;
@@ -743,7 +1401,7 @@ void MainWindow::MainContent::saveProject()
     pushRecent(currentProjectFile); // Z5
 
     juce::DynamicObject::Ptr root = new juce::DynamicObject();
-    root->setProperty("version", 3);              // T6 — adds audioClips wavRef
+    root->setProperty("version", 4);              // RR6 — adds userProgram, clipName, markers, etc.
     root->setProperty("projectName", "MidiGPT Project");
     root->setProperty("bpm", audioEngine.getTempo());
     // BB5/BB6 — tempo/time-sig maps
@@ -768,6 +1426,18 @@ void MainWindow::MainContent::saveProject()
             tsArr.add(juce::var(o.get()));
         }
         root->setProperty("tsMap", tsArr);
+
+        // EE6 — markers
+        juce::Array<juce::var> mkArr;
+        for (auto& mk : audioEngine.getMidiEngine().getMarkers())
+        {
+            juce::DynamicObject::Ptr o = new juce::DynamicObject();
+            o->setProperty("beat", mk.beat);
+            o->setProperty("name", mk.name);
+            o->setProperty("colour", (int)mk.colour.getARGB());
+            mkArr.add(juce::var(o.get()));
+        }
+        root->setProperty("markers", mkArr);
     }
 
     // T6 — sidecar audio dir for externalised clips (sibling to .mgp file)
@@ -802,9 +1472,15 @@ void MainWindow::MainContent::saveProject()
         tObj->setProperty("solo", track.solo);
         tObj->setProperty("colour", (int)track.colour.getARGB());
         tObj->setProperty("outputBusId", track.outputBusId);
+        if (track.userProgram >= 0) tObj->setProperty("userProgram", track.userProgram);
         tObj->setProperty("parentTrackId", track.parentTrackId); // AA6
         tObj->setProperty("isFolder",      track.isFolder);
         tObj->setProperty("collapsed",     track.collapsed);      // BB1
+        // RR6 — v4 fields
+        if (track.displayHeight != 48) tObj->setProperty("displayHeight", track.displayHeight);
+        if (track.frozen) tObj->setProperty("frozen", true);
+        if (track.overdub != true) tObj->setProperty("overdub", track.overdub);
+        if (track.inputMonitor) tObj->setProperty("inputMonitor", true);
 
         // U3 — sends
         juce::Array<juce::var> sendsArr;
@@ -813,6 +1489,8 @@ void MainWindow::MainContent::saveProject()
             juce::DynamicObject::Ptr so = new juce::DynamicObject();
             so->setProperty("busId", s.busId);
             so->setProperty("level", (double)s.level);
+            so->setProperty("preFader", s.preFader); // EE3
+            if (s.sidechain) so->setProperty("sidechain", true); // KK3
             sendsArr.add(juce::var(so.get()));
         }
         tObj->setProperty("sends", sendsArr);
@@ -824,6 +1502,11 @@ void MainWindow::MainContent::saveProject()
             juce::DynamicObject::Ptr cObj = new juce::DynamicObject();
             cObj->setProperty("startBeat", clip.startBeat);
             cObj->setProperty("lengthBeats", clip.lengthBeats);
+            if (clip.name.isNotEmpty()) cObj->setProperty("name", clip.name); // MM4
+            if (clip.hasCustomColour()) // KK2
+                cObj->setProperty("colour", (int)clip.colour.getARGB());
+            if (clip.swing > 0.001f) // FF5
+                cObj->setProperty("swing", (double)clip.swing);
 
             juce::Array<juce::var> noteArr;
             juce::Array<juce::var> ccArr;
@@ -870,6 +1553,10 @@ void MainWindow::MainContent::saveProject()
             aObj->setProperty("channels", a.buffer.getNumChannels());
             aObj->setProperty("samples", a.buffer.getNumSamples());
             aObj->setProperty("sourceOffsetSamples", (double)a.sourceOffsetSamples); // W5
+            if (a.fadeInBeats > 0.0)  aObj->setProperty("fadeInBeats", a.fadeInBeats);   // DD2
+            if (a.fadeOutBeats > 0.0) aObj->setProperty("fadeOutBeats", a.fadeOutBeats); // DD2
+            if (std::abs(a.pitchSemitones) > 0.01f) aObj->setProperty("pitchSemitones", (double)a.pitchSemitones); // PP1
+            if (std::abs(a.playbackRate - 1.0) > 0.001) aObj->setProperty("playbackRate", a.playbackRate); // PP1
 
             const juce::int64 byteSize = (juce::int64)sizeof(float)
                 * a.buffer.getNumChannels() * a.buffer.getNumSamples();
@@ -951,6 +1638,8 @@ void MainWindow::MainContent::saveProject()
                 juce::DynamicObject::Ptr p = new juce::DynamicObject();
                 p->setProperty("beat", pt.beat);
                 p->setProperty("value", (double)pt.value);
+                if (std::abs(pt.curve) > 0.001f) // CC6 — only save non-zero
+                    p->setProperty("curve", (double)pt.curve);
                 pts.add(juce::var(p.get()));
             }
             la->setProperty("points", pts);
@@ -964,7 +1653,18 @@ void MainWindow::MainContent::saveProject()
 
     auto json = juce::JSON::toString(juce::var(root.get()));
     currentProjectFile.replaceWithText(json);
-    statusBar.setMessage("Saved (v2): " + currentProjectFile.getFileName());
+    projectDirty = false; // NN6
+    // UU6 — show filename in title bar
+    if (auto* w = findParentComponentOfClass<MainWindow>())
+        w->setName("MidiGPT - " + currentProjectFile.getFileNameWithoutExtension());
+    // SS5 — show project stats on save
+    int totalClips = 0, totalAudio = 0;
+    for (auto& t : audioEngine.getTrackModel().getTracks())
+    { totalClips += (int)t.clips.size(); totalAudio += (int)t.audioClips.size(); }
+    statusBar.setMessage("Saved v4: " + currentProjectFile.getFileName()
+        + " (" + juce::String(audioEngine.getTrackModel().getNumTracks()) + " tracks, "
+        + juce::String(totalClips) + " clips, "
+        + juce::String(totalAudio) + " audio)");
 }
 
 void MainWindow::MainContent::saveProjectAs()
@@ -1020,6 +1720,7 @@ void MainWindow::MainContent::loadProjectFromFile(const juce::File& file)
             // BB5/BB6 — restore tempo + time-sig maps
             audioEngine.getMidiEngine().clearTempoMap();
             audioEngine.getMidiEngine().clearTimeSignatureMap();
+            audioEngine.getMidiEngine().clearMarkers(); // EE6
             if (auto* tmArr = parsed.getProperty("tempoMap", juce::var()).getArray())
                 for (auto& v : *tmArr)
                     audioEngine.getMidiEngine().addTempoChange(
@@ -1031,6 +1732,13 @@ void MainWindow::MainContent::loadProjectFromFile(const juce::File& file)
                         v.getProperty("beat", 0.0),
                         v.getProperty("num", 4),
                         v.getProperty("den", 4));
+
+            // EE6 — restore markers
+            if (auto* mkArr = parsed.getProperty("markers", juce::var()).getArray())
+                for (auto& v : *mkArr)
+                    audioEngine.getMidiEngine().addMarker(
+                        v.getProperty("beat", 0.0),
+                        v.getProperty("name", "Marker").toString());
 
             // v2 — restore buses
             if (version >= 2)
@@ -1064,9 +1772,15 @@ void MainWindow::MainContent::loadProjectFromFile(const juce::File& file)
                 track.solo = tVar.getProperty("solo", false);
                 track.colour = juce::Colour((juce::uint32)(int)tVar.getProperty("colour", (int)0xFF5E81AC));
                 track.outputBusId = tVar.getProperty("outputBusId", 0);
+                track.userProgram = tVar.getProperty("userProgram", -1);
                 track.parentTrackId = tVar.getProperty("parentTrackId", -1); // AA6
                 track.isFolder      = tVar.getProperty("isFolder", false);
                 track.collapsed     = tVar.getProperty("collapsed", false);  // BB1
+                // RR6 — v4 fields
+                track.displayHeight  = tVar.getProperty("displayHeight", 48);
+                track.frozen         = tVar.getProperty("frozen", false);
+                track.overdub        = tVar.getProperty("overdub", true);
+                track.inputMonitor   = tVar.getProperty("inputMonitor", false);
 
                 // U3 — sends
                 if (version >= 3)
@@ -1079,6 +1793,8 @@ void MainWindow::MainContent::loadProjectFromFile(const juce::File& file)
                             Track::Send s;
                             s.busId = sv.getProperty("busId", 0);
                             s.level = (float)(double)sv.getProperty("level", 0.0);
+                            s.preFader = sv.getProperty("preFader", false); // EE3
+                            s.sidechain = sv.getProperty("sidechain", false); // KK3
                             track.sends.push_back(s);
                         }
                     }
@@ -1093,6 +1809,11 @@ void MainWindow::MainContent::loadProjectFromFile(const juce::File& file)
                         MidiClip clip;
                         clip.startBeat = cVar.getProperty("startBeat", 0.0);
                         clip.lengthBeats = cVar.getProperty("lengthBeats", 4.0);
+                        clip.name = cVar.getProperty("name", "").toString(); // MM4
+                        // KK2 + FF5
+                        if (cVar.hasProperty("colour"))
+                            clip.colour = juce::Colour((juce::uint32)(int)cVar.getProperty("colour", 0));
+                        clip.swing = (float)(double)cVar.getProperty("swing", 0.0);
 
                         auto* notesArr = cVar.getProperty("notes", juce::var()).getArray();
                         if (notesArr)
@@ -1146,6 +1867,10 @@ void MainWindow::MainContent::loadProjectFromFile(const juce::File& file)
                             ac.lengthBeats = aVar.getProperty("lengthBeats", 0.0);
                             ac.sourceSampleRate = aVar.getProperty("sourceSampleRate", 44100.0);
                             ac.sourceOffsetSamples = (juce::int64)(double)aVar.getProperty("sourceOffsetSamples", 0.0); // W5
+                            ac.fadeInBeats  = aVar.getProperty("fadeInBeats", 0.0);  // DD2
+                            ac.fadeOutBeats = aVar.getProperty("fadeOutBeats", 0.0); // DD2
+                            ac.pitchSemitones = (float)(double)aVar.getProperty("pitchSemitones", 0.0); // PP1
+                            ac.playbackRate = aVar.getProperty("playbackRate", 1.0); // PP1
                             const int ch = aVar.getProperty("channels", 1);
                             const int sa = aVar.getProperty("samples", 0);
 
@@ -1249,6 +1974,7 @@ void MainWindow::MainContent::loadProjectFromFile(const juce::File& file)
                                     AutomationPoint pt;
                                     pt.beat  = pVar.getProperty("beat", 0.0);
                                     pt.value = (float)(double)pVar.getProperty("value", 0.0);
+                                    pt.curve = (float)(double)pVar.getProperty("curve", 0.0); // CC6
                                     lane.points.push_back(pt);
                                 }
                             }
@@ -1284,6 +2010,10 @@ void MainWindow::MainContent::loadProjectFromFile(const juce::File& file)
             }
 
             statusBar.setMessage("Opened (v" + juce::String(version) + "): " + file.getFileName());
+            // UU6 — title bar
+            if (auto* w = findParentComponentOfClass<MainWindow>())
+                w->setName("MidiGPT - " + file.getFileNameWithoutExtension());
+            projectDirty = false;
     }
 }
 
@@ -1343,11 +2073,18 @@ void MainWindow::MainContent::exportMidi()
                 nameMsg.setTimeStamp(0.0);
                 midiTrack.addEvent(nameMsg);
 
+                // RR5 — insert program change if user has set an instrument
+                if (track.userProgram >= 0)
+                {
+                    auto pc = juce::MidiMessage::programChange(track.midiChannel, track.userProgram);
+                    pc.setTimeStamp(0.0);
+                    midiTrack.addEvent(pc);
+                }
+
                 auto seq = track.flattenForPlayback();
                 for (int i = 0; i < seq.getNumEvents(); ++i)
                 {
                     auto msg = seq.getEventPointer(i)->message;
-                    // Convert beats to ticks (480 TPQ)
                     msg.setTimeStamp(msg.getTimeStamp() * 480.0);
                     msg.setChannel(track.midiChannel);
                     midiTrack.addEvent(msg);
@@ -1399,6 +2136,14 @@ void MainWindow::MainContent::exportMidiStems()
                 auto nameMsg = juce::MidiMessage::textMetaEvent(3, track.name);
                 nameMsg.setTimeStamp(0.0);
                 midiTrack.addEvent(nameMsg);
+
+                // RR5 — program change for stems
+                if (track.userProgram >= 0)
+                {
+                    auto pc = juce::MidiMessage::programChange(track.midiChannel, track.userProgram);
+                    pc.setTimeStamp(0.0);
+                    midiTrack.addEvent(pc);
+                }
 
                 auto seq = track.flattenForPlayback();
                 for (int i = 0; i < seq.getNumEvents(); ++i)
@@ -1460,6 +2205,7 @@ void MainWindow::MainContent::loadAudioFile(const juce::File& file)
     const double durationSec = (double)reader->lengthInSamples / reader->sampleRate;
     clip.lengthBeats = durationSec * (audioEngine.getTempo() / 60.0);
 
+    clip.sourceName = file.getFileNameWithoutExtension(); // LL6
     auto& newTrack = audioEngine.getTrackModel().addTrack(file.getFileNameWithoutExtension());
     audioEngine.prebuildTrackSynth(newTrack.id); // T1
     newTrack.audioClips.push_back(std::move(clip));
@@ -1556,5 +2302,48 @@ void MainWindow::MainContent::openPluginBrowser()
             audioEngine.getPluginChains().addPlugin(target.id, slotIdx, std::move(inst));
 
             statusBar.setMessage("Added " + desc.name + " to " + target.name);
+        });
+}
+
+// HH5 — crash recovery
+juce::File MainWindow::MainContent::getCrashRecoveryFile() const
+{
+    return juce::File::getSpecialLocation(juce::File::tempDirectory)
+        .getChildFile("MidiGPTDAW_recovery.mgp");
+}
+
+void MainWindow::MainContent::panicSave()
+{
+    auto recFile = getCrashRecoveryFile();
+    auto saved = currentProjectFile;
+    currentProjectFile = recFile;
+    saveProject();
+    currentProjectFile = saved;
+}
+
+void MainWindow::MainContent::checkCrashRecovery()
+{
+    auto recFile = getCrashRecoveryFile();
+    if (! recFile.existsAsFile()) return;
+
+    // HH5 — use async message box for crash recovery
+    juce::AlertWindow::showAsync(
+        juce::MessageBoxOptions()
+            .withIconType(juce::MessageBoxIconType::WarningIcon)
+            .withTitle("Crash Recovery")
+            .withMessage("A recovery file was found. Restore it?")
+            .withButton("Restore")
+            .withButton("Discard"),
+        [this, recFile](int result) {
+            if (result == 1) // Restore
+            {
+                loadProjectFromFile(recFile);
+                recFile.deleteFile();
+                statusBar.setMessage("Recovered from crash save");
+            }
+            else // Discard
+            {
+                recFile.deleteFile();
+            }
         });
 }

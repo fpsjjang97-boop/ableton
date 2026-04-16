@@ -60,9 +60,16 @@ public:
      *  Windows: %ProgramFiles%\Common Files\VST3 + user-level VST3 folders. */
     static juce::FileSearchPath getDefaultVst3SearchPaths();
 
+    // JJ6 — plugin blacklist
+    void addToBlacklist(const juce::String& identifier) { blacklist.add(identifier); }
+    void removeFromBlacklist(const juce::String& identifier) { blacklist.removeString(identifier); }
+    bool isBlacklisted(const juce::String& identifier) const { return blacklist.contains(identifier); }
+    const juce::StringArray& getBlacklist() const { return blacklist; }
+
 private:
     juce::AudioPluginFormatManager formatManager;
     juce::KnownPluginList          knownPlugins;
+    juce::StringArray              blacklist; // JJ6
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginHost)
 };

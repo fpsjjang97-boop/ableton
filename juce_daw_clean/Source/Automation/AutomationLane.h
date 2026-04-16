@@ -23,6 +23,7 @@ struct AutomationPoint
 {
     double beat   { 0.0 };
     float  value  { 0.0f }; // normalized 0..1
+    float  curve  { 0.0f }; // CC6 — curvature: 0=linear, -1..1=concave/convex
 };
 
 struct AutomationLane
@@ -48,7 +49,17 @@ struct AutomationLane
         auto& lo = *(it - 1);
         const double span = hi.beat - lo.beat;
         if (span <= 0.0) return lo.value;
-        const double t = (beat - lo.beat) / span;
+        double t = (beat - lo.beat) / span;
+
+        // CC6 — apply curvature (power curve). curve > 0 = convex, < 0 = concave
+        if (std::abs(lo.curve) > 0.001f)
+        {
+            // Map curve [-1,1] to exponent [3, 1/3]
+            double exp = lo.curve > 0.0f ? (1.0 / (1.0 + 2.0 * lo.curve))
+                                         : (1.0 - 2.0 * lo.curve);
+            t = std::pow(t, exp);
+        }
+
         return lo.value + (hi.value - lo.value) * (float)t;
     }
 

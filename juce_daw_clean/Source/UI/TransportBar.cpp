@@ -98,7 +98,39 @@ TransportBar::TransportBar(AudioEngine& engine)
     snapSelector.setSelectedId(6); // 1/16 default
     addAndMakeVisible(snapSelector);
 
+    // OO5 — click position label to toggle format
+    positionLabel.addMouseListener(this, false);
+    timeLabel.addMouseListener(this, false);
+
+    // FF6 — tempo tap button
+    tapButton.onClick = [this] { handleTap(); };
+    addAndMakeVisible(tapButton);
+
     startTimerHz(30);
+}
+
+// FF6 — tempo tap: average intervals of last 4-8 taps
+void TransportBar::handleTap()
+{
+    double now = juce::Time::getMillisecondCounterHiRes() / 1000.0;
+    tapTimes.push_back(now);
+
+    // Expire taps older than 3 seconds
+    while (tapTimes.size() > 1 && (now - tapTimes.front()) > 3.0)
+        tapTimes.erase(tapTimes.begin());
+
+    if (tapTimes.size() >= 2)
+    {
+        double totalInterval = tapTimes.back() - tapTimes.front();
+        double avgInterval = totalInterval / (double)(tapTimes.size() - 1);
+        if (avgInterval > 0.0)
+        {
+            double bpm = 60.0 / avgInterval;
+            bpm = juce::jlimit(20.0, 300.0, bpm);
+            tempoSlider.setValue(bpm);
+            audioEngine.setTempo(bpm);
+        }
+    }
 }
 
 void TransportBar::paint(juce::Graphics& g)
@@ -153,26 +185,108 @@ void TransportBar::resized()
     metroButton.setBounds(area.removeFromLeft(48));
     area.removeFromLeft(6);
     countInSelector.setBounds(area.removeFromLeft(80));   // Z3
+    area.removeFromLeft(4);
+    tapButton.setBounds(area.removeFromLeft(36)); // FF6
+}
+
+// OO5 — toggle time display format on click
+void TransportBar::mouseDown(const juce::MouseEvent& e)
+{
+    auto posArea = positionLabel.getBounds().expanded(4);
+    auto timeArea = timeLabel.getBounds().expanded(4);
+    if (posArea.contains(e.getPosition()) || timeArea.contains(e.getPosition()))
+        showTimeFormat = ! showTimeFormat;
+}
+
+// SS2 — double-click position label → direct beat input
+void TransportBar::mouseDoubleClick(const juce::MouseEvent& e)
+{
+    auto posArea = positionLabel.getBounds().expanded(4);
+    if (posArea.contains(e.getPosition()))
+    {
+        auto* aw = new juce::AlertWindow("Go to Position", "Enter beat number:",
+                                          juce::MessageBoxIconType::NoIcon);
+        aw->addTextEditor("beat", juce::String(audioEngine.getPositionBeats(), 2));
+        aw->addButton("Go", 1);
+        aw->addButton("Cancel", 0);
+        aw->enterModalState(true, juce::ModalCallbackFunction::create(
+            [this, aw](int r) {
+                if (r == 1)
+                {
+                    double beat = juce::jmax(0.0, aw->getTextEditorContents("beat").getDoubleValue());
+                    audioEngine.getMidiEngine().setPositionBeats(beat);
+                }
+                delete aw;
+            }), false);
+    }
 }
 
 void TransportBar::timerCallback()
 {
     double beats = audioEngine.getPositionBeats();
-    int bar  = static_cast<int>(beats / 4.0) + 1;
-    int beat = static_cast<int>(std::fmod(beats, 4.0)) + 1;
-    int tick = static_cast<int>(std::fmod(beats * 480.0, 480.0));
-    positionLabel.setText(juce::String::formatted("%d.%d.%03d", bar, beat, tick),
-                          juce::dontSendNotification);
 
+    // KK4 — time-sig aware bar/beat calculation
+    auto& me = audioEngine.getMidiEngine();
+    int bar = 1;
+    double remaining = beats;
+    double pos = 0.0;
+    for (int safety = 0; safety < 10000 && remaining > 0.001; ++safety)
+    {
+        auto ts = me.timeSigAt(pos);
+        double barLen = (ts.den > 0) ? (double)ts.num * (4.0 / (double)ts.den) : 4.0; // D2
+        if (remaining < barLen) break;
+        remaining -= barLen;
+        pos += barLen;
+        ++bar;
+    }
+    auto curTs = me.timeSigAt(pos);
+    double beatUnit = 4.0 / (double)curTs.den;
+    int beat = (int)(remaining / beatUnit) + 1;
+    int tick = (int)(std::fmod(remaining, beatUnit) / beatUnit * 480.0);
     double seconds = beats * 60.0 / audioEngine.getTempo();
     int mins = static_cast<int>(seconds) / 60;
     int secs = static_cast<int>(seconds) % 60;
     int ms   = static_cast<int>(std::fmod(seconds, 1.0) * 1000.0);
-    timeLabel.setText(juce::String::formatted("%d:%02d.%03d", mins, secs, ms),
-                      juce::dontSendNotification);
+
+    // OO5 — swap primary/secondary display based on format toggle
+    if (showTimeFormat)
+    {
+        positionLabel.setText(juce::String::formatted("%d:%02d.%03d", mins, secs, ms),
+                              juce::dontSendNotification);
+        timeLabel.setText(juce::String::formatted("%d.%d.%03d", bar, beat, tick),
+                          juce::dontSendNotification);
+    }
+    else
+    {
+        positionLabel.setText(juce::String::formatted("%d.%d.%03d", bar, beat, tick),
+                              juce::dontSendNotification);
+        timeLabel.setText(juce::String::formatted("%d:%02d.%03d", mins, secs, ms),
+                          juce::dontSendNotification);
+    }
 
     // Update play button colour
     playButton.setColour(juce::TextButton::buttonColourId,
                          audioEngine.isPlaying() ? juce::Colour(0xFF4CAF50)
                                                  : juce::Colour(0xFF2E7D32));
+
+    // UU4 — sync tempo slider to current effective tempo
+    {
+        double effTempo = audioEngine.getMidiEngine().tempoAt(audioEngine.getPositionBeats());
+        if (! tempoSlider.isMouseButtonDown()
+            && std::abs(tempoSlider.getValue() - effTempo) > 0.2)
+            tempoSlider.setValue(effTempo, juce::dontSendNotification);
+    }
+
+    // RR4 — count-in visual: flash record button during pre-roll
+    if (audioEngine.getCountInBars() > 0 && ! audioEngine.isPlaying()
+        && recordButton.getToggleState())
+    {
+        bool flash = ((int)(juce::Time::getMillisecondCounter() / 250) % 2) == 0;
+        recordButton.setColour(juce::TextButton::buttonColourId,
+            flash ? juce::Colour(0xFFFF5722) : juce::Colour(0xFFC62828));
+    }
+    else
+    {
+        recordButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFFC62828));
+    }
 }

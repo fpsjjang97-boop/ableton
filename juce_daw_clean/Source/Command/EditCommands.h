@@ -117,3 +117,39 @@ private:
 
     void applyState(bool toAfter);
 };
+
+/** DD6 — Undo/redo for track property changes (volume, pan, mute, solo).
+ *  Captures before/after values of one property at a time. */
+class TrackPropertyCmd : public juce::UndoableAction
+{
+public:
+    enum Prop { Volume, Pan, Mute, Solo };
+
+    TrackPropertyCmd(TrackModel& model, int trackId, Prop prop,
+                     float beforeF, float afterF, bool beforeB = false, bool afterB = false);
+    bool perform() override;
+    bool undo() override;
+
+private:
+    TrackModel& model;
+    int trackId;
+    Prop prop;
+    float beforeF, afterF;
+    bool  beforeB, afterB;
+
+    void apply(float fval, bool bval);
+};
+
+/** EE4 — Move or resize a MidiClip (startBeat / lengthBeats). */
+class MoveClipCmd : public juce::UndoableAction
+{
+public:
+    MoveClipCmd(MidiClip* clip, double beforeStart, double beforeLen,
+                double afterStart, double afterLen);
+    bool perform() override;
+    bool undo() override;
+private:
+    MidiClip* clip;
+    double beforeStart, beforeLen;
+    double afterStart, afterLen;
+};

@@ -1,6 +1,39 @@
 #include "CCLane.h"
 
-CCLane::CCLane() = default;
+CCLane::CCLane()
+{
+    // DD3 — CC number picker with common controller names
+    static const char* ccNames[] = {
+        "1 - Modulation", "2 - Breath", "7 - Volume", "10 - Pan",
+        "11 - Expression", "64 - Sustain", "65 - Portamento",
+        "71 - Resonance", "74 - Cutoff", "91 - Reverb", "93 - Chorus"
+    };
+    static const int ccNums[] = { 1, 2, 7, 10, 11, 64, 65, 71, 74, 91, 93 };
+
+    for (int i = 0; i < 11; ++i)
+        ccPicker.addItem(ccNames[i], ccNums[i] + 1);
+    ccPicker.addSeparator();
+    // Add remaining CCs as plain numbers
+    for (int c = 0; c <= 127; ++c)
+    {
+        bool already = false;
+        for (int i = 0; i < 11; ++i) if (ccNums[i] == c) { already = true; break; }
+        if (!already)
+            ccPicker.addItem("CC " + juce::String(c), c + 1);
+    }
+
+    ccPicker.setSelectedId(ccNum + 1, juce::dontSendNotification);
+    ccPicker.onChange = [this] {
+        ccNum = ccPicker.getSelectedId() - 1;
+        repaint();
+    };
+    addAndMakeVisible(ccPicker);
+}
+
+void CCLane::resized()
+{
+    ccPicker.setBounds(getWidth() - 160, 4, 150, 22);
+}
 
 void CCLane::paint(juce::Graphics& g)
 {

@@ -54,14 +54,13 @@ void AudioEngine::handleIncomingMidiMessage(juce::MidiInput*,
 
 void AudioEngine::initialise()
 {
-    // Try default devices first
+    // Try output-only first (most reliable), then enable input if available
     auto result = deviceManager.initialiseWithDefaultDevices(0, 2);
 
     if (result.isNotEmpty())
     {
         DBG("AudioEngine: default init failed: " + result);
 
-        // Fallback: try with explicit setup
         juce::AudioDeviceManager::AudioDeviceSetup setup;
         setup.outputChannels.setRange(0, 2, true);
         setup.inputChannels.clear();
@@ -71,6 +70,17 @@ void AudioEngine::initialise()
 
         if (result.isNotEmpty())
             DBG("AudioEngine: fallback init also failed: " + result);
+    }
+
+    // DD1 — try to enable audio input after output is confirmed working
+    if (auto* device = deviceManager.getCurrentAudioDevice())
+    {
+        auto setup = deviceManager.getAudioDeviceSetup();
+        if (device->getInputChannelNames().size() > 0)
+        {
+            setup.inputChannels.setRange(0, 2, true);
+            deviceManager.setAudioDeviceSetup(setup, true);
+        }
     }
 
     deviceManager.addAudioCallback(this);
@@ -126,6 +136,9 @@ void AudioEngine::stop()
 {
     midiEngine.setPlaying(false);
     synthEngine.allNotesOff();
+    // S1 — silence all per-track synths too
+    for (auto& [id, syn] : trackSynths)
+        if (syn) syn->allNotesOff();
 }
 
 void AudioEngine::togglePlayStop()
@@ -137,6 +150,8 @@ void AudioEngine::rewind()
 {
     midiEngine.setPositionBeats(0.0);
     synthEngine.allNotesOff();
+    for (auto& [id, syn] : trackSynths)
+        if (syn) syn->allNotesOff();
     lastMetronomeBeat = -1.0;
 }
 
@@ -157,62 +172,144 @@ void AudioEngine::rewind()
 // matches the previous single-synth path (just gated per-channel).
 // ---------------------------------------------------------------------------
 void AudioEngine::audioDeviceIOCallbackWithContext(
-    const float* const*, int,
+    const float* const* inputChannelData, int numInputChannels,
     float* const* outputChannelData, int numOutputChannels,
     int numSamples, const juce::AudioIODeviceCallbackContext&)
 {
     const int outCh = juce::jmax(1, numOutputChannels);
+
+    // D3 — guard sample rate before any division
+    if (currentSampleRate <= 0.0) currentSampleRate = 44100.0;
+
+    // DD1 — capture audio input when recording
+    if (audioRecTrackId >= 0 && midiEngine.isPlaying() && numInputChannels > 0
+        && midiEngine.isInPunchRegion(midiEngine.getPositionBeats())) // GG1
+    {
+        const int recCh = juce::jmin(2, numInputChannels);
+        // Grow buffer if needed (pre-allocate ~5 min chunks)
+        static constexpr double kAudioRecChunkSec = 300.0; // H1 — 5 min chunks
+        const int chunkSize = (int)(currentSampleRate * kAudioRecChunkSec);
+        if (audioRecBuffer.getNumSamples() == 0)
+        {
+            audioRecBuffer.setSize(recCh, chunkSize);
+            audioRecBuffer.clear();
+            audioRecWritePos = 0;
+            audioRecStartBeat = midiEngine.getPositionBeats();
+        }
+        if (audioRecWritePos + numSamples > audioRecBuffer.getNumSamples())
+        {
+            // Extend buffer
+            const int newSize = audioRecBuffer.getNumSamples() + chunkSize;
+            audioRecBuffer.setSize(recCh, newSize, true, true, false);
+        }
+        for (int ch = 0; ch < recCh; ++ch)
+        {
+            if (inputChannelData[ch] != nullptr)
+                audioRecBuffer.copyFrom(ch, audioRecWritePos, inputChannelData[ch], numSamples);
+        }
+        audioRecWritePos += numSamples;
+    }
 
     // Clear output
     for (int ch = 0; ch < numOutputChannels; ++ch)
         if (outputChannelData[ch])
             juce::FloatVectorOperations::clear(outputChannelData[ch], numSamples);
 
-    // X1 — drain MIDI input collector and write into the armed track's clip.
-    // Still touches MidiMessageSequence from the audio thread (GUI readers
-    // are short-lived and only during paint); acceptable tradeoff without
-    // a full message queue to the GUI.
+    // EE1 (replaces X1) — MIDI Thru: feed incoming MIDI to armed track's synth for live monitoring
+    // (even when not playing / not recording)
     {
-        juce::MidiBuffer inBuf;
-        midiInputCollector.removeNextBlockOfMessages(inBuf, numSamples);
-        if (! inBuf.isEmpty()
-            && recordingTrackId >= 0
-            && midiEngine.isPlaying())
+        juce::MidiBuffer thruBuf;
+        midiInputCollector.removeNextBlockOfMessages(thruBuf, numSamples);
+
+        if (! thruBuf.isEmpty())
         {
-            if (auto* rt = trackModel.getTrack(recordingTrackId))
+            // Write to recording clip (existing X1 logic, GG1 — punch gate)
+            if (recordingTrackId >= 0 && midiEngine.isPlaying()
+                && midiEngine.isInPunchRegion(midiEngine.getPositionBeats()))
             {
-                if (rt->armed && ! rt->clips.empty())
+                if (auto* rt = trackModel.getTrack(recordingTrackId))
                 {
-                    auto& clip = rt->clips.back();
-                    const double posBeat = midiEngine.getPositionBeats();
-                    const double bps = midiEngine.getTempo() / 60.0;
-
-                    // Z6 + AA4 — subtract device latency + user-specified
-                    // MIDI input port latency so recorded events align with
-                    // what the performer heard.
-                    double latencySec = 0.0;
-                    if (auto* dev = deviceManager.getCurrentAudioDevice())
+                    if (rt->armed && ! rt->clips.empty())
                     {
-                        const int outLatency = dev->getOutputLatencyInSamples();
-                        const int inLatency  = dev->getInputLatencyInSamples();
-                        latencySec = (outLatency + inLatency) / currentSampleRate;
-                    }
-                    latencySec += midiInputLatencyMs / 1000.0; // AA4
-                    const double latencyBeats = latencySec * bps;
-
-                    for (const auto meta : inBuf)
-                    {
-                        auto msg = meta.getMessage();
-                        const double sampleBeat = posBeat + (meta.samplePosition / currentSampleRate) * bps;
-                        msg.setTimeStamp(sampleBeat - clip.startBeat - latencyBeats);
-                        if (msg.getTimeStamp() >= 0.0)
+                        auto& clip = rt->clips.back();
+                        const double posBeat = midiEngine.getPositionBeats();
+                        const double bps = midiEngine.getTempo() / 60.0;
+                        double latencySec = 0.0;
+                        if (auto* dev = deviceManager.getCurrentAudioDevice())
                         {
-                            clip.sequence.addEvent(msg);
-                            if (msg.isNoteOff()) clip.sequence.updateMatchedPairs();
+                            const int outLat = dev->getOutputLatencyInSamples();
+                            const int inLat  = dev->getInputLatencyInSamples();
+                            latencySec = (outLat + inLat) / currentSampleRate;
+                        }
+                        latencySec += midiInputLatencyMs / 1000.0;
+                        const double latencyBeats = latencySec * bps;
+
+                        // HH1 — if not overdub, erase existing notes in this block's range
+                        if (! rt->overdub)
+                        {
+                            const double blockStartRel = posBeat - clip.startBeat - latencyBeats;
+                            const double blockEndRel = blockStartRel + (double)numSamples / currentSampleRate * bps;
+                            for (int ni = clip.sequence.getNumEvents() - 1; ni >= 0; --ni)
+                            {
+                                auto& em = clip.sequence.getEventPointer(ni)->message;
+                                if (em.isNoteOn() && em.getTimeStamp() >= blockStartRel
+                                    && em.getTimeStamp() < blockEndRel)
+                                    clip.sequence.deleteEvent(ni, true);
+                            }
+                        }
+
+                        for (const auto meta : thruBuf)
+                        {
+                            auto msg = meta.getMessage();
+                            const double sampleBeat = posBeat + (meta.samplePosition / currentSampleRate) * bps;
+                            msg.setTimeStamp(sampleBeat - clip.startBeat - latencyBeats);
+                            if (msg.getTimeStamp() >= 0.0)
+                            {
+                                clip.sequence.addEvent(msg);
+                                if (msg.isNoteOff()) clip.sequence.updateMatchedPairs();
+                            }
                         }
                     }
                 }
             }
+
+            // MIDI Thru: send to armed track's synth for immediate audition
+            int thruTarget = recordingTrackId;
+            if (thruTarget < 0)
+            {
+                // Find first armed track
+                for (auto& t : trackModel.getTracks())
+                    if (t.armed) { thruTarget = t.id; break; }
+            }
+            if (thruTarget >= 0)
+            {
+                auto& syn = getOrCreateTrackSynth(thruTarget);
+                juce::AudioBuffer<float> thruAudio(outCh, numSamples);
+                thruAudio.clear();
+                syn.renderBlock(thruAudio, thruBuf);
+
+                // Mix thru audio into output directly
+                auto* t = trackModel.getTrack(thruTarget);
+                float vol = (t != nullptr) ? t->volume : 1.0f;
+                for (int ch = 0; ch < juce::jmin(numOutputChannels, thruAudio.getNumChannels()); ++ch)
+                    if (outputChannelData[ch] != nullptr)
+                        for (int s = 0; s < numSamples; ++s)
+                            outputChannelData[ch][s] += thruAudio.getReadPointer(ch)[s] * vol * masterVolume;
+            }
+        }
+    }
+
+    // FF4 — audio input monitoring: pass input to output for armed+monitor tracks
+    if (numInputChannels > 0)
+    {
+        for (auto& t : trackModel.getTracks())
+        {
+            if (!t.armed || !t.inputMonitor) continue;
+            const int monCh = juce::jmin(2, numInputChannels, numOutputChannels);
+            for (int ch = 0; ch < monCh; ++ch)
+                if (inputChannelData[ch] != nullptr && outputChannelData[ch] != nullptr)
+                    for (int s = 0; s < numSamples; ++s)
+                        outputChannelData[ch][s] += inputChannelData[ch][s] * t.volume * masterVolume;
         }
     }
 
@@ -311,12 +408,45 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
         effVolume = juce::jlimit(0.0f, 4.0f, effVolume);
         effPan    = juce::jlimit(-1.0f, 1.0f, effPan);
 
+        // FF1 — automation Write/Latch: record current fader values as automation points
+        if (midiEngine.isPlaying()
+            && track.autoMode != Track::AutoMode::Read)
+        {
+            auto recordParam = [&](const juce::String& pid, float val) {
+                // NP1 — avoid iterator invalidation: find or create by index
+                int laneIdx = -1;
+                for (int li = 0; li < (int)track.automation.size(); ++li)
+                    if (track.automation[(size_t)li].paramId == pid) { laneIdx = li; break; }
+                if (laneIdx < 0)
+                {
+                    AutomationLane nl;
+                    nl.paramId = pid;
+                    track.automation.push_back(std::move(nl));
+                    laneIdx = (int)track.automation.size() - 1;
+                }
+                track.automation[(size_t)laneIdx].addPoint(curBeat, val);
+            };
+
+            recordParam("volume", track.volume);
+            recordParam("pan", (track.pan + 1.0f) * 0.5f);
+        }
+
         // Filter MIDI to this track's channel
         juce::MidiBuffer trackMidi;
+
+        // userProgram override: send program change at block start
+        if (track.userProgram >= 0)
+        {
+            auto pc = juce::MidiMessage::programChange(track.midiChannel, track.userProgram);
+            trackMidi.addEvent(pc, 0);
+        }
+
         for (const auto meta : midiBuf)
         {
             auto msg = meta.getMessage();
             if (msg.getChannel() != track.midiChannel) continue;
+            // Skip MIDI file program changes when user has override
+            if (msg.isProgramChange() && track.userProgram >= 0) continue;
             trackMidi.addEvent(msg, meta.samplePosition);
         }
 
@@ -342,7 +472,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
                     + (juce::int64)(secsIntoClip * clip.sourceSampleRate);
                 if (srcStart >= clip.buffer.getNumSamples()) continue;
 
-                const double srRatio = clip.sourceSampleRate / currentSampleRate;
+                const double srRatio = clip.effectiveSrRatio(currentSampleRate); // PP1
                 const int dstChannels = juce::jmin(trackBuf.getNumChannels(), clip.buffer.getNumChannels());
                 const juce::int64 srcLen = clip.buffer.getNumSamples();
                 for (int ch = 0; ch < dstChannels; ++ch)
@@ -370,10 +500,32 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
                         const float b =  y0 - 2.5f*y1 + 2.0f*y2 - 0.5f*y3;
                         const float c = -0.5f*y0 + 0.5f*y2;
                         const float d =  y1;
-                        dst[s] += ((a*t + b)*t + c)*t + d;
+                        float sample = ((a*t + b)*t + c)*t + d;
+
+                        // DD2 — apply fade envelope
+                        const double beatInClip = (curBeat - clip.startBeat)
+                            + (double)s * beatsPerSample;
+                        sample *= clip.fadeGainAt(beatInClip);
+
+                        dst[s] += sample;
                     }
                 }
             }
+        }
+
+        // EE3 — pre-fader sends (before volume/pan)
+        for (auto& snd : track.sends)
+        {
+            if (snd.level <= 0.0f || !snd.preFader) continue;
+            if (snd.busId == 0) continue;
+            if (busModel.getBus(snd.busId) == nullptr) continue;
+
+            auto& sbuf = busBuffers[snd.busId];
+            if (sbuf.getNumChannels() != outCh || sbuf.getNumSamples() != numSamples)
+                sbuf.setSize(outCh, numSamples, false, false, true);
+
+            for (int ch = 0; ch < juce::jmin(outCh, trackBuf.getNumChannels()); ++ch)
+                sbuf.addFrom(ch, 0, trackBuf, ch, 0, numSamples, snd.level);
         }
 
         // Apply track volume + simple constant-power pan
@@ -387,6 +539,27 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
         else
         {
             trackBuf.applyGain(effVolume);
+        }
+
+        // OO4 — per-track RMS VU
+        {
+            float rmsL = 0.0f, rmsR = 0.0f;
+            if (trackBuf.getNumChannels() >= 1)
+            {
+                auto* p = trackBuf.getReadPointer(0);
+                double sq = 0.0;
+                for (int s = 0; s < numSamples; ++s) sq += p[s] * p[s];
+                rmsL = (float)std::sqrt(sq / juce::jmax(1, numSamples));
+            }
+            if (trackBuf.getNumChannels() >= 2)
+            {
+                auto* p = trackBuf.getReadPointer(1);
+                double sq = 0.0;
+                for (int s = 0; s < numSamples; ++s) sq += p[s] * p[s];
+                rmsR = (float)std::sqrt(sq / juce::jmax(1, numSamples));
+            }
+            trackVuL[track.id] = trackVuL[track.id] * 0.85f + rmsL * 0.15f;
+            trackVuR[track.id] = trackVuR[track.id] * 0.85f + rmsR * 0.15f;
         }
 
         // Run through track FX chain (no-op if track.plugins empty)
@@ -408,11 +581,11 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
         for (int ch = 0; ch < juce::jmin(outCh, trackBuf.getNumChannels()); ++ch)
             busBuf.addFrom(ch, 0, trackBuf, ch, 0, numSamples);
 
-        // U3 — post-fader sends. Adds a scaled copy of trackBuf to each send bus.
+        // U3 + EE3 — post-fader sends only (pre-fader already done above).
         for (auto& snd : track.sends)
         {
-            if (snd.level <= 0.0f) continue;
-            if (snd.busId == 0) continue; // sending to master = duplicate path
+            if (snd.level <= 0.0f || snd.preFader) continue; // EE3
+            if (snd.busId == 0) continue;
             if (busModel.getBus(snd.busId) == nullptr) continue;
 
             auto& sbuf = busBuffers[snd.busId];
@@ -539,7 +712,10 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
         if (beatFloorAfter > beatFloorBefore || beatsBefore < 0.001)
         {
             metronomeClickSample = 0;
-            metronomeIsDownbeat = (std::fmod(beatsAfter, 4.0) < 1.0);
+            // HH6 — time-sig aware downbeat detection
+            auto ts = midiEngine.timeSigAt(beatsAfter);
+            double barLen = (ts.den > 0) ? (double)ts.num * (4.0 / (double)ts.den) : 4.0; // D2
+            metronomeIsDownbeat = (std::fmod(beatsAfter, barLen) < 1.0);
         }
 
         if (numOutputChannels >= 2)
@@ -620,6 +796,54 @@ void AudioEngine::generateMetronomeClick(float* left, float* right, int numSampl
             right[s] += sample;
         }
         metronomeClickSample++;
+    }
+}
+
+// DD1 — finalize audio recording: trim buffer and create AudioClip on target track
+void AudioEngine::finalizeAudioRecording()
+{
+    if (audioRecTrackId < 0 || audioRecWritePos <= 0) return;
+
+    auto* t = trackModel.getTrack(audioRecTrackId);
+    if (t != nullptr)
+    {
+        AudioClip clip;
+        clip.sourceSampleRate = currentSampleRate;
+        clip.startBeat = audioRecStartBeat;
+
+        // Trim buffer to actual recorded length
+        const int recCh = audioRecBuffer.getNumChannels();
+        clip.buffer.setSize(recCh, audioRecWritePos);
+        for (int ch = 0; ch < recCh; ++ch)
+            clip.buffer.copyFrom(ch, 0, audioRecBuffer, ch, 0, audioRecWritePos);
+
+        const double durationSec = (double)audioRecWritePos / currentSampleRate;
+        double tempo = juce::jmax(1.0, midiEngine.getTempo()); // BC2
+        clip.lengthBeats = durationSec * (tempo / 60.0);
+
+        t->audioClips.push_back(std::move(clip));
+    }
+
+    // Reset
+    audioRecTrackId = -1;
+    audioRecBuffer.setSize(0, 0);
+    audioRecWritePos = 0;
+}
+
+// FF2 — recompute per-track delay needed for PDC alignment
+void AudioEngine::updatePDC()
+{
+    maxPluginLatency = 0;
+    for (auto& t : trackModel.getTracks())
+    {
+        int lat = pluginChains.getTotalLatency(t.id);
+        if (lat > maxPluginLatency) maxPluginLatency = lat;
+    }
+    pdcDelaySamples.clear();
+    for (auto& t : trackModel.getTracks())
+    {
+        int lat = pluginChains.getTotalLatency(t.id);
+        pdcDelaySamples[t.id] = maxPluginLatency - lat;
     }
 }
 

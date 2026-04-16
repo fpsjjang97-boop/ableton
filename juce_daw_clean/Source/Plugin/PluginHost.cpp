@@ -6,9 +6,8 @@
 
 PluginHost::PluginHost()
 {
-    // addDefaultFormats picks up VST3 because CMakeLists sets
-    // JUCE_PLUGINHOST_VST3=1. AU is macOS-only (auto-disabled on Windows).
-    formatManager.addDefaultFormats();
+    // Register VST3 format (JUCE_PLUGINHOST_VST3=1 in CMakeLists)
+    formatManager.addFormat(new juce::VST3PluginFormat());
 }
 
 PluginHost::~PluginHost() = default;
@@ -51,6 +50,13 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::instantiate(
     juce::String& errorOut)
 {
     errorOut.clear();
+
+    // JJ6 — check blacklist
+    if (isBlacklisted(desc.createIdentifierString()))
+    {
+        errorOut = "Plugin is blacklisted: " + desc.name;
+        return nullptr;
+    }
 
     auto instance = formatManager.createPluginInstance(desc, sampleRate,
                                                        blockSize, errorOut);

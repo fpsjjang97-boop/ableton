@@ -64,6 +64,28 @@ public:
     }
     void setLooping(bool on) { looping = on; }
     bool isLooping() const   { return looping; }
+    double getLoopStart() const { return loopStart; }
+    double getLoopEnd()   const { return loopEnd; }
+
+    // GG1 — punch in/out region
+    void setPunchRegion(double inBeat, double outBeat)
+    { punchIn = inBeat; punchOut = outBeat; punchEnabled = (outBeat > inBeat); }
+    void setPunchEnabled(bool on) { punchEnabled = on; }
+    bool isPunchEnabled() const   { return punchEnabled; }
+    double getPunchIn()  const    { return punchIn; }
+    double getPunchOut() const    { return punchOut; }
+    bool isInPunchRegion(double beat) const
+    { return !punchEnabled || (beat >= punchIn && beat < punchOut); }
+
+    // EE6 — Markers (named positions)
+    struct Marker { double beat; juce::String name; juce::Colour colour { juce::Colours::yellow }; };
+    void addMarker(double beat, const juce::String& name)
+    { markers.push_back({ beat, name }); std::sort(markers.begin(), markers.end(),
+        [](auto& a, auto& b) { return a.beat < b.beat; }); }
+    void removeMarker(int idx) { if (idx >= 0 && idx < (int)markers.size()) markers.erase(markers.begin() + idx); }
+    void clearMarkers() { markers.clear(); }
+    std::vector<Marker>& getMarkers() { return markers; }
+    const std::vector<Marker>& getMarkers() const { return markers; }
 
     /** Call from the audio callback. Fills midiBuffer with events
         for the current block. Advances the playhead. */
@@ -129,4 +151,11 @@ private:
     bool looping { false };
     double loopStart { 0.0 };
     double loopEnd { 0.0 };
+
+    // GG1
+    bool   punchEnabled { false };
+    double punchIn  { 0.0 };
+    double punchOut { 0.0 };
+
+    std::vector<Marker> markers; // EE6
 };

@@ -21,6 +21,7 @@ public:
     void resized() override;
     void timerCallback() override;
     void refresh();
+    void scrollToTrack(int trackId); // MM6
 
 private:
     AudioEngine& audioEngine;
@@ -36,6 +37,9 @@ private:
         std::unique_ptr<juce::TextButton> soloBtn;
         std::unique_ptr<juce::Label>      nameLabel;
         std::unique_ptr<juce::Label>      dbLabel;
+
+        // HH4 — FX bypass toggle
+        std::unique_ptr<juce::TextButton> fxBypassBtn;
 
         // V2/W2 — up to 2 send slots per strip
         struct SendSlot
@@ -63,6 +67,12 @@ private:
     void drawVuMeter(juce::Graphics& g, int x, int y, int w, int h, float level, float peak);
     void mouseDown(const juce::MouseEvent& e) override;   // X5
     void showBusContextMenu(int busId);                   // X5
+
+    // CC4 — horizontal scroll
+    int scrollX { 0 };
+    void mouseWheelMove(const juce::MouseEvent& e,
+                        const juce::MouseWheelDetails& w) override;
+    int  totalContentWidth() const;
 
     static constexpr int stripWidth  = 80;
     static constexpr int busWidth    = 80;
