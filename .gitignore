@@ -23,8 +23,14 @@ midigpt_data/
 midigpt/dpo_pairs/
 midigpt_pipeline/augmented/
 midigpt_pipeline/tokenized/
+midi_data_combined/
+raw_midi/
 *.pt
 *.onnx
+
+# Test outputs (generation results, not source assets)
+원신_output.mid
+*_output.mid
 
 # Generated MIDI outputs
 output/
