@@ -260,6 +260,120 @@ def generate_json(req: GenerateJsonRequest):
 
 
 # ---------------------------------------------------------------------------
+# Sprint 35 ZZ1 — Audio → MIDI endpoint
+# ---------------------------------------------------------------------------
+class AudioToMidiRequest(BaseModel):
+    """Base64 audio blob + format hint. Result is base64 Type-1 MIDI.
+
+    The file extension is needed because some decoders (pydub/librosa) peek
+    at the suffix; we re-use it when writing a temp file.
+    """
+    audio_base64: str
+    filename: str = "input.wav"     # hint for format sniffing (.mp3, .wav, .flac, ...)
+    keep_vocals: bool = False
+    rerank_with_midigpt: bool = True   # ZZ1d — enable score_loglik reranking
+
+
+@app.post("/audio_to_midi")
+def audio_to_midi(req: AudioToMidiRequest):
+    """Convert an uploaded audio clip to a Type-1 MIDI using the
+    tools/audio_to_midi/convert.py pipeline (Demucs + Basic Pitch + librosa).
+
+    ⚠ Beta. Accuracy varies 50-85% depending on source material — see
+    docs/business/10_audio2midi_roadmap.md for the improvement plan.
+
+    Current pipeline:
+      1. Source separation: Demucs htdemucs_6s → vocals/drums/bass/guitar/piano/other
+      2. Per-stem transcription: Basic Pitch (melodic) + librosa onset (drums)
+      3. Optional: MidiGPT score_loglik reranking (ZZ1d)
+
+    Future (Tier 1, Sprint 36+):
+      - Onsets & Frames for piano stem (+20% F1)
+      - ADTOF for drums (+15% F1)
+      - pYIN for bass (+10% F1)
+    """
+    # convert.py is a heavy import (demucs, basic_pitch, librosa) — only
+    # pulled in on first call to keep the server startup light when users
+    # don't need this feature.
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "tools" / "audio_to_midi"))
+        import convert as a2m_convert  # type: ignore
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Audio2MIDI 의존성 누락: {e}. "
+                f"서버에서 `pip install demucs basic-pitch librosa` 실행 필요."
+            ),
+        )
+
+    import tempfile as _tmpmod
+    suffix = Path(req.filename).suffix or ".wav"
+    tmp_audio = Path(_tmpmod.mktemp(suffix=suffix, dir=str(REPO_ROOT)))
+    tmp_out_dir = Path(_tmpmod.mkdtemp(prefix="a2m_", dir=str(REPO_ROOT)))
+
+    try:
+        try:
+            audio_bytes = _b64.b64decode(req.audio_base64)
+        except Exception as e:
+            raise HTTPException(status_code=400,
+                                detail=f"Invalid base64 audio: {e}")
+        tmp_audio.write_bytes(audio_bytes)
+
+        # Run the pipeline end-to-end (separation + transcription + merge).
+        result_midi_path = a2m_convert.convert_single(
+            audio_path=tmp_audio,
+            output_dir=tmp_out_dir,
+            keep_vocals=req.keep_vocals,
+            no_merge=False,
+        )
+        if result_midi_path is None or not Path(result_midi_path).exists():
+            raise HTTPException(status_code=500,
+                                detail="Audio2MIDI 파이프라인이 MIDI 를 생성하지 못했습니다.")
+
+        midi_bytes = Path(result_midi_path).read_bytes()
+
+        # ZZ1d — optional reranking. Tokenise the result and score it; in
+        # the current single-path implementation this is diagnostic rather
+        # than a pick-from-K. When the pipeline grows to produce multiple
+        # candidates (Sprint 36), this becomes the selection mechanism.
+        loglik = None
+        if req.rerank_with_midigpt and _inference is not None and _inference.is_loaded:
+            try:
+                tok_ids = _inference.encoder.encode_file(str(result_midi_path))
+                loglik = _inference.score_loglik(tok_ids)
+            except Exception as e:
+                # Non-fatal: return the MIDI anyway, just without the score.
+                print(f"[WARN] score_loglik 실패 (생성 결과는 유지): {e}")
+
+        return {
+            "ok": True,
+            "midi_base64": _b64.b64encode(midi_bytes).decode("ascii"),
+            "bytes": len(midi_bytes),
+            "loglik": loglik,            # None when scoring skipped/failed
+            "beta_warning": (
+                "⚠ Audio2MIDI 는 베타 기능입니다. 정확도는 곡 복잡도에 따라 "
+                "50-85% 범위이며 수동 편집이 필요합니다."
+            ),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Audio2MIDI 실패: {e}")
+    finally:
+        for p in (tmp_audio,):
+            try:
+                if p.exists(): p.unlink()
+            except Exception:
+                pass
+        try:
+            import shutil as _sh
+            _sh.rmtree(tmp_out_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 def main():

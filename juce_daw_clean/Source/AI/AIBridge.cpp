@@ -280,6 +280,96 @@ void AIBridge::requestVariationAsync (const juce::MidiMessageSequence& input,
     worker->startRequest (std::move (midiBytes), params, std::move (callback));
 }
 
+void AIBridge::requestAudioToMidiAsync (const juce::MemoryBlock& audioBytes,
+                                        const juce::String& filename,
+                                        ResultCallback callback)
+{
+    // Sprint 35 ZZ1b: audio2midi sits on a detached thread like LoRA —
+    // the server call can take 30-120s (Demucs + Basic Pitch), far beyond
+    // acceptable UI-blocking time. We don't reuse the AsyncWorker because
+    // that serialises generation requests; audio2midi is user-initiated and
+    // should be independent.
+    auto urlCopy = serverUrl;
+    // Capture by value: JUCE MemoryBlock is ref-counted-copy via move, so
+    // this is O(1) on the calling thread.
+    juce::MemoryBlock audioCopy = audioBytes;
+
+    juce::Thread::launch (
+        [urlCopy, audioCopy = std::move (audioCopy), filename,
+         callback = std::move (callback)]() mutable
+        {
+            Result r;
+
+            // Build JSON body with base64-encoded audio
+            juce::MemoryOutputStream b64;
+            juce::Base64::convertToBase64 (b64, audioCopy.getData(), audioCopy.getSize());
+
+            juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+            obj->setProperty ("audio_base64", b64.toString());
+            obj->setProperty ("filename",     filename);
+            obj->setProperty ("keep_vocals",  false);
+            obj->setProperty ("rerank_with_midigpt", true);
+            auto body = juce::JSON::toString (juce::var (obj.get()));
+
+            auto url = urlCopy.getChildURL ("audio_to_midi").withPOSTData (body);
+            auto options = juce::URL::InputStreamOptions (
+                                juce::URL::ParameterHandling::inPostData)
+                           .withExtraHeaders ("Content-Type: application/json\r\n")
+                           .withConnectionTimeoutMs (180000);   // 3 min for audio2midi
+
+            int statusCode = 0;
+            auto stream = url.createInputStream (options.withStatusCode (&statusCode));
+            r.httpStatus = statusCode;
+
+            if (stream == nullptr)
+            {
+                r.errorMessage = "Audio2MIDI 서버 연결 실패 (/audio_to_midi).";
+            }
+            else
+            {
+                juce::MemoryBlock response;
+                stream->readIntoMemoryBlock (response);
+                if (statusCode >= 400)
+                {
+                    r.errorMessage = "Audio2MIDI 서버 오류 " + juce::String (statusCode)
+                                   + ": " + response.toString();
+                }
+                else
+                {
+                    auto parsed = juce::JSON::parse (response.toString());
+                    auto midiB64 = parsed.getProperty ("midi_base64", "").toString();
+                    if (midiB64.isEmpty())
+                    {
+                        r.errorMessage = "Audio2MIDI 응답에 MIDI 데이터가 없습니다.";
+                    }
+                    else
+                    {
+                        juce::MemoryOutputStream decoded;
+                        if (juce::Base64::convertFromBase64 (decoded, midiB64))
+                        {
+                            juce::MemoryBlock midiOut (decoded.getData(), decoded.getDataSize());
+                            r.generatedSequence = AIBridge::midiBytesToSequence (midiOut);
+                            r.success = true;
+                        }
+                        else
+                        {
+                            r.errorMessage = "Audio2MIDI Base64 디코딩 실패.";
+                        }
+                    }
+                }
+            }
+
+            if (callback)
+            {
+                juce::MessageManager::callAsync (
+                    [cb = std::move (callback), r = std::move (r)]() mutable
+                    {
+                        cb (std::move (r));
+                    });
+            }
+        });
+}
+
 void AIBridge::cancelPendingRequests()
 {
     // Nothing graceful we can do during a blocking HTTP read in JUCE —

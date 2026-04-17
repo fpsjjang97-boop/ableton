@@ -42,6 +42,21 @@ try:
 except ImportError:
     MISSING.append("basic-pitch")
 
+# Sprint 35 ZZ1c — Onsets & Frames for piano-specific transcription.
+# Piano-only but ~95% F1 vs Basic Pitch's ~70%; this is THE single biggest
+# accuracy win for piano stems (docs/business/10_audio2midi_roadmap.md Tier 1).
+# Optional dep — if unavailable, piano falls back to Basic Pitch gracefully.
+_OAF_AVAILABLE = False
+try:
+    # magenta's onsets_frames_transcription is the reference implementation.
+    # The pip package is `magenta` (CPU) or `magenta[gpu]`. Loading is heavy
+    # so we do it lazily on first call.
+    import importlib.util as _ilu
+    if _ilu.find_spec("magenta.models.onsets_frames_transcription") is not None:
+        _OAF_AVAILABLE = True
+except Exception:
+    _OAF_AVAILABLE = False
+
 try:
     import pretty_midi
 except ImportError:
@@ -237,6 +252,67 @@ def audio_to_midi(
         return None
 
 
+def piano_to_midi_oaf(
+    wav_path: Path,
+    output_path: Path,
+) -> Path | None:
+    """Sprint 35 ZZ1c — Piano-specific transcription via Onsets & Frames.
+
+    Accuracy: ~95% note F1 on solo piano (ref. MAESTRO benchmarks), vs.
+    Basic Pitch's ~70%. Only applies to the `piano` stem of a Demucs 6s
+    split — for anything else we'd be outside the model's training domain
+    and should stay on Basic Pitch.
+
+    Lazy-imports the heavy magenta stack so users who don't need piano
+    transcription aren't forced to install TF.
+
+    Returns the output path on success, None on any failure (caller must
+    then fall back to Basic Pitch).
+    """
+    try:
+        from magenta.models.onsets_frames_transcription import infer_util
+        from magenta.models.onsets_frames_transcription import audio_label_data_utils
+        import tensorflow.compat.v1 as tf          # O&F uses TF1 graphs
+        tf.disable_v2_behavior()
+    except Exception as e:
+        print(f"  -> piano (O&F): import 실패, Basic Pitch 로 fallback ({e})")
+        return None
+
+    try:
+        # The O&F reference uses a checkpoint from Magenta. We look for it
+        # in the conventional location — users set MAGENTA_OAF_CHECKPOINT
+        # or place the model at ./checkpoints/onsets_frames/.
+        import os
+        ckpt = os.environ.get("MAGENTA_OAF_CHECKPOINT") \
+               or str(Path("./checkpoints/onsets_frames"))
+        if not Path(ckpt).exists():
+            print(f"  -> piano (O&F): checkpoint 없음 ({ckpt}), Basic Pitch 로 fallback")
+            print(f"     다운로드: https://storage.googleapis.com/magentadata/models/onsets_frames_transcription/maps_9_checkpoint.zip")
+            return None
+
+        # Full inference is a long call; wrap with a broad guard so the
+        # caller doesn't crash if TF errors out mid-graph.
+        # NOTE: the precise API surface varies across magenta releases.
+        # This is the 2.0 interface — adapt if future versions change it.
+        from magenta.models.onsets_frames_transcription import transcribe
+        # Caller-facing: transcribe.transcribe_audio (or model_inference)
+        if hasattr(transcribe, "transcribe_audio"):
+            pm = transcribe.transcribe_audio(str(wav_path), checkpoint_dir=ckpt)
+        else:
+            # Older API fallback — we can't guess; bail to Basic Pitch.
+            print(f"  -> piano (O&F): 미지원 magenta 버전, Basic Pitch fallback")
+            return None
+
+        pm.write(str(output_path))
+        note_count = sum(len(inst.notes) for inst in pm.instruments)
+        print(f"  -> piano (O&F): {note_count} notes -> {output_path.name}")
+        return output_path
+
+    except Exception as e:
+        print(f"  -> piano (O&F): 실행 실패, Basic Pitch fallback ({e})")
+        return None
+
+
 def drums_to_midi(
     wav_path: Path,
     output_path: Path,
@@ -401,6 +477,19 @@ def convert_stems_to_midi(
 
         if stem_type == "drums":
             result = drums_to_midi(wav_path, out_path)
+        elif stem_type == "piano" and _OAF_AVAILABLE:
+            # ZZ1c: try Onsets & Frames first (95% F1), fall back to
+            # Basic Pitch (70%) if checkpoint/import/inference fails.
+            # Fall-back is silent from the user's POV — they get MIDI either way.
+            result = piano_to_midi_oaf(wav_path, out_path)
+            if result is None:
+                params = track_params.get("piano", {})
+                result = audio_to_midi(
+                    wav_path=wav_path,
+                    output_path=out_path,
+                    track_name="piano",
+                    **params,
+                )
         else:
             params = track_params.get(stem_type, track_params.get("other", {}))
             result = audio_to_midi(

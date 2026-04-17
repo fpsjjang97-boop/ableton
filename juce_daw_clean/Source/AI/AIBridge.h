@@ -97,6 +97,21 @@ public:
                                 const GenerateParams& params,
                                 ResultCallback callback);
 
+    // =========================================================================
+    // Sprint 35 ZZ1b — Audio → MIDI (beta)
+    // =========================================================================
+    /** Asynchronously send an audio file to the server's /audio_to_midi
+        endpoint. The server runs Demucs + Basic Pitch (+ Onsets & Frames
+        for piano stems) and returns a Type-1 MIDI. Accuracy is 50-85%
+        depending on source complexity — see 10_audio2midi_roadmap.md.
+
+        The ``audioBytes`` must be the raw file content (we do the
+        base64-encoding here). ``filename`` is a suffix hint for the
+        decoder (e.g. "input.wav" / "song.mp3"). */
+    void requestAudioToMidiAsync (const juce::MemoryBlock& audioBytes,
+                                  const juce::String& filename,
+                                  ResultCallback callback);
+
     /** Cancel any in-flight asynchronous request. Safe to call from
         the message thread. */
     void cancelPendingRequests();
