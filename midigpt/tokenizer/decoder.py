@@ -225,7 +225,17 @@ class MidiDecoder:
             # Unknown token, skip
             i += 1
 
-        return notes
+        # Dedup by (track_type, start_tick, pitch) — 6차 리포트:
+        # 모델이 같은 위치에 동일 pitch 노트를 2회 이상 방출하면
+        # DAW(Cubase)에서 두 겹으로 표시됨. 같은 키의 두 번째 방출은
+        # 첫 번째를 덮어쓴다(정책: last-wins; 더 최근 방출이 refinement로 간주).
+        # dict 는 insertion-order 를 보존하므로 하류의 정렬/믹싱에 영향 없음.
+        # velocity/duration 이 다른 중복도 하나로 수렴된다.
+        deduped: dict[tuple[str, int, int], DecodedNote] = {}
+        for note in notes:
+            key = (note.track_type, note.start_tick, note.pitch)
+            deduped[key] = note
+        return list(deduped.values())
 
     # ------------------------------------------------------------------
     # MIDI file writing
