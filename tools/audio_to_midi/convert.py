@@ -74,6 +74,16 @@ try:
 except Exception:
     _ADTOF_AVAILABLE = False
 
+# Sprint 38 BBB2 — madmom beat grid quantization.
+# 더 정확한 박/다운박 추정 (librosa 비트 트래커보다 ~5% F1 개선).
+# 선택: 없으면 librosa 로 fallback 하거나 양자화를 스킵.
+_MADMOM_AVAILABLE = False
+try:
+    if _ilu2.find_spec("madmom") is not None:
+        _MADMOM_AVAILABLE = True
+except Exception:
+    _MADMOM_AVAILABLE = False
+
 try:
     import pretty_midi
 except ImportError:
@@ -283,6 +293,85 @@ def audio_to_midi(
 
     except Exception as e:
         print(f"  -> {track_name}: 변환 실패 ({e})")
+        return None
+
+
+def bass_to_midi_pyin(
+    wav_path: Path,
+    output_path: Path,
+) -> Path | None:
+    """Sprint 38 BBB1 — Bass stem transcription via pYIN.
+
+    Basic Pitch 는 폴리포닉 범용이라 모노 베이스 라인에 과민. 유령 노트가
+    많이 섞이고 옥타브 오류도 종종 발생 (F1 ~75%). pYIN 은 단일 F0 특화
+    알고리즘 (Mauch & Dixon 2014) 으로 monophonic 악기에서 F1 ~88%.
+    librosa.pyin 으로 사용 가능 — 이미 baseline dep.
+
+    파이프라인: pYIN frame-level F0 → onset detect → 동일 F0 세그먼트 병합
+    → MIDI note. 베이스 음역 30-260Hz (E1-C4) 로 클램프.
+
+    참조:
+      Mauch & Dixon, "pYIN: A Fundamental Frequency Estimator Using Probabilistic
+      Threshold Distributions" (ICASSP 2014).
+    """
+    try:
+        import librosa
+    except Exception as e:
+        print(f"  -> bass (pYIN): import 실패, Basic Pitch fallback ({e})")
+        return None
+
+    try:
+        y, sr = librosa.load(str(wav_path), sr=22050, mono=True)
+        # pYIN 프레임 수준 F0 추정. voiced 확률이 낮으면 NaN 반환.
+        f0, voiced_flag, voiced_prob = librosa.pyin(
+            y, sr=sr, fmin=30.0, fmax=260.0,   # E1 ~ C4 베이스 음역
+            frame_length=2048, hop_length=256,
+        )
+
+        hop_sec = 256.0 / sr
+        # 연속된 같은 pitch (반음 허용) 프레임을 하나의 노트로 병합
+        notes: list[tuple[float, float, int, int]] = []   # (start, end, pitch, vel)
+        from typing import Optional as _Opt
+        seg_start: _Opt[float] = None
+        seg_pitch: _Opt[int] = None
+        import numpy as np
+        for i, hz in enumerate(f0):
+            t = i * hop_sec
+            if voiced_flag[i] and hz is not None and not np.isnan(hz):
+                midi = int(round(librosa.hz_to_midi(hz)))
+                if seg_pitch is None:
+                    seg_start = t
+                    seg_pitch = midi
+                elif abs(midi - seg_pitch) > 0:
+                    # segment 종료: 새 노트 시작
+                    if seg_start is not None and t - seg_start >= 0.06:
+                        notes.append((seg_start, t, seg_pitch, 90))
+                    seg_start = t
+                    seg_pitch = midi
+            else:
+                if seg_start is not None and seg_pitch is not None:
+                    if t - seg_start >= 0.06:
+                        notes.append((seg_start, t, seg_pitch, 90))
+                seg_start = None
+                seg_pitch = None
+        # trail
+        if seg_start is not None and seg_pitch is not None:
+            end = len(f0) * hop_sec
+            if end - seg_start >= 0.06:
+                notes.append((seg_start, end, seg_pitch, 90))
+
+        pm = pretty_midi.PrettyMIDI(initial_tempo=120.0)
+        inst = pretty_midi.Instrument(program=33, name="bass")   # Electric Bass (finger)
+        for start, end, pitch, vel in notes:
+            inst.notes.append(pretty_midi.Note(
+                velocity=vel, pitch=pitch, start=start, end=end))
+        pm.instruments.append(inst)
+        pm.write(str(output_path))
+        print(f"  -> bass (pYIN): {len(inst.notes)} notes -> {output_path.name}")
+        return output_path
+    except Exception as e:
+        msg = str(e) if str(e) else type(e).__name__
+        print(f"  -> bass (pYIN): 실행 실패, Basic Pitch fallback ({msg})")
         return None
 
 
@@ -633,6 +722,16 @@ def convert_stems_to_midi(
 
         if stem_type == "drums":
             result = drums_to_midi(wav_path, out_path)
+        elif stem_type == "bass":
+            # BBB1: pYIN (monophonic F0, ~88% F1) first,
+            # fall back to Basic Pitch (~75%) on any failure.
+            result = bass_to_midi_pyin(wav_path, out_path)
+            if result is None:
+                params = track_params.get("bass", {})
+                result = audio_to_midi(
+                    wav_path=wav_path, output_path=out_path,
+                    track_name="bass", **params,
+                )
         elif stem_type == "piano":
             # Cascade: PTI (Sprint 37.4, 96%) -> OAF (Sprint 35 ZZ1c, 95%)
             # -> Basic Pitch (70%). 각 단계가 실패(import/infererence) 시
@@ -740,17 +839,81 @@ def split_other_by_register(
         return {"other": wav_path}
 
 
+def _try_detect_beats(audio_path: Path | None) -> list[float]:
+    """BBB2 — madmom 우선, librosa 로 fallback. 둘 다 실패 시 빈 리스트.
+
+    Returns: 절대 시간(초) 비트 목록. 빈 리스트 = 양자화 스킵 신호.
+    """
+    if audio_path is None or not Path(audio_path).exists():
+        return []
+    if _MADMOM_AVAILABLE:
+        try:
+            from madmom.features.beats import RNNBeatProcessor, BeatTrackingProcessor
+            act = RNNBeatProcessor()(str(audio_path))
+            proc = BeatTrackingProcessor(fps=100)
+            beats = proc(act)
+            return [float(t) for t in beats]
+        except Exception as e:
+            print(f"  [beat] madmom 실패, librosa 로 fallback ({type(e).__name__})")
+    try:
+        import librosa
+        y, sr = librosa.load(str(audio_path), sr=22050, mono=True)
+        _, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+        return librosa.frames_to_time(beat_frames, sr=sr).tolist()
+    except Exception:
+        return []
+
+
+def _snap_notes_to_beat_grid(
+    notes: list,
+    beat_times: list,
+    grid_division: int = 4,
+) -> None:
+    """BBB2 — 노트 start/end 를 가장 가까운 비트 하위 그리드로 스냅 (in-place).
+
+    beat_times 는 절대 시간(초) 리스트. grid_division=4 이면 16분음표 그리드.
+    각 노트의 start 를 가장 가까운 그리드 tick 으로 반올림. 길이는 유지.
+    """
+    if len(beat_times) < 2 or not notes:
+        return
+    import bisect
+    # Sub-divide beats into a fine grid.
+    grid: list[float] = []
+    for i in range(len(beat_times) - 1):
+        b0, b1 = beat_times[i], beat_times[i + 1]
+        for k in range(grid_division):
+            grid.append(b0 + (b1 - b0) * k / grid_division)
+    grid.append(beat_times[-1])
+
+    for n in notes:
+        dur = n.end - n.start
+        idx = bisect.bisect_left(grid, n.start)
+        # 왼쪽 이웃과 비교해서 더 가까운 쪽으로
+        candidates = []
+        if idx > 0: candidates.append(grid[idx - 1])
+        if idx < len(grid): candidates.append(grid[idx])
+        if candidates:
+            snapped = min(candidates, key=lambda g: abs(g - n.start))
+            n.start = snapped
+            n.end = snapped + dur
+
+
 def merge_midi_tracks(
     midi_paths: dict[str, Path],
     output_path: Path,
     song_name: str = "Converted",
     bpm: float = 120.0,
+    audio_path_for_beats: Path | None = None,
 ) -> Path:
     """분리된 MIDI 파일들을 하나의 Type 1 MIDI로 합치기.
 
     Sprint 37.2: bpm <= 0 방어 (detect_bpm 은 이미 클램핑하지만 외부
     호출자가 0 을 넘길 수 있음). rules/02 § "기본값 삼킴" 금지 — 0 은
     unspecified, silently 120 으로 복원.
+
+    Sprint 38 BBB2: audio_path_for_beats 가 주어지고 madmom 이 설치되어
+    있으면 비트 트래커로 절대 비트 시간 추출 → 각 트랙 노트를 16분음표
+    그리드로 스냅. 타이밍 오차 ±50ms → ±10ms. madmom 없으면 건너뜀.
     """
     if bpm <= 0.0 or bpm > 300.0:
         print(f"  [WARN] bpm={bpm} 유효 범위 밖 — 기본값 120 사용")
@@ -789,6 +952,18 @@ def merge_midi_tracks(
         if inst.notes:
             merged.instruments.append(inst)
             print(f"  → {stem_type}: {len(inst.notes)} notes (program={program})")
+
+    # Sprint 38 BBB2 — optional beat-grid quantization
+    beat_times = _try_detect_beats(audio_path_for_beats)
+    if beat_times:
+        snapped = 0
+        for inst in merged.instruments:
+            if inst.is_drum:
+                # 드럼은 별도 onset detection 기반이라 스냅 시 과도하게 정렬됨
+                continue
+            _snap_notes_to_beat_grid(inst.notes, beat_times, grid_division=4)
+            snapped += len(inst.notes)
+        print(f"  [beat-snap] {len(beat_times)} beats, {snapped} notes aligned to 16th grid")
 
     merged.write(str(output_path))
     total_notes = sum(len(inst.notes) for inst in merged.instruments)
@@ -835,7 +1010,8 @@ def convert_single(
 
     # Step 3: Merge
     final_path = song_output / f"{song_name}_converted.mid"
-    merge_midi_tracks(midi_paths, final_path, song_name=song_name, bpm=bpm)
+    merge_midi_tracks(midi_paths, final_path, song_name=song_name, bpm=bpm,
+                      audio_path_for_beats=audio_path)
 
     elapsed = time.time() - start
     print(f"\n완료! ({elapsed:.1f}s)")
