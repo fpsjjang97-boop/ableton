@@ -2,6 +2,8 @@
 
 > 자체 MIDI 전용 LLM(MidiGPT 50M) + Cubase 15 표현력 + JUCE 통합 워크스테이션
 
+**🚀 Quick Start**: [QUICKSTART.md](QUICKSTART.md) — 한/EN 5분 가이드
+
 [English README](README.en.md)
 
 ![Python](https://img.shields.io/badge/Python-3.13-blue)
