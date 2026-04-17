@@ -30,6 +30,7 @@ from ..tokenizer import MidiVocab, MidiEncoder, MidiDecoder
 from ..tokenizer.vocab import VOCAB, NOTE_NAMES, PITCH_MIN, PITCH_MAX
 from ..tokenizer.encoder import SongMeta, ChordEvent
 from ..training.lora import LoRAConfig, apply_lora, load_lora, merge_lora
+from .constrained import MidiGrammarFSM
 
 
 # ---------------------------------------------------------------------------
@@ -386,6 +387,7 @@ class MidiGPTInference:
         repetition_penalty: float = 1.0,
         no_repeat_ngram_size: int = 0,
         use_kv_cache: bool = True,
+        grammar: Optional[MidiGrammarFSM] = None,
     ) -> torch.Tensor:
         """Autoregressive generation with harmonic constraint.
 
@@ -472,6 +474,15 @@ class MidiGPTInference:
                 context = idx[b].tolist()
                 logits[b] = self._apply_harmonic_mask(logits[b], context)
 
+            # ----- Grammar FSM (Pitch→Vel→Dur, Bar mono, pitch dedup) -----
+            # Inspired by ACE-Step constrained_logits_processor (Apache 2.0).
+            # Hard-mask structural violations before top-k/top-p so that
+            # sampling cannot produce "incomplete note" sequences that the
+            # decoder would silently drop (6차 리포트 무음 갭 근본 차단).
+            if grammar is not None:
+                for b in range(logits.size(0)):
+                    logits[b] = grammar.apply(logits[b], batch=b)
+
             # ----- Top-K filtering -----
             if top_k > 0:
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
@@ -495,6 +506,13 @@ class MidiGPTInference:
 
             # Append
             idx = torch.cat([idx, next_token], dim=1)
+
+            # ----- Grammar FSM state update -----
+            # Must run AFTER sampling so the FSM sees what was actually
+            # emitted (transitions Pitch→EXPECT_VEL→EXPECT_DUR→ANY).
+            if grammar is not None:
+                for b in range(logits.size(0)):
+                    grammar.observe(next_token[b, 0].item(), batch=b)
 
             # Stop on EOS
             if (next_token == eos_id).all():
@@ -655,6 +673,39 @@ class MidiGPTInference:
             "total": round(total, 4),
         }
 
+    @torch.no_grad()
+    def score_loglik(self, token_ids: list[int]) -> float:
+        """Mean log-likelihood of ``token_ids`` under the current model.
+
+        Inspired by ACE-Step v1.5 ``lm_score.py`` (Apache 2.0). Used as
+        a self-consistency signal for Best-of-N reranking — a sequence
+        the model itself finds "plausible" tends to beat a low-probability
+        outlier even when heuristic scores agree.
+
+        The value is the mean per-token log-prob over positions 1..N-1
+        (position 0 has no context). Higher = more plausible. Range is
+        unbounded negative; typical music sequences fall in roughly
+        [-4.0, -0.5] depending on model temperature.
+
+        Returns ``-inf`` if the sequence is too short (< 2 tokens).
+        """
+        if self.model is None or len(token_ids) < 2:
+            return float("-inf")
+        self.model.eval()
+
+        block = self.model.config.block_size
+        seq = token_ids[-block:]  # clip to model window
+        ids = torch.tensor([seq], dtype=torch.long, device=self.device)
+        # Next-token loss with pad ignored gives mean negative log-likelihood
+        # over non-pad positions, exactly what we want (but negated).
+        input_ids = ids[:, :-1]
+        targets = ids[:, 1:]
+        _, loss, _ = self.model(input_ids, targets=targets)
+        if loss is None:
+            return float("-inf")
+        # model loss = mean NLL; loglik = -NLL
+        return float(-loss.item())
+
     def _score_scale_consistency(self, tokens: list[str]) -> float:
         """Ratio of pitch tokens that fall within the active chord's scale."""
         total_pitches = 0
@@ -810,6 +861,10 @@ class MidiGPTInference:
         beam_width: int = 4,
         length_penalty: float = 1.0,
         score_and_rank: bool = False,
+        use_grammar: bool = True,
+        grammar_forward_bar_jump: int = 1,
+        grammar_dedup_pitches: bool = True,
+        rank_by_loglik: bool = False,
     ) -> list[dict] | list[list[dict]]:
         """Generate a MIDI variation.
 
@@ -911,6 +966,19 @@ class MidiGPTInference:
                 input_tensor = torch.tensor(
                     [input_ids], dtype=torch.long, device=self.device
                 )
+                # Fresh grammar per sample (ACE-1): state resets between
+                # candidates so dedup / bar-monotonicity don't leak across runs.
+                grammar = None
+                if use_grammar:
+                    grammar = MidiGrammarFSM(
+                        vocab=self.vocab,
+                        allow_forward_bar_jump=grammar_forward_bar_jump,
+                        dedup_pitches=grammar_dedup_pitches,
+                    )
+                    # Warm up with the prompt so Bar/Pos/Track context
+                    # carries over into the generated region.
+                    for tid in input_ids:
+                        grammar.observe(tid, batch=0)
                 with torch.no_grad():
                     output = self._generate_with_harmony(
                         input_tensor,
@@ -923,6 +991,7 @@ class MidiGPTInference:
                         repetition_penalty=repetition_penalty,
                         no_repeat_ngram_size=no_repeat_ngram_size,
                         use_kv_cache=use_kv_cache,
+                        grammar=grammar,
                     )
 
                 variation_ids = output[0].tolist()[sep_pos:]
@@ -940,13 +1009,20 @@ class MidiGPTInference:
                 variations.append(note_dicts)
 
         # --- Self-consistency scoring & ranking ---
-        if score_and_rank and len(variations) > 1:
+        if (score_and_rank or rank_by_loglik) and len(variations) > 1:
             scored: list[tuple[list[dict], float]] = []
             for var_notes in variations:
                 # Re-encode notes to token IDs for scoring
                 var_token_ids = self.encoder.encode_notes(var_notes, meta=meta, chords=chords)
-                scores = self.score_sequence(var_token_ids)
-                scored.append((var_notes, scores["total"]))
+                if rank_by_loglik:
+                    # ACE-2: LM self-loglik — the model's own confidence.
+                    # Complements heuristic scores; use this when diversity
+                    # was high (temperature > 1.0) and heuristic metrics
+                    # cluster too tightly to discriminate.
+                    score = self.score_loglik(var_token_ids)
+                else:
+                    score = self.score_sequence(var_token_ids)["total"]
+                scored.append((var_notes, score))
             scored.sort(key=lambda x: x[1], reverse=True)
             variations = [v for v, _s in scored]
 
