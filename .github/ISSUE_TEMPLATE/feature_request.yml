@@ -1,0 +1,50 @@
+name: Feature request (기능 제안)
+description: 새 기능 / 개선 제안
+title: "[FEAT] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 문제 상황
+      description: 현재 MidiGPT 에서 무엇이 불편/부족한가?
+      placeholder: "예: 생성 결과가 늘 같은 스타일로만 수렴한다"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 제안
+      description: 구체적으로 어떻게 해결/개선할 수 있을까?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 범위
+      options:
+        - "Plugin GUI"
+        - "Inference / LLM"
+        - "Audio2MIDI"
+        - "LoRA / 스타일"
+        - "DAW 호스팅 호환성"
+        - "문서 / UX"
+        - "기타"
+
+  - type: dropdown
+    id: persona
+    attributes:
+      label: 주 수혜자
+      options:
+        - "작곡가 / 음악가"
+        - "사운드 디자이너"
+        - "개발자"
+        - "전부"
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 검토한 대안
+      description: 비슷한 도구나 우회 방법이 이미 있는가?

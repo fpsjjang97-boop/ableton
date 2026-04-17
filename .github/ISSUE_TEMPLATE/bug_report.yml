@@ -1,0 +1,80 @@
+name: Bug report (버그 리포트)
+description: 플러그인 / 서버 / Audio2MIDI 에서 재현 가능한 버그
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        리포트해 주셔서 감사합니다. **플러그인의 "Report" 버튼** 을 먼저
+        눌러 진단 zip 을 생성해 첨부해 주시면 훨씬 빠르게 원인을 찾을
+        수 있습니다. zip 에는 `state.json`, `plugin.log`, 마지막 생성
+        MIDI 가 포함됩니다.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: 선행 점검
+      options:
+        - label: "`python scripts/doctor.py` 를 실행했습니다"
+          required: true
+        - label: QUICKSTART.md 의 FAQ 를 확인했습니다
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 한 줄 증상
+      description: "무엇이 잘못되고 있는가?"
+      placeholder: "예: Ctrl+Z 를 누르면 호스트가 크래시한다"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 재현 경로
+      description: 1, 2, 3 스텝으로
+      placeholder: |
+        1. Cubase 15 에서 MIDI 트랙에 MidiGPT 를 로드
+        2. 4 마디 재생 후 Generate 클릭
+        3. 결과가 재생되는 동안 Ctrl+Z → 크래시
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: 영역
+      options:
+        - Plugin GUI (VST3/Standalone)
+        - Inference Server (HTTP API)
+        - Audio2MIDI (Demucs/Basic Pitch/PTI/pYIN)
+        - MidiGPT LLM (생성 결과 품질)
+        - Build / Installer
+        - Documentation
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 환경
+      placeholder: "Windows 11 23H2 / Python 3.10.11 / RTX 3060 Ti / Cubase 15.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: doctor.py 출력 (전체 붙여넣기)
+      render: shell
+      placeholder: "python scripts/doctor.py 결과"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 로그 / 진단 zip
+      description: "~/MidiGPT/logs/plugin.log 첨부 또는 Report 버튼 zip 링크"

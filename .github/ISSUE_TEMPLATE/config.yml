@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 질문 / 사용법 문의
+    url: https://github.com/fpsjjang97-boop/ableton/discussions
+    about: 버그나 기능 제안이 아닌 질문은 Discussions 에 먼저 남겨주세요.
+  - name: QUICKSTART.md
+    url: https://github.com/fpsjjang97-boop/ableton/blob/main/QUICKSTART.md
+    about: 5분 셋업 가이드 + FAQ 5문항.
