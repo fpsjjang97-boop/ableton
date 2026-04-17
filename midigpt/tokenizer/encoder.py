@@ -386,6 +386,13 @@ class MidiEncoder:
                  program as "unspecified" and skip program-based fallback;
                  go straight to register-based fallback.
 
+            2026-04-17 (6차 리포트 확인 사항):
+              C.BASS (C_BASS / CBASS) = 콘트라베이스(오케스트라 더블베이스)
+              abbreviation. 기존에는 "bass" substring 에 걸려 ``bass`` 로
+              분류되었으나, 의도는 strings family. bass-check 앞단에 전용
+              abbreviation 분기를 추가. E.BASS (일렉베이스) 등 일반 bass
+              표기는 계속 ``bass`` 로 분류됨.
+
             BREAKING: retokenize + retrain required after this change
             (rules/04-commit-discipline.md, rules/05 패턴 F).
         """
@@ -400,7 +407,15 @@ class MidiEncoder:
                 "timpani", "mallet")):
             return "drums"
 
-        # Bass — must guard substring collisions with "brass" and "bassoon"
+        # Contrabass abbreviation (C.BASS, C_BASS, CBASS) — route to strings
+        # BEFORE the bass check, because "bass" substring would otherwise
+        # win. Orchestral double bass belongs to the strings family.
+        # 6차 리포트 2026-04-17: 테스터 확인 — C.BASS = 콘트라베이스.
+        if any(k in name_lower for k in ("c.bass", "c_bass", "cbass")):
+            return "strings"
+
+        # Bass — must guard substring collisions with "brass", "bassoon",
+        # and the contrabass abbreviations handled above.
         if ("bass" in name_lower
                 and "brass" not in name_lower
                 and "bassoon" not in name_lower):
