@@ -42,20 +42,25 @@ try:
 except ImportError:
     MISSING.append("basic-pitch")
 
-# Sprint 35 ZZ1c — Onsets & Frames for piano-specific transcription.
-# Piano-only but ~95% F1 vs Basic Pitch's ~70%; this is THE single biggest
-# accuracy win for piano stems (docs/business/10_audio2midi_roadmap.md Tier 1).
-# Optional dep — if unavailable, piano falls back to Basic Pitch gracefully.
+# Sprint 35 ZZ1c / Sprint 37.4 — Piano-specific transcription.
+# Two optional backends, checked at import time:
+#   (a) piano_transcription_inference  (PyTorch port of Onsets&Frames,
+#       ByteDance 2020, ~96% F1 on MAESTRO). Pip-installable, weights
+#       auto-download ~700MB on first inference. Preferred — simpler setup.
+#   (b) magenta.models.onsets_frames_transcription (TF1). Reference
+#       implementation, also ~95% F1, but requires TF1 stack + manual
+#       checkpoint. Kept as fallback for users already set up.
+# Neither installed  → piano stem falls back to Basic Pitch (~70% F1).
+_PTI_AVAILABLE = False
 _OAF_AVAILABLE = False
 try:
-    # magenta's onsets_frames_transcription is the reference implementation.
-    # The pip package is `magenta` (CPU) or `magenta[gpu]`. Loading is heavy
-    # so we do it lazily on first call.
     import importlib.util as _ilu
+    if _ilu.find_spec("piano_transcription_inference") is not None:
+        _PTI_AVAILABLE = True
     if _ilu.find_spec("magenta.models.onsets_frames_transcription") is not None:
         _OAF_AVAILABLE = True
 except Exception:
-    _OAF_AVAILABLE = False
+    pass
 
 # Sprint 36 AAA5 — ADTOF drum transcription (learned model).
 # Replaces the librosa 3-band heuristic with a CNN trained on drum
@@ -278,6 +283,51 @@ def audio_to_midi(
 
     except Exception as e:
         print(f"  -> {track_name}: 변환 실패 ({e})")
+        return None
+
+
+def piano_to_midi_pti(
+    wav_path: Path,
+    output_path: Path,
+) -> Path | None:
+    """Sprint 37.4 — Piano transcription via piano_transcription_inference.
+
+    PyTorch port of Onsets&Frames (ByteDance 2020). 96% F1 on MAESTRO.
+    Pip package handles weight download (~700MB) to user cache on first
+    call. Preferred over the magenta path because it Just Works without
+    TF1 / manual checkpoints.
+
+    참조: https://github.com/qiuqiangkong/piano_transcription_inference
+    """
+    try:
+        from piano_transcription_inference import PianoTranscription, sample_rate as _pti_sr
+        import torch as _t
+    except Exception as e:
+        print(f"  -> piano (PTI): import 실패, 다음 경로로 fallback ({e})")
+        return None
+
+    try:
+        import librosa  # already a baseline dep
+        # Sprint 37.4: PTI 의 자체 load_audio 가 Windows 에서 audioread
+        # NoBackendError 로 실패. librosa.load 가 soundfile/libsndfile 을
+        # 직접 써서 더 안정적. 모노 + PTI 기대 샘플레이트 (16kHz) 로 로드.
+        audio, _ = librosa.load(str(wav_path), sr=_pti_sr, mono=True)
+
+        device = "cuda" if _t.cuda.is_available() else "cpu"
+        # Transcriptor 생성자가 weights 를 자동 다운로드 (없으면 ~700MB).
+        transcriptor = PianoTranscription(device=device, checkpoint_path=None)
+        _ = transcriptor.transcribe(audio, str(output_path))
+        if not Path(output_path).exists():
+            print(f"  -> piano (PTI): 출력 파일 생성 안됨")
+            return None
+        pm = pretty_midi.PrettyMIDI(str(output_path))
+        n = sum(len(inst.notes) for inst in pm.instruments)
+        print(f"  -> piano (PTI): {n} notes -> {output_path.name}")
+        return output_path
+    except Exception as e:
+        # 예외가 빈 문자열이면 type 이라도 보여주자 (6시간 디버깅 방지).
+        msg = str(e) if str(e) else type(e).__name__
+        print(f"  -> piano (PTI): 실행 실패, fallback ({msg})")
         return None
 
 
@@ -583,11 +633,15 @@ def convert_stems_to_midi(
 
         if stem_type == "drums":
             result = drums_to_midi(wav_path, out_path)
-        elif stem_type == "piano" and _OAF_AVAILABLE:
-            # ZZ1c: try Onsets & Frames first (95% F1), fall back to
-            # Basic Pitch (70%) if checkpoint/import/inference fails.
-            # Fall-back is silent from the user's POV — they get MIDI either way.
-            result = piano_to_midi_oaf(wav_path, out_path)
+        elif stem_type == "piano":
+            # Cascade: PTI (Sprint 37.4, 96%) -> OAF (Sprint 35 ZZ1c, 95%)
+            # -> Basic Pitch (70%). 각 단계가 실패(import/infererence) 시
+            # 다음 backend 로 silently 강등. 사용자는 어쨌든 MIDI 를 받음.
+            result = None
+            if _PTI_AVAILABLE:
+                result = piano_to_midi_pti(wav_path, out_path)
+            if result is None and _OAF_AVAILABLE:
+                result = piano_to_midi_oaf(wav_path, out_path)
             if result is None:
                 params = track_params.get("piano", {})
                 result = audio_to_midi(

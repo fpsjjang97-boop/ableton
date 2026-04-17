@@ -113,7 +113,8 @@ def preflight():
     info = {
         "model_loaded": _inference is not None and _inference.is_loaded,
         "audio2midi_available": False,
-        "onsets_frames": False,
+        "piano_pti": False,        # piano_transcription_inference (Sprint 37.4)
+        "onsets_frames": False,    # magenta TF1 path
         "adtof": False,
         "missing": [],
     }
@@ -122,6 +123,7 @@ def preflight():
         import convert as a2m_convert  # type: ignore
         info["audio2midi_available"] = not bool(a2m_convert.MISSING)
         info["missing"] = list(a2m_convert.MISSING)
+        info["piano_pti"] = getattr(a2m_convert, "_PTI_AVAILABLE", False)
         info["onsets_frames"] = getattr(a2m_convert, "_OAF_AVAILABLE", False)
         info["adtof"] = getattr(a2m_convert, "_ADTOF_AVAILABLE", False)
     except ImportError as e:

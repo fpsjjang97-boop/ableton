@@ -91,15 +91,25 @@ def check_a2m_deps() -> Check:
 def check_tier1_ckpt() -> list[Check]:
     checks: list[Check] = []
 
-    oaf = Check("Tier 1 — Onsets & Frames 체크포인트 (피아노)")
+    # Sprint 37.4: piano backend preference order =
+    #   piano_transcription_inference (pip, auto weights)
+    #   -> magenta O&F (manual)
+    #   -> Basic Pitch fallback
+    # 둘 중 하나라도 있으면 OK. 둘 다 없으면 Basic Pitch fallback 안내.
+    pti_ok = importlib.util.find_spec("piano_transcription_inference") is not None
     oaf_dir = Path(os.environ.get("MAGENTA_OAF_CHECKPOINT",
                                   REPO_ROOT / "checkpoints" / "onsets_frames"))
-    if oaf_dir.exists() and any(oaf_dir.iterdir()):
-        oaf.set(True, f"{oaf_dir} — 존재")
+    oaf_ok = oaf_dir.exists() and any(oaf_dir.iterdir())
+
+    piano = Check("Tier 1 — 피아노 전사 (PTI or O&F)")
+    if pti_ok:
+        piano.set(True, "piano_transcription_inference 설치됨 (PyTorch, F1 ~96%)")
+    elif oaf_ok:
+        piano.set(True, f"magenta O&F checkpoint: {oaf_dir}")
     else:
-        oaf.set(False, f"{oaf_dir} — 없음 (Basic Pitch 로 fallback)",
-                "python scripts/download_checkpoints.py --oaf   (optional ~180MB)")
-    checks.append(oaf)
+        piano.set(False, "PTI / O&F 둘 다 없음 (Basic Pitch ~70% fallback 사용)",
+                  "python scripts/download_checkpoints.py --piano")
+    checks.append(piano)
 
     adtof = Check("Tier 1 — ADTOF 체크포인트 (드럼)")
     adtof_dir = Path(os.environ.get("ADTOF_MODEL",
