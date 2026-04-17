@@ -29,6 +29,9 @@
 #include "AI/AIBridge.h"
 #include "PluginUI/MiniPianoRoll.h"
 #include "PluginUI/PresetManager.h"
+#include "PluginUI/I18n.h"
+#include "PluginUI/PluginLogger.h"
+#include "PluginUI/TutorialOverlay.h"
 
 class MidiGPTEditor : public juce::AudioProcessorEditor,
                        public juce::FileDragAndDropTarget,  // YY5 drag-and-drop
@@ -121,6 +124,18 @@ private:
 
     // YY6 Theme toggle (text reflects CURRENT theme; click cycles)
     juce::TextButton themeButton    { "Dark" };
+
+    // ZZ3 Language toggle (KO ↔ EN)
+    juce::TextButton langButton     { "EN" };
+
+    // ZZ5 First-run tutorial overlay + ZZ6 tooltip window
+    TutorialOverlay tutorial;
+    juce::TooltipWindow tooltipWindow { this, 600 /*ms delay*/ };
+
+    // ZZ5 persistent "tutorial seen" flag via PropertiesFile
+    std::unique_ptr<juce::PropertiesFile> settings;
+    void applyLanguage();        // re-label all localised controls
+    void maybeStartTutorial();   // first-run only
 
     juce::Slider     temperatureSlider;
     juce::Label      temperatureLabel { {}, "Temperature" };

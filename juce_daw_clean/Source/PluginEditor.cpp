@@ -122,8 +122,59 @@ MidiGPTEditor::MidiGPTEditor (MidiGPTProcessor& p)
 
     // --- YY6 Theme toggle ----------------------------------------------------
     themeButton.onClick = [this] { applyTheme (! darkTheme); };
-    themeButton.setTooltip ("Toggle dark/light theme");
     addAndMakeVisible (themeButton);
+
+    // --- ZZ3 Language toggle -------------------------------------------------
+    langButton.onClick = [this]
+    {
+        I18n::setLanguage (I18n::isEnglish() ? I18n::Lang::KO : I18n::Lang::EN);
+        applyLanguage();
+        if (settings != nullptr)
+        {
+            settings->setValue ("language", I18n::isEnglish() ? "en" : "ko");
+            settings->saveIfNeeded();
+        }
+    };
+    addAndMakeVisible (langButton);
+
+    // --- ZZ5 Persistent settings (language + tutorial_seen) ------------------
+    juce::PropertiesFile::Options opts;
+    opts.applicationName     = "MidiGPT";
+    opts.filenameSuffix      = ".settings";
+    opts.folderName          = "MidiGPT";
+    opts.osxLibrarySubFolder = "Application Support";
+    settings = std::make_unique<juce::PropertiesFile> (opts);
+    if (settings->getValue ("language", "ko") == "en")
+        I18n::setLanguage (I18n::Lang::EN);
+
+    // --- ZZ5 Tutorial overlay (added last so it paints on top) ---------------
+    addChildComponent (tutorial);
+    tutorial.setOnDismiss ([this]
+    {
+        if (settings != nullptr)
+        {
+            settings->setValue ("tutorial_seen", true);
+            settings->saveIfNeeded();
+        }
+    });
+
+    // --- ZZ6 Apply tooltips to every control ---------------------------------
+    generateButton.setTooltip     (I18n::t ("tip.generate"));
+    cancelButton.setTooltip       (I18n::t ("tip.cancel"));
+    clearButton.setTooltip        (I18n::t ("tip.clear"));
+    exportButton.setTooltip       (I18n::t ("tip.export"));
+    infoButton.setTooltip         (I18n::t ("tip.info"));
+    undoButton.setTooltip         (I18n::t ("tip.undo"));
+    redoButton.setTooltip         (I18n::t ("tip.redo"));
+    temperatureSlider.setTooltip  (I18n::t ("tip.temperature"));
+    numVariationsSlider.setTooltip(I18n::t ("tip.variations"));
+    styleBox.setTooltip           (I18n::t ("tip.style"));
+    presetBox.setTooltip          (I18n::t ("tip.preset"));
+    savePresetButton.setTooltip   (I18n::t ("tip.save_preset"));
+    deletePresetButton.setTooltip (I18n::t ("tip.delete_preset"));
+    themeButton.setTooltip        (I18n::t ("tip.theme"));
+
+    applyLanguage();      // apply after all controls exist
 
     // --- Status labels -------------------------------------------------------
     statusLabel.setJustificationType (juce::Justification::centred);
@@ -175,10 +226,20 @@ MidiGPTEditor::MidiGPTEditor (MidiGPTProcessor& p)
     addKeyListener (this);
 
     setSize (720, 520);
+
+    // ZZ4 Logger — share one file across all plugin instances.
+    PluginLogger::ensureInitialised();
+    PluginLogger::info ("Editor opened");
+
+    // ZZ5 First-run tutorial — deferred to resized() so tutorial.setBounds
+    // has real geometry when start() runs.
+    maybeStartTutorial();
 }
 
 MidiGPTEditor::~MidiGPTEditor()
 {
+    PluginLogger::info ("Editor closing");
+
     // Detach the status callback so the processor doesn't invoke a dead
     // editor if the host tears us down while a request is in flight.
     processorRef.setStatusCallback (nullptr);
@@ -291,6 +352,12 @@ void MidiGPTEditor::resized()
     const int bottomW = totalW / 2;
     serverStatusLabel.setBounds (margin, y, bottomW, 18);
     capturedCountLabel.setBounds (margin + bottomW, y, bottomW, 18);
+
+    // ZZ3/ZZ6 right-pinned utility buttons: [ EN ] beside theme.
+    langButton.setBounds (getWidth() - margin - 24 - 6 - 28, 14, 28, 24);
+
+    // ZZ5 Tutorial overlay covers the whole client area.
+    tutorial.setBounds (getLocalBounds());
 }
 
 void MidiGPTEditor::timerCallback()
@@ -351,6 +418,7 @@ void MidiGPTEditor::handleStatus (MidiGPTProcessor::GenerationStatus st, juce::S
         case MidiGPTProcessor::GenerationStatus::Error:
             statusLabel.setColour (juce::Label::textColourId, juce::Colours::red);
             setGenerationInFlight (false);
+            PluginLogger::error ("generation failed: " + msg);
             break;
     }
 }
@@ -644,9 +712,12 @@ void MidiGPTEditor::applyUndoRedoEnable()
 // =============================================================================
 bool MidiGPTEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
+    static const juce::StringArray kAccepted { ".mid", ".midi",
+                                               ".wav", ".mp3", ".flac", ".ogg", ".m4a" };
     for (const auto& f : files)
-        if (f.endsWithIgnoreCase (".mid") || f.endsWithIgnoreCase (".midi"))
-            return true;
+        for (const auto& ext : kAccepted)
+            if (f.endsWithIgnoreCase (ext))
+                return true;
     return false;
 }
 
@@ -655,18 +726,80 @@ void MidiGPTEditor::filesDropped (const juce::StringArray& files, int /*x*/, int
     dragHover = false;
     repaint();
 
-    // Only the first MIDI file is used as the prompt — multi-file drop is an
-    // ambiguity we'd rather not guess at (merge? queue?). Caller can drop
-    // another file next to replace.
-    juce::File midiFile;
+    // Priority: a dropped MIDI file is used as-is (fast path); a dropped
+    // audio file triggers Audio2MIDI (slow path, 30-120s). We pick the
+    // first file that matches either — multi-file drop is ambiguous and
+    // we'd rather be predictable than clever.
+    juce::File midiFile, audioFile;
     for (const auto& f : files)
     {
-        if (f.endsWithIgnoreCase (".mid") || f.endsWithIgnoreCase (".midi"))
+        if (midiFile == juce::File()
+            && (f.endsWithIgnoreCase (".mid") || f.endsWithIgnoreCase (".midi")))
         {
             midiFile = juce::File (f);
-            break;
+        }
+        else if (audioFile == juce::File())
+        {
+            for (const auto& ext : juce::StringArray { ".wav", ".mp3", ".flac", ".ogg", ".m4a" })
+            {
+                if (f.endsWithIgnoreCase (ext)) { audioFile = juce::File (f); break; }
+            }
         }
     }
+
+    // --- ZZ1b Audio2MIDI path (beta) ----------------------------------------
+    if (midiFile == juce::File() && audioFile != juce::File() && audioFile.existsAsFile())
+    {
+        juce::MemoryBlock audioBytes;
+        if (! audioFile.loadFileAsData (audioBytes))
+        {
+            statusLabel.setText ("오디오 파일 읽기 실패: " + audioFile.getFileName(),
+                                 juce::dontSendNotification);
+            statusLabel.setColour (juce::Label::textColourId, juce::Colours::red);
+            return;
+        }
+
+        statusLabel.setText ("⚠ Audio2MIDI (Beta) 변환 중... 30~120초 소요",
+                             juce::dontSendNotification);
+        statusLabel.setColour (juce::Label::textColourId, juce::Colours::yellow);
+        setGenerationInFlight (true);     // reuse spinner overlay
+
+        juce::Component::SafePointer<MidiGPTEditor> safeThis (this);
+        auto fname = audioFile.getFileName();
+        // Reuse healthBridge — requestAudioToMidiAsync spawns a detached
+        // thread that captures serverUrl by value, so it's independent of
+        // the bridge's lifetime and doesn't contend with checkHealth polls
+        // (which run synchronously on the message thread and are short).
+        healthBridge.requestAudioToMidiAsync (
+            audioBytes, fname,
+            [safeThis, fname] (AIBridge::Result result) mutable
+            {
+                auto* self = safeThis.getComponent();
+                if (self == nullptr) return;
+                self->setGenerationInFlight (false);
+                if (! result.success)
+                {
+                    self->statusLabel.setText (
+                        result.errorMessage.isNotEmpty()
+                            ? result.errorMessage
+                            : juce::String ("Audio2MIDI 실패"),
+                        juce::dontSendNotification);
+                    self->statusLabel.setColour (juce::Label::textColourId, juce::Colours::red);
+                    return;
+                }
+                // Treat the returned sequence as the new prompt (captured input).
+                self->processorRef.loadAsCapturedInput (result.generatedSequence);
+                self->inputRoll.setSequence (result.generatedSequence);
+                self->statusLabel.setText (
+                    juce::String ("Loaded: ") + fname
+                        + "  (" + juce::String (self->processorRef.getCapturedNoteCount())
+                        + " notes)  ⚠ Beta — 편집 필요",
+                    juce::dontSendNotification);
+                self->statusLabel.setColour (juce::Label::textColourId, juce::Colours::limegreen);
+            });
+        return;
+    }
+
     if (midiFile == juce::File() || ! midiFile.existsAsFile())
         return;
 
@@ -758,6 +891,69 @@ void MidiGPTEditor::filesDropped (const juce::StringArray& files, int /*x*/, int
 // =============================================================================
 // YY6 — Theme toggle (dark/light via LookAndFeel_V4 colour scheme swap)
 // =============================================================================
+// =============================================================================
+// ZZ3 — apply current I18n language to all localised labels
+// =============================================================================
+// Called on construction and after every language toggle. Keeps UI text and
+// tooltips synchronised with I18n::current().
+void MidiGPTEditor::applyLanguage()
+{
+    generateButton.setButtonText (I18n::t ("btn.generate"));
+    cancelButton.setButtonText   (I18n::t ("btn.cancel"));
+    clearButton.setButtonText    (I18n::t ("btn.clear"));
+    exportButton.setButtonText   (I18n::t ("btn.export"));
+    infoButton.setButtonText     (I18n::t ("btn.info"));
+    undoButton.setButtonText     (I18n::t ("btn.undo"));
+    redoButton.setButtonText     (I18n::t ("btn.redo"));
+    savePresetButton.setButtonText   (I18n::t ("btn.save_preset"));
+    deletePresetButton.setButtonText (I18n::t ("btn.delete_preset"));
+    themeButton.setButtonText    (darkTheme ? I18n::t ("btn.theme_dark")
+                                            : I18n::t ("btn.theme_light"));
+    // Button itself shows the language we'd switch TO, not the current one.
+    langButton.setButtonText     (I18n::isEnglish() ? "KO" : "EN");
+
+    inputRoll.setTitle              (I18n::t ("roll.input.title"));
+    outputRoll.setTitle             (I18n::t ("roll.output.title"));
+    inputRoll.setEmptyPlaceholder   (I18n::t ("roll.input.empty"));
+    outputRoll.setEmptyPlaceholder  (I18n::t ("roll.output.empty"));
+
+    // Re-apply tooltips (they embed language too).
+    generateButton.setTooltip     (I18n::t ("tip.generate"));
+    cancelButton.setTooltip       (I18n::t ("tip.cancel"));
+    clearButton.setTooltip        (I18n::t ("tip.clear"));
+    exportButton.setTooltip       (I18n::t ("tip.export"));
+    infoButton.setTooltip         (I18n::t ("tip.info"));
+    undoButton.setTooltip         (I18n::t ("tip.undo"));
+    redoButton.setTooltip         (I18n::t ("tip.redo"));
+    temperatureSlider.setTooltip  (I18n::t ("tip.temperature"));
+    numVariationsSlider.setTooltip(I18n::t ("tip.variations"));
+    styleBox.setTooltip           (I18n::t ("tip.style"));
+    presetBox.setTooltip          (I18n::t ("tip.preset"));
+    savePresetButton.setTooltip   (I18n::t ("tip.save_preset"));
+    deletePresetButton.setTooltip (I18n::t ("tip.delete_preset"));
+    themeButton.setTooltip        (I18n::t ("tip.theme"));
+    repaint();
+}
+
+// =============================================================================
+// ZZ5 — first-run tutorial (only shown when tutorial_seen flag is absent)
+// =============================================================================
+void MidiGPTEditor::maybeStartTutorial()
+{
+    if (settings == nullptr) return;
+    if (settings->getBoolValue ("tutorial_seen", false)) return;
+
+    juce::Array<TutorialOverlay::Step> steps;
+    steps.add ({ nullptr,           "tut.step1.title", "tut.step1.body" });
+    steps.add ({ &inputRoll,        "tut.step2.title", "tut.step2.body" });
+    steps.add ({ &temperatureSlider,"tut.step3.title", "tut.step3.body" });
+    steps.add ({ &generateButton,   "tut.step4.title", "tut.step4.body" });
+    steps.add ({ &exportButton,     "tut.step5.title", "tut.step5.body" });
+    tutorial.setSteps (steps);
+    tutorial.start();
+    tutorial.setBounds (getLocalBounds());
+}
+
 void MidiGPTEditor::applyTheme (bool dark)
 {
     darkTheme = dark;
