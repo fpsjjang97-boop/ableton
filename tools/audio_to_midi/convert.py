@@ -89,12 +89,23 @@ except ImportError:
 # BPM detection (from agents/audio2midi.py)
 # ---------------------------------------------------------------------------
 def detect_bpm(audio_path: Path) -> float:
-    """librosa를 사용하여 BPM 자동 감지."""
+    """librosa를 사용하여 BPM 자동 감지.
+
+    Sprint 37.2: librosa.beat.beat_track 가 비음악적 / 너무 짧은 오디오에
+    대해 0.0 을 반환하는 경우 발견 (6초 짜리 테스트 신스). 0.0 은 예외가
+    아니라 "unspecified" 이므로 (rules/02 §2.2 참고) 기본값 120 으로 대체.
+    0 을 그대로 흘리면 merge_midi_tracks → pretty_midi 내부 60000000/tempo
+    에서 ZeroDivisionError.
+    """
     try:
         import librosa
         y, sr = librosa.load(str(audio_path), sr=22050, mono=True, duration=60)
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
         bpm = float(tempo) if not hasattr(tempo, '__len__') else float(tempo[0])
+        if bpm < 30.0 or bpm > 300.0:
+            # librosa 범위 외 — unspecified 로 처리.
+            print(f"  BPM 감지: {bpm:.1f} (범위 외, 기본값 120 사용)")
+            return 120.0
         print(f"  BPM 감지: {bpm:.1f}")
         return bpm
     except Exception as e:
@@ -668,7 +679,15 @@ def merge_midi_tracks(
     song_name: str = "Converted",
     bpm: float = 120.0,
 ) -> Path:
-    """분리된 MIDI 파일들을 하나의 Type 1 MIDI로 합치기."""
+    """분리된 MIDI 파일들을 하나의 Type 1 MIDI로 합치기.
+
+    Sprint 37.2: bpm <= 0 방어 (detect_bpm 은 이미 클램핑하지만 외부
+    호출자가 0 을 넘길 수 있음). rules/02 § "기본값 삼킴" 금지 — 0 은
+    unspecified, silently 120 으로 복원.
+    """
+    if bpm <= 0.0 or bpm > 300.0:
+        print(f"  [WARN] bpm={bpm} 유효 범위 밖 — 기본값 120 사용")
+        bpm = 120.0
     print(f"\n[3/3] 트랙 합치기 → Type 1 MIDI (BPM={bpm:.1f})...")
 
     merged = pretty_midi.PrettyMIDI(initial_tempo=bpm)
