@@ -1,8 +1,8 @@
 /*
  * MidiGPT VST3 Plugin — PluginEditor.cpp
  *
- * Minimal plugin UI: style selector, temperature, variations, generate button.
- * Based on JUCE standard tutorial patterns.
+ * Plugin UI: style / temperature / variations + generate button, plus
+ * server-health and captured-MIDI feedback (Sprint 32 WW5).
  *
  * NO references to Cubase binaries or Ghidra output.
  */
@@ -42,19 +42,52 @@ MidiGPTEditor::MidiGPTEditor (MidiGPTProcessor& p)
         processorRef.parameters, "style", styleBox);
 
     // --- Generate button -----------------------------------------------------
+    generateButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xFF4A90D9));
     generateButton.onClick = [this]
     {
-        statusLabel.setText ("Generating...", juce::dontSendNotification);
         processorRef.requestVariation();
-        statusLabel.setText ("Ready", juce::dontSendNotification);
     };
     addAndMakeVisible (generateButton);
 
-    // --- Status label --------------------------------------------------------
+    // --- Clear captured-input button -----------------------------------------
+    clearButton.onClick = [this]
+    {
+        processorRef.clearCapturedInput();
+    };
+    addAndMakeVisible (clearButton);
+
+    // --- Status labels -------------------------------------------------------
     statusLabel.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (statusLabel);
 
-    setSize (480, 320);
+    serverStatusLabel.setJustificationType (juce::Justification::centredLeft);
+    serverStatusLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible (serverStatusLabel);
+
+    capturedCountLabel.setJustificationType (juce::Justification::centredRight);
+    capturedCountLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible (capturedCountLabel);
+
+    // --- Wire processor callbacks -------------------------------------------
+    processorRef.setStatusCallback (
+        [this] (MidiGPTProcessor::GenerationStatus st, juce::String msg)
+        {
+            handleStatus (st, std::move (msg));
+        });
+
+    // Poll server health once a second so the user sees red/green without
+    // having to click a "Connect" button. checkHealth uses a short timeout
+    // to avoid stalling the UI thread.
+    startTimerHz (1);
+
+    setSize (480, 340);
+}
+
+MidiGPTEditor::~MidiGPTEditor()
+{
+    // Detach the status callback so the processor doesn't invoke a
+    // dead editor if the host tears us down while a request is in flight.
+    processorRef.setStatusCallback (nullptr);
 }
 
 void MidiGPTEditor::paint (juce::Graphics& g)
@@ -87,8 +120,61 @@ void MidiGPTEditor::resized()
     styleBox.setBounds (margin + labelW, y, getWidth() - margin * 2 - labelW, controlH);
     y += controlH + 24;
 
-    generateButton.setBounds (margin, y, getWidth() - margin * 2, 40);
+    // Two buttons side-by-side: Generate (primary), Clear (secondary)
+    const int buttonGap = 8;
+    const int buttonW = (getWidth() - margin * 2 - buttonGap) * 2 / 3;
+    generateButton.setBounds (margin, y, buttonW, 40);
+    clearButton.setBounds (margin + buttonW + buttonGap, y,
+                           getWidth() - margin * 2 - buttonW - buttonGap, 40);
     y += 40 + 12;
 
     statusLabel.setBounds (margin, y, getWidth() - margin * 2, 24);
+    y += 28;
+
+    // Bottom row: server status (left) + captured count (right)
+    const int bottomW = (getWidth() - margin * 2) / 2;
+    serverStatusLabel.setBounds (margin, y, bottomW, 20);
+    capturedCountLabel.setBounds (margin + bottomW, y, bottomW, 20);
+}
+
+void MidiGPTEditor::timerCallback()
+{
+    const bool ok = healthBridge.checkHealth (500);
+    if (ok != serverConnected)
+    {
+        serverConnected = ok;
+        serverStatusLabel.setText (ok ? "Server: connected" : "Server: disconnected",
+                                   juce::dontSendNotification);
+        serverStatusLabel.setColour (juce::Label::textColourId,
+                                     ok ? juce::Colours::limegreen : juce::Colours::red);
+        generateButton.setEnabled (ok);
+    }
+
+    // Update captured-note count (cheap atomic read).
+    capturedCountLabel.setText (
+        juce::String ("Captured: ") + juce::String (processorRef.getCapturedNoteCount()),
+        juce::dontSendNotification);
+}
+
+void MidiGPTEditor::handleStatus (MidiGPTProcessor::GenerationStatus st, juce::String msg)
+{
+    statusLabel.setText (msg, juce::dontSendNotification);
+    switch (st)
+    {
+        case MidiGPTProcessor::GenerationStatus::Idle:
+            statusLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
+            break;
+        case MidiGPTProcessor::GenerationStatus::NoInputCaptured:
+            statusLabel.setColour (juce::Label::textColourId, juce::Colours::orange);
+            break;
+        case MidiGPTProcessor::GenerationStatus::InFlight:
+            statusLabel.setColour (juce::Label::textColourId, juce::Colours::yellow);
+            break;
+        case MidiGPTProcessor::GenerationStatus::Ready:
+            statusLabel.setColour (juce::Label::textColourId, juce::Colours::limegreen);
+            break;
+        case MidiGPTProcessor::GenerationStatus::Error:
+            statusLabel.setColour (juce::Label::textColourId, juce::Colours::red);
+            break;
+    }
 }

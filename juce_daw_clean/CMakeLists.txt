@@ -132,3 +132,60 @@ target_link_libraries(MidiGPTDAW PRIVATE
 # C++ standard
 # -----------------------------------------------------------------------------
 target_compile_features(MidiGPTDAW PRIVATE cxx_std_17)
+
+# =============================================================================
+# VST3 Plugin target — MidiGPTPlugin
+# -----------------------------------------------------------------------------
+# Host-agnostic VST3 + Standalone plugin that runs INSIDE a DAW (Cubase,
+# Ableton Live, Reaper, etc.). Shares Source/AI/AIBridge.* with the
+# standalone app — both talk to the same inference_server.py over HTTP.
+#
+# Sprint 32 WW1 (2026-04-17): target activated. Before this the plugin
+# source files existed but were orphaned — not compiled by any target.
+# =============================================================================
+juce_add_plugin(MidiGPTPlugin
+    PRODUCT_NAME            "MidiGPT"
+    COMPANY_NAME            "MidiGPT"
+    BUNDLE_ID               "com.midigpt.plugin"
+    PLUGIN_MANUFACTURER_CODE Mgpt
+    PLUGIN_CODE             MGpt
+    FORMATS                 VST3 Standalone
+    IS_MIDI_EFFECT          TRUE
+    IS_SYNTH                FALSE
+    NEEDS_MIDI_INPUT        TRUE
+    NEEDS_MIDI_OUTPUT       TRUE
+    EDITOR_WANTS_KEYBOARD_FOCUS TRUE
+    COPY_PLUGIN_AFTER_BUILD FALSE
+    VST3_CATEGORIES         "Fx" "Tools"
+)
+
+target_sources(MidiGPTPlugin PRIVATE
+    Source/PluginProcessor.h
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.h
+    Source/PluginEditor.cpp
+
+    # Shared with standalone — HTTP client to inference_server.py
+    Source/AI/AIBridge.h
+    Source/AI/AIBridge.cpp
+)
+
+target_compile_definitions(MidiGPTPlugin PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
+)
+
+target_link_libraries(MidiGPTPlugin PRIVATE
+    juce::juce_audio_basics
+    juce::juce_audio_processors
+    juce::juce_audio_formats
+    juce::juce_core
+    juce::juce_events
+    juce::juce_gui_extra
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_lto_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_features(MidiGPTPlugin PRIVATE cxx_std_17)
