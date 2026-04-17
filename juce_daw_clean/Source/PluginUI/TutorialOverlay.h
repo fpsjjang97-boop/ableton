@@ -42,6 +42,18 @@ public:
         skipButton.setButtonText ("Skip");
         skipButton.onClick = [this] { dismiss(); };
         addAndMakeVisible (skipButton);
+
+        // AAA6 — offer an external "Full Guide" link on the final step.
+        // Hidden until we're on the last step so it doesn't clutter the UI
+        // earlier. URL is intentionally a placeholder — replace when the
+        // docs site goes live.
+        guideButton.setButtonText ("Online Guide");
+        guideButton.onClick = [] {
+            juce::URL ("https://github.com/fpsjjang97-boop/ableton/wiki/MidiGPT-Guide")
+                .launchInDefaultBrowser();
+        };
+        guideButton.setVisible (false);
+        addAndMakeVisible (guideButton);
     }
 
     void setSteps (juce::Array<Step> s) { steps = std::move (s); idx = 0; repaint(); }
@@ -120,12 +132,16 @@ public:
         auto card = getLocalBounds().withSizeKeepingCentre (juce::jmin (420, getWidth() - 32), 140);
         nextButton.setBounds (card.getRight() - 80, card.getBottom() - 34, 64, 24);
         skipButton.setBounds (card.getRight() - 160, card.getBottom() - 34, 64, 24);
+        // Guide button aligns to the card's left edge; visibility toggled per step.
+        guideButton.setBounds (card.getX() + 16, card.getBottom() - 34, 110, 24);
     }
 
 private:
     void advance()
     {
         ++idx;
+        // Show the Online Guide link only on the final step.
+        guideButton.setVisible (idx == steps.size() - 1);
         if (idx >= steps.size()) dismiss();
         else                     repaint();
     }
@@ -137,7 +153,7 @@ private:
 
     juce::Array<Step> steps;
     int idx { 0 };
-    juce::TextButton nextButton, skipButton;
+    juce::TextButton nextButton, skipButton, guideButton;
     DismissCallback onDismiss;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TutorialOverlay)

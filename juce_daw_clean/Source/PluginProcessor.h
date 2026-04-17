@@ -135,6 +135,29 @@ public:
     int  undoDepth() const { return static_cast<int> (undoStack.size()); }
     int  redoDepth() const { return static_cast<int> (redoStack.size()); }
 
+    // =========================================================================
+    // Sprint 36 AAA1 — Crash recovery
+    // =========================================================================
+    // Autosave a minimal session state (params + capturedInput + lastGenerated)
+    // to disk at every Ready-status event and on a 30-second heartbeat timer.
+    // On plugin construction, if the crash flag in the autosave file is set
+    // (i.e. the previous session didn't shut down cleanly), the state is
+    // reloaded and the editor is notified so it can offer "Restore last session".
+    //
+    // Design: we do NOT auto-restore silently. The user must approve via the
+    // editor dialog — a silently-restored state can surprise them and make
+    // undo/redo behave confusingly on first open.
+    juce::File getAutosaveFile() const;
+    void autosave();                              // write current state to disk
+    bool hadUncleanShutdown() const { return sawUncleanShutdown; }
+    bool restoreFromAutosave();                   // user-confirmed restore
+    void dismissCrashRecovery();                  // user declined restore
+
+    // Diagnostic report (AAA2) needs access to the capture/generated state
+    // plus metadata (params). This helper bundles everything into a single
+    // DynamicObject for the editor to serialise.
+    juce::var buildDiagnosticReport() const;
+
     // Public parameter tree (exposed to host automation)
     juce::AudioProcessorValueTreeState parameters;
 
@@ -185,6 +208,12 @@ private:
 
     void fireStatus (GenerationStatus st, juce::String msg);
     void installGeneratedSequence (juce::MidiMessageSequence seq);   // shared by generate + undo
+
+    // ---- AAA1 Crash recovery state -----------------------------------------
+    // Set in the constructor by inspecting the autosave file's crash flag.
+    // The editor queries this via hadUncleanShutdown() and prompts the user.
+    // Cleared after restoreFromAutosave() or dismissCrashRecovery().
+    bool sawUncleanShutdown { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiGPTProcessor)
 };

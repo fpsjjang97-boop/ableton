@@ -22,12 +22,48 @@ MidiGPTProcessor::MidiGPTProcessor()
       parameters (*this, nullptr, "MidiGPT", createParameterLayout()),
       aiBridge (std::make_unique<AIBridge>())
 {
+    // AAA1: on construction, detect unclean shutdown from last session.
+    // We do NOT auto-restore — just set the flag and let the editor ask.
+    auto f = getAutosaveFile();
+    if (f.existsAsFile())
+    {
+        auto xml = juce::parseXML (f);
+        if (xml != nullptr && xml->hasTagName ("MidiGPTAutosave")
+            && xml->getBoolAttribute ("clean_shutdown", false) == false)
+        {
+            sawUncleanShutdown = true;
+        }
+    }
+
+    // Write an "in progress" marker immediately so that if we crash before
+    // the first autosave, next session still sees the flag.
+    {
+        juce::XmlElement root ("MidiGPTAutosave");
+        root.setAttribute ("clean_shutdown", false);
+        root.setAttribute ("session_start", juce::Time::getCurrentTime().toISO8601 (true));
+        root.writeTo (getAutosaveFile(), {});
+    }
 }
 
 MidiGPTProcessor::~MidiGPTProcessor()
 {
     if (aiBridge != nullptr)
         aiBridge->cancelPendingRequests();
+
+    // AAA1: mark clean shutdown so next session doesn't think we crashed.
+    // We keep the captured state in the file for diagnostic use, but flip
+    // the flag.
+    auto f = getAutosaveFile();
+    if (f.existsAsFile())
+    {
+        auto xml = juce::parseXML (f);
+        if (xml != nullptr)
+        {
+            xml->setAttribute ("clean_shutdown", true);
+            xml->setAttribute ("session_end", juce::Time::getCurrentTime().toISO8601 (true));
+            xml->writeTo (f, {});
+        }
+    }
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout
@@ -249,6 +285,10 @@ void MidiGPTProcessor::requestVariation()
 
             installGeneratedSequence (result.generatedSequence);
 
+            // AAA1: autosave after every successful generation so a crash
+            // within seconds of "I finally got a good take" doesn't lose it.
+            autosave();
+
             fireStatus (GenerationStatus::Ready,
                         juce::String ("생성 완료 — ")
                           + juce::String (result.generatedSequence.getNumEvents())
@@ -450,6 +490,148 @@ void MidiGPTProcessor::setStateInformation (const void* data, int sizeInBytes)
 juce::AudioProcessorEditor* MidiGPTProcessor::createEditor()
 {
     return new MidiGPTEditor (*this);
+}
+
+// =============================================================================
+// AAA1 — Autosave / crash recovery
+// =============================================================================
+juce::File MidiGPTProcessor::getAutosaveFile() const
+{
+    // One shared file across all plugin instances in the host — simplest model
+    // and matches PluginLogger's approach. If a user runs 3 MidiGPT instances
+    // in parallel they'll autosave on top of each other, but that's a niche
+    // case and the alternative (per-instance UUID files) risks orphaned files.
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+               .getChildFile ("MidiGPT")
+               .getChildFile ("autosave.xml");
+}
+
+void MidiGPTProcessor::autosave()
+{
+    auto f = getAutosaveFile();
+    f.getParentDirectory().createDirectory();
+
+    juce::XmlElement root ("MidiGPTAutosave");
+    root.setAttribute ("clean_shutdown", false);
+    root.setAttribute ("version",        1);
+    root.setAttribute ("session_start",  juce::Time::getCurrentTime().toISO8601 (true));
+
+    // Parameters
+    if (auto paramXml = std::unique_ptr<juce::XmlElement> (parameters.copyState().createXml()))
+        root.addChildElement (paramXml.release());
+
+    // Captured input (may be large; base64 MIDI)
+    auto encodeSeq = [] (const juce::MidiMessageSequence& seq) -> juce::String
+    {
+        if (seq.getNumEvents() == 0) return {};
+        juce::MidiFile mf;
+        mf.setTicksPerQuarterNote (480);
+        mf.addTrack (seq);
+        juce::MemoryOutputStream midiOut;
+        mf.writeTo (midiOut);
+        juce::MemoryOutputStream b64;
+        juce::Base64::convertToBase64 (b64, midiOut.getData(), midiOut.getDataSize());
+        return b64.toString();
+    };
+
+    {
+        const juce::ScopedLock lock (captureLock);
+        auto* c = new juce::XmlElement ("CapturedInput");
+        c->setAttribute ("base64", encodeSeq (capturedInput));
+        c->setAttribute ("notes", capturedNoteCount.load());
+        root.addChildElement (c);
+    }
+    {
+        auto* g = new juce::XmlElement ("LastGenerated");
+        g->setAttribute ("base64", encodeSeq (lastGenerated));
+        g->setAttribute ("events", lastGenerated.getNumEvents());
+        root.addChildElement (g);
+    }
+
+    root.writeTo (f, {});
+}
+
+bool MidiGPTProcessor::restoreFromAutosave()
+{
+    auto f = getAutosaveFile();
+    if (! f.existsAsFile()) { sawUncleanShutdown = false; return false; }
+    auto xml = juce::parseXML (f);
+    if (xml == nullptr || ! xml->hasTagName ("MidiGPTAutosave"))
+    { sawUncleanShutdown = false; return false; }
+
+    // Parameters
+    if (auto* paramXml = xml->getChildByName (parameters.state.getType()))
+        parameters.replaceState (juce::ValueTree::fromXml (*paramXml));
+
+    auto decodeSeq = [] (const juce::String& b64) -> juce::MidiMessageSequence
+    {
+        juce::MidiMessageSequence flat;
+        if (b64.isEmpty()) return flat;
+        juce::MemoryOutputStream decoded;
+        if (! juce::Base64::convertFromBase64 (decoded, b64)) return flat;
+        juce::MemoryBlock mb (decoded.getData(), decoded.getDataSize());
+        juce::MemoryInputStream in (mb, false);
+        juce::MidiFile mf;
+        if (! mf.readFrom (in)) return flat;
+        for (int t = 0; t < mf.getNumTracks(); ++t)
+            if (auto* track = mf.getTrack (t))
+                for (int e = 0; e < track->getNumEvents(); ++e)
+                    flat.addEvent (track->getEventPointer (e)->message, 0.0);
+        flat.updateMatchedPairs();
+        return flat;
+    };
+
+    if (auto* c = xml->getChildByName ("CapturedInput"))
+    {
+        auto seq = decodeSeq (c->getStringAttribute ("base64"));
+        const juce::ScopedLock lock (captureLock);
+        capturedInput = seq;
+        int noteCount = 0;
+        for (int i = 0; i < capturedInput.getNumEvents(); ++i)
+            if (capturedInput.getEventPointer (i)->message.isNoteOn()) ++noteCount;
+        capturedNoteCount.store (noteCount);
+    }
+    if (auto* g = xml->getChildByName ("LastGenerated"))
+    {
+        lastGenerated = decodeSeq (g->getStringAttribute ("base64"));
+    }
+
+    sawUncleanShutdown = false;
+    return true;
+}
+
+void MidiGPTProcessor::dismissCrashRecovery()
+{
+    sawUncleanShutdown = false;
+    // Purge the stale autosave so we don't re-prompt after a clean close.
+    autosave();   // overwrite with current (empty) state
+}
+
+// =============================================================================
+// AAA2 — Diagnostic report (captures params + captured + generated)
+// =============================================================================
+juce::var MidiGPTProcessor::buildDiagnosticReport() const
+{
+    juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+
+    // Timestamps
+    obj->setProperty ("generated_at", juce::Time::getCurrentTime().toISO8601 (true));
+    obj->setProperty ("plugin_version", "0.1.0");
+
+    // Parameters (flattened to a sub-object)
+    juce::DynamicObject::Ptr params = new juce::DynamicObject();
+    if (auto* p = parameters.getRawParameterValue ("temperature"))   params->setProperty ("temperature", p->load());
+    if (auto* p = parameters.getRawParameterValue ("numVariations")) params->setProperty ("numVariations", p->load());
+    if (auto* p = parameters.getRawParameterValue ("style"))         params->setProperty ("style", p->load());
+    obj->setProperty ("params", juce::var (params.get()));
+
+    // Counts (full MIDI bytes are included separately via the zip)
+    obj->setProperty ("captured_note_count", capturedNoteCount.load());
+    obj->setProperty ("last_generated_events", lastGenerated.getNumEvents());
+    obj->setProperty ("undo_depth", (int) undoStack.size());
+    obj->setProperty ("redo_depth", (int) redoStack.size());
+
+    return juce::var (obj.get());
 }
 
 // -----------------------------------------------------------------------------

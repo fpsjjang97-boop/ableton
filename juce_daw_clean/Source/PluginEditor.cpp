@@ -146,6 +146,8 @@ MidiGPTEditor::MidiGPTEditor (MidiGPTProcessor& p)
     settings = std::make_unique<juce::PropertiesFile> (opts);
     if (settings->getValue ("language", "ko") == "en")
         I18n::setLanguage (I18n::Lang::EN);
+    // Restore HUD visibility from previous session (AAA4).
+    hudVisible = settings->getBoolValue ("hud_visible", false);
 
     // --- ZZ5 Tutorial overlay (added last so it paints on top) ---------------
     addChildComponent (tutorial);
@@ -157,6 +159,19 @@ MidiGPTEditor::MidiGPTEditor (MidiGPTProcessor& p)
             settings->saveIfNeeded();
         }
     });
+
+    // --- AAA2 / AAA3 / AAA4 utility buttons + HUD -----------------------------
+    reportButton.onClick = [this] { onReportIssue(); };
+    addAndMakeVisible (reportButton);
+
+    sampleButton.onClick = [this] { onLoadSampleMenu(); };
+    addAndMakeVisible (sampleButton);
+
+    addChildComponent (perfHud);   // hidden by default; Ctrl+Shift+D toggles
+    perfHud.setVisible (hudVisible);
+
+    // Populate sample dir on first run (copies from docs/samples/ if present).
+    SampleGallery::installIfMissing();
 
     // --- ZZ6 Apply tooltips to every control ---------------------------------
     generateButton.setTooltip     (I18n::t ("tip.generate"));
@@ -234,6 +249,17 @@ MidiGPTEditor::MidiGPTEditor (MidiGPTProcessor& p)
     // ZZ5 First-run tutorial — deferred to resized() so tutorial.setBounds
     // has real geometry when start() runs.
     maybeStartTutorial();
+
+    // AAA1 — after all UI is ready, prompt for crash recovery if the last
+    // session ended uncleanly. Using MessageManager::callAsync to defer
+    // until the constructor returns — AlertWindow inside ctor can trip
+    // some VST3 hosts.
+    juce::Component::SafePointer<MidiGPTEditor> safeThis (this);
+    juce::MessageManager::callAsync ([safeThis]() mutable
+    {
+        if (auto* self = safeThis.getComponent())
+            self->maybeOfferCrashRecovery();
+    });
 }
 
 MidiGPTEditor::~MidiGPTEditor()
@@ -340,10 +366,14 @@ void MidiGPTEditor::resized()
     infoButton.setBounds   (x, y, secondaryW, 32);
     y += 32 + 6;
 
-    // Action buttons row 2: Undo / Redo (YY4), filler on right
-    const int undoW = 80;
+    // Action buttons row 2: Undo / Redo (YY4) + Report / Sample (AAA2/3)
+    const int undoW = 70;
+    const int utilW = 80;
     undoButton.setBounds (margin, y, undoW, 26);
     redoButton.setBounds (margin + undoW + buttonGap, y, undoW, 26);
+    // Right-pinned utility buttons
+    reportButton.setBounds (getWidth() - margin - utilW, y, utilW, 26);
+    sampleButton.setBounds (getWidth() - margin - utilW * 2 - buttonGap, y, utilW, 26);
     y += 26 + 6;
 
     statusLabel.setBounds (margin, y, totalW, 20);
@@ -358,6 +388,9 @@ void MidiGPTEditor::resized()
 
     // ZZ5 Tutorial overlay covers the whole client area.
     tutorial.setBounds (getLocalBounds());
+
+    // AAA4 HUD — top-left corner of the piano roll area, above inputRoll.
+    perfHud.setBounds (margin + 4, 62 + 4, 140, 70);
 }
 
 void MidiGPTEditor::timerCallback()
@@ -378,6 +411,16 @@ void MidiGPTEditor::timerCallback()
         juce::dontSendNotification);
 
     refreshPianoRolls();
+
+    // AAA4 — feed the HUD with whatever we have on this tick.
+    // Generation latency / RTT aren't instrumented yet (would need hooks in
+    // AIBridge.cpp start/end timestamps); for now surface the two numbers
+    // we DO have: captured-note rate and whether output is actively playing.
+    if (hudVisible)
+    {
+        perfHud.setCapturedCount (processorRef.getCapturedNoteCount());
+        perfHud.setQueueDepth (processorRef.getLastGenerated().getNumEvents());
+    }
 }
 
 void MidiGPTEditor::refreshPianoRolls()
@@ -615,7 +658,184 @@ bool MidiGPTEditor::keyPressed (const juce::KeyPress& key, juce::Component* /*or
         redoButton.triggerClick();
         return true;
     }
+    // AAA4 — Ctrl+Shift+D toggles performance HUD
+    if (key == juce::KeyPress ('d', juce::ModifierKeys::commandModifier
+                                    | juce::ModifierKeys::shiftModifier, 0))
+    {
+        toggleHud();
+        return true;
+    }
     return false;
+}
+
+// =============================================================================
+// AAA2 — Diagnostic report dump (params + logs + last MIDI → zip on Desktop)
+// =============================================================================
+void MidiGPTEditor::onReportIssue()
+{
+    auto destDir = juce::File::getSpecialLocation (juce::File::userDesktopDirectory);
+    auto timestamp = juce::Time::getCurrentTime().formatted ("%Y%m%d-%H%M%S");
+    auto reportDir = destDir.getChildFile ("MidiGPT-report-" + timestamp);
+    reportDir.createDirectory();
+
+    // 1) Plugin state JSON
+    auto stateJson = juce::JSON::toString (processorRef.buildDiagnosticReport());
+    reportDir.getChildFile ("state.json").replaceWithText (stateJson);
+
+    // 2) Recent log (copy from log dir — last file only, capped size)
+    auto logDir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                      .getChildFile ("MidiGPT").getChildFile ("logs");
+    if (logDir.isDirectory())
+    {
+        juce::Array<juce::File> logs;
+        logDir.findChildFiles (logs, juce::File::findFiles, false, "*.log");
+        // Newest first — JUCE returns in unspecified order; sort by modified time.
+        std::sort (logs.begin(), logs.end(),
+                   [] (const juce::File& a, const juce::File& b)
+                   { return a.getLastModificationTime() > b.getLastModificationTime(); });
+        if (! logs.isEmpty())
+            logs.getFirst().copyFileTo (reportDir.getChildFile ("plugin.log"));
+    }
+
+    // 3) Last-generated MIDI
+    const auto& gen = processorRef.getLastGenerated();
+    if (gen.getNumEvents() > 0)
+    {
+        juce::MidiFile mf;
+        mf.setTicksPerQuarterNote (480);
+        mf.addTrack (gen);
+        juce::FileOutputStream out (reportDir.getChildFile ("last_generated.mid"));
+        if (out.openedOk()) mf.writeTo (out);
+    }
+
+    // 4) README describing the contents so whoever gets the zip knows.
+    reportDir.getChildFile ("README.txt").replaceWithText (
+        "MidiGPT Diagnostic Report\n"
+        "Timestamp: " + timestamp + "\n\n"
+        "Contents:\n"
+        "  state.json           - plugin/server parameters snapshot\n"
+        "  plugin.log           - recent plugin log (last session)\n"
+        "  last_generated.mid   - last AI-generated MIDI (if any)\n\n"
+        "Please attach this folder to your issue report.\n");
+
+    // Open the folder in the system file manager so the user can zip/attach.
+    reportDir.revealToUser();
+
+    statusLabel.setText ("리포트 생성: " + reportDir.getFileName(),
+                         juce::dontSendNotification);
+    statusLabel.setColour (juce::Label::textColourId, juce::Colours::limegreen);
+    PluginLogger::info ("Diagnostic report written to " + reportDir.getFullPathName());
+}
+
+// =============================================================================
+// AAA3 — Load sample from the bundled gallery
+// =============================================================================
+void MidiGPTEditor::onLoadSampleMenu()
+{
+    auto samples = SampleGallery::listSamples();
+    juce::PopupMenu menu;
+    if (samples.isEmpty())
+    {
+        menu.addItem (1, "(no samples installed)", false);
+    }
+    else
+    {
+        for (int i = 0; i < samples.size(); ++i)
+        {
+            const auto& s = samples.getReference (i);
+            juce::String label = s.name;
+            if (s.description.isNotEmpty())
+                label += "  —  " + s.description;
+            menu.addItem (100 + i, label);
+        }
+    }
+
+    juce::Component::SafePointer<MidiGPTEditor> safeThis (this);
+    menu.showMenuAsync (
+        juce::PopupMenu::Options().withTargetComponent (&sampleButton),
+        [safeThis, samples] (int choice)
+        {
+            auto* self = safeThis.getComponent();
+            if (self == nullptr || choice < 100) return;
+            const auto& s = samples.getReference (choice - 100);
+            juce::FileInputStream in (s.file);
+            if (! in.openedOk()) return;
+            juce::MidiFile mf;
+            if (! mf.readFrom (in)) return;
+            juce::MidiMessageSequence flat;
+            const int tf = mf.getTimeFormat();
+            if (tf > 0)
+            {
+                const double ppq = static_cast<double> (tf);
+                for (int t = 0; t < mf.getNumTracks(); ++t)
+                    if (auto* trk = mf.getTrack (t))
+                        for (int e = 0; e < trk->getNumEvents(); ++e)
+                        {
+                            auto msg = trk->getEventPointer (e)->message;
+                            msg.setTimeStamp (msg.getTimeStamp() / ppq);
+                            flat.addEvent (msg, 0.0);
+                        }
+            }
+            flat.updateMatchedPairs();
+            self->processorRef.loadAsCapturedInput (flat);
+            self->inputRoll.setSequence (flat);
+            self->statusLabel.setText ("샘플 로드: " + s.name,
+                                       juce::dontSendNotification);
+            self->statusLabel.setColour (juce::Label::textColourId, juce::Colours::limegreen);
+        });
+}
+
+// =============================================================================
+// AAA4 — Performance HUD toggle
+// =============================================================================
+void MidiGPTEditor::toggleHud()
+{
+    hudVisible = ! hudVisible;
+    perfHud.setVisible (hudVisible);
+    if (settings != nullptr)
+    {
+        settings->setValue ("hud_visible", hudVisible);
+        settings->saveIfNeeded();
+    }
+}
+
+// =============================================================================
+// AAA1 — Crash recovery prompt
+// =============================================================================
+void MidiGPTEditor::maybeOfferCrashRecovery()
+{
+    if (! processorRef.hadUncleanShutdown()) return;
+
+    juce::Component::SafePointer<MidiGPTEditor> safeThis (this);
+    juce::AlertWindow::showYesNoCancelBox (
+        juce::MessageBoxIconType::QuestionIcon,
+        "이전 세션 복구",
+        "MidiGPT 가 비정상 종료된 것으로 보입니다. 마지막 입력/생성 결과를 복구하시겠습니까?",
+        "복구", "무시", "",
+        nullptr,
+        juce::ModalCallbackFunction::create ([safeThis] (int result)
+        {
+            auto* self = safeThis.getComponent();
+            if (self == nullptr) return;
+            if (result == 1)        // "복구"
+            {
+                if (self->processorRef.restoreFromAutosave())
+                {
+                    self->refreshPianoRolls();
+                    self->applyUndoRedoEnable();
+                    self->statusLabel.setText ("이전 세션 상태 복구됨",
+                                               juce::dontSendNotification);
+                    self->statusLabel.setColour (juce::Label::textColourId,
+                                                 juce::Colours::limegreen);
+                    PluginLogger::info ("crash recovery: state restored");
+                }
+            }
+            else
+            {
+                self->processorRef.dismissCrashRecovery();
+                PluginLogger::info ("crash recovery: user dismissed");
+            }
+        }));
 }
 
 // =============================================================================

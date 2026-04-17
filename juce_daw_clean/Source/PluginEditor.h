@@ -32,6 +32,8 @@
 #include "PluginUI/I18n.h"
 #include "PluginUI/PluginLogger.h"
 #include "PluginUI/TutorialOverlay.h"
+#include "PluginUI/SampleGallery.h"
+#include "PluginUI/PerformanceHUD.h"
 
 class MidiGPTEditor : public juce::AudioProcessorEditor,
                        public juce::FileDragAndDropTarget,  // YY5 drag-and-drop
@@ -136,6 +138,17 @@ private:
     std::unique_ptr<juce::PropertiesFile> settings;
     void applyLanguage();        // re-label all localised controls
     void maybeStartTutorial();   // first-run only
+
+    // AAA2 Report Issue / AAA3 sample gallery / AAA4 performance HUD
+    juce::TextButton reportButton   { "Report" };
+    juce::TextButton sampleButton   { "Sample" };
+    PerformanceHUD   perfHud;
+    bool             hudVisible { false };
+
+    void onReportIssue();
+    void onLoadSampleMenu();
+    void toggleHud();
+    void maybeOfferCrashRecovery();    // AAA1 — called during construction
 
     juce::Slider     temperatureSlider;
     juce::Label      temperatureLabel { {}, "Temperature" };
