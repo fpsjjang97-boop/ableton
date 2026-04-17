@@ -80,6 +80,13 @@ public:
         on success. */
     bool loadLora (const juce::String& name, int timeoutMs = 10000);
 
+    /** Asynchronously load a LoRA adapter. The callback receives (success,
+        errorMessage) on the message thread.  Prefer this over the sync
+        variant from UI code — LoRA load is ~1-5s and blocking the UI
+        stalls the whole plugin editor.  Sprint 33 XX4 addition. */
+    using LoraCallback = std::function<void (bool success, juce::String errorMessage)>;
+    void loadLoraAsync (const juce::String& name, LoraCallback callback);
+
     /** Asynchronously request a variation. The callback is invoked on
         the message thread when the result is ready (success or failure).
 

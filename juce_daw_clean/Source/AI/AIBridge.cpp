@@ -223,6 +223,55 @@ bool AIBridge::loadLora (const juce::String& name, int timeoutMs)
     return stream != nullptr && statusCode == 200;
 }
 
+void AIBridge::loadLoraAsync (const juce::String& name, LoraCallback callback)
+{
+    // Sprint 33 XX4: offload the blocking HTTP call to a detached thread
+    // so the plugin editor doesn't freeze while a LoRA loads (typical
+    // 1-5s). We use juce::Thread::launch (free function) rather than a
+    // persistent worker — load requests are rare (user toggling style)
+    // and never overlap generation, so the extra thread is fine.
+    //
+    // serverUrl is captured by value to avoid a dangling reference if the
+    // bridge is destroyed mid-request. The callback hops to the message
+    // thread via MessageManager::callAsync so UI updates are safe.
+    auto urlCopy = serverUrl;
+    juce::Thread::launch (
+        [urlCopy, name, callback = std::move (callback)]() mutable
+        {
+            juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+            obj->setProperty ("name", name);
+            auto body = juce::JSON::toString (juce::var (obj.get()));
+
+            auto url = urlCopy.getChildURL ("load_lora").withPOSTData (body);
+            auto options = juce::URL::InputStreamOptions (
+                                juce::URL::ParameterHandling::inPostData)
+                           .withExtraHeaders ("Content-Type: application/json\r\n")
+                           .withConnectionTimeoutMs (15000);   // LoRA load can be slow
+
+            int statusCode = 0;
+            auto stream = url.createInputStream (options.withStatusCode (&statusCode));
+
+            bool success = stream != nullptr && statusCode == 200;
+            juce::String err;
+            if (! success)
+            {
+                err = stream == nullptr
+                          ? juce::String ("LoRA 서버 연결 실패")
+                          : juce::String ("LoRA 로드 실패 (HTTP ")
+                              + juce::String (statusCode) + ")";
+            }
+
+            if (callback)
+            {
+                juce::MessageManager::callAsync (
+                    [cb = std::move (callback), success, err = std::move (err)]() mutable
+                    {
+                        cb (success, std::move (err));
+                    });
+            }
+        });
+}
+
 void AIBridge::requestVariationAsync (const juce::MidiMessageSequence& input,
                                       const GenerateParams& params,
                                       ResultCallback callback)

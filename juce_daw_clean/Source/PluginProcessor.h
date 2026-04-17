@@ -104,6 +104,14 @@ public:
     /** Returns the captured input size (for editor "notes captured" display). */
     int getCapturedNoteCount() const { return capturedNoteCount.load(); }
 
+    /** Thread-safe copy of the captured-input sequence (for editor visualisation).
+        Takes captureLock, so it's safe to call concurrently with processBlock. */
+    juce::MidiMessageSequence getCapturedInputCopy() const
+    {
+        const juce::ScopedLock lock (captureLock);
+        return capturedInput;   // MidiMessageSequence is copyable
+    }
+
     // Public parameter tree (exposed to host automation)
     juce::AudioProcessorValueTreeState parameters;
 
@@ -125,7 +133,8 @@ private:
     // ---- Captured-input buffer (from host MIDI in) --------------------------
     // CriticalSection because the UI thread reads it for serialisation while
     // the audio thread writes into it. Kept short: one lock per block start.
-    juce::CriticalSection captureLock;
+    // Mutable so const accessors (e.g. getCapturedInputCopy) can still lock.
+    mutable juce::CriticalSection captureLock;
     juce::MidiMessageSequence capturedInput;
     std::atomic<int> capturedNoteCount { 0 };
 
