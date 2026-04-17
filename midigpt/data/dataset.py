@@ -18,6 +18,16 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
+from midigpt.tokenizer.vocab import VOCAB
+
+
+# Minimum number of output-region label tokens that must survive truncation
+# for an SFT pair to be usable. Pairs below this threshold would produce a
+# loss computed from 0-3 tokens, which is both high-variance and (at 0) a
+# NaN (cross_entropy with all targets == ignore_index returns nan — 6차
+# 리포트 NaN 근본 원인). Conservative floor.
+MIN_SFT_OUTPUT_LABELS = 4
+
 
 class MidiDataset(Dataset):
     """Dataset for tokenized MIDI sequences.
@@ -33,12 +43,15 @@ class MidiDataset(Dataset):
         data_dir: str,
         mode: str = "pretrain",
         block_size: int = 2048,
-        pad_id: int = 0,
+        pad_id: int | None = None,
     ):
         self.data_dir = Path(data_dir)
         self.mode = mode
         self.block_size = block_size
-        self.pad_id = pad_id
+        # Single source of truth: vocab.pad_id (rules/05 패턴 H).
+        # Accepts an override for tests; None → use vocab.
+        self.pad_id = VOCAB.pad_id if pad_id is None else pad_id
+        self.sep_id = VOCAB.sep_id
 
         if mode == "pretrain":
             self._load_pretrain()
@@ -104,11 +117,17 @@ class MidiDataset(Dataset):
     def _load_sft(self):
         """Load SFT paired data from JSON files.
 
-        Two-layer defense against metadata files (e.g., ``summary.json``)
-        sharing the output directory (rules/05-bug-history.md — 패턴 A):
+        Three-layer defense (rules/05-bug-history.md — 패턴 A, 패턴 G):
           1. Glob pattern restricted to ``sft_*.json`` (producer convention).
           2. Schema validation: entries missing "input"/"output" are skipped
              with a warning rather than raising KeyError downstream.
+          3. Label-viability pre-filter (6차 리포트 NaN 대응):
+             If ``len(input_ids) >= block_size`` (or within
+             ``MIN_SFT_OUTPUT_LABELS`` of it), all output tokens are truncated
+             at __getitem__ time and every label position becomes ignore_index.
+             cross_entropy(..., ignore_index=pad_id) with zero surviving
+             targets returns NaN (0/0). Skip such pairs up front so the
+             DataLoader never yields a guaranteed-NaN batch.
         """
         self.sft_pairs: list[dict] = []
         sft_dir = self.data_dir / "sft"
@@ -118,6 +137,7 @@ class MidiDataset(Dataset):
 
         skipped_schema = 0
         skipped_parse = 0
+        skipped_labels = 0
         for json_file in sorted(sft_dir.glob("sft_*.json")):
             try:
                 with open(json_file, "r", encoding="utf-8") as f:
@@ -133,11 +153,29 @@ class MidiDataset(Dataset):
                 print(f"  [WARN] SFT skip (missing input/output) {json_file.name}")
                 continue
 
+            # Labels are tokens[1:] of length block_size. Positions
+            # 0..len(input_ids)-1 are masked (input-region). The output
+            # region has at most `block_size - len(input_ids)` slots, and
+            # holds at most `len(output_ids)` real tokens.
+            effective_output_labels = max(
+                0,
+                min(len(pair["output"]), self.block_size - len(pair["input"]))
+            )
+            if effective_output_labels < MIN_SFT_OUTPUT_LABELS:
+                skipped_labels += 1
+                print(f"  [WARN] SFT skip (labels<{MIN_SFT_OUTPUT_LABELS}) "
+                      f"{json_file.name}: "
+                      f"input={len(pair['input'])} output={len(pair['output'])} "
+                      f"effective={effective_output_labels}")
+                continue
+
             self.sft_pairs.append(pair)
 
-        if skipped_schema or skipped_parse:
+        if skipped_schema or skipped_parse or skipped_labels:
             print(f"  [INFO] SFT load: {len(self.sft_pairs)} ok, "
-                  f"{skipped_schema} schema-invalid, {skipped_parse} malformed")
+                  f"{skipped_schema} schema-invalid, "
+                  f"{skipped_parse} malformed, "
+                  f"{skipped_labels} truncated-too-much")
 
     def _load_dpo(self):
         """Load DPO preference data from JSON files.
@@ -214,15 +252,25 @@ class MidiDataset(Dataset):
         return {"input_ids": input_ids, "labels": labels}
 
     def _get_sft(self, idx: int) -> dict:
-        """Get an SFT sample: condition + original → variation."""
+        """Get an SFT sample: condition + original → variation.
+
+        Label masking: positions 0..len(input_ids)-1 predict the input/SEP
+        region and are set to pad_id so cross_entropy(ignore_index=pad_id)
+        skips them. The output region (labels[len(input_ids):]) is trained.
+
+        Pre-filter in _load_sft guarantees at least MIN_SFT_OUTPUT_LABELS
+        unmasked labels survive — so this sample can never produce the
+        0-valid-target NaN (6차 리포트 근본 원인).
+        """
         pair = self.sft_pairs[idx]
         # Expected format: {"input": [token_ids], "output": [token_ids]}
         input_ids = pair["input"]
         output_ids = pair["output"]
 
-        # Concatenate: input <SEP> output
-        # SEP token id = 3
-        combined = input_ids + [3] + output_ids
+        # Concatenate: input <SEP> output (SEP from single-source vocab —
+        # 패턴 H; prior hardcode of literal `3` was a latent bug waiting
+        # for vocab reorder.)
+        combined = input_ids + [self.sep_id] + output_ids
         combined = combined[:self.block_size + 1]
 
         # Pad
@@ -233,9 +281,10 @@ class MidiDataset(Dataset):
         input_tensor = tokens[:-1]
         labels = tokens[1:].clone()
 
-        # Mask loss for input portion (only train on output)
+        # Mask loss for input portion (only train on output).
+        # Masked positions set to pad_id → cross_entropy ignore_index.
         input_len = len(input_ids) + 1  # +1 for SEP
-        labels[:input_len - 1] = 0  # pad_id = 0, ignored in loss
+        labels[:input_len - 1] = self.pad_id
 
         return {"input_ids": input_tensor, "labels": labels}
 
@@ -248,7 +297,7 @@ class MidiDataset(Dataset):
         rejected = triple["rejected"]
 
         def _build_seq(response: list[int]) -> torch.Tensor:
-            combined = prompt + [3] + response  # SEP=3
+            combined = prompt + [self.sep_id] + response
             combined = combined[:self.block_size]
             if len(combined) < self.block_size:
                 combined += [self.pad_id] * (self.block_size - len(combined))

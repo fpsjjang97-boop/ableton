@@ -103,6 +103,8 @@ def train_sft(args):
     for epoch in range(args.epochs):
         model.train()
         epoch_loss = 0.0
+        valid_batches = 0
+        nan_batches = 0
 
         for batch_idx, batch in enumerate(loader):
             input_ids = batch["input_ids"].to(device)
@@ -118,21 +120,37 @@ def train_sft(args):
             if (batch_idx + 1) % args.grad_accum == 0 or (batch_idx + 1) == len(loader):
                 scaler.unscale_(optimizer)
                 nn.utils.clip_grad_norm_(lora_params, 1.0)
+                # scaler.step auto-skips when grads contain inf/nan; no manual guard needed.
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad(set_to_none=True)
 
             batch_loss = loss.item() * args.grad_accum
-            epoch_loss += batch_loss
+
+            # NaN-robust accumulation: dataset pre-filter should prevent
+            # zero-valid-target NaN, but fp16 overflow in attention can still
+            # produce transient NaN on individual batches. Exclude those from
+            # the running average so one bad batch doesn't poison the epoch
+            # metric (6차 리포트: Avg Loss: nan, Best loss: inf).
+            if math.isnan(batch_loss) or math.isinf(batch_loss):
+                nan_batches += 1
+            else:
+                epoch_loss += batch_loss
+                valid_batches += 1
 
             if (batch_idx + 1) % 10 == 0:
                 print(f"  Epoch {epoch+1} | Batch {batch_idx+1}/{len(loader)} | Loss {batch_loss:.4f}")
 
-        avg_loss = epoch_loss / max(len(loader), 1)
+        avg_loss = epoch_loss / max(valid_batches, 1)
         elapsed = time.time() - start_time
-        print(f"Epoch {epoch+1} | Avg Loss: {avg_loss:.4f} | Time: {elapsed/60:.1f}min")
+        print(f"Epoch {epoch+1} | Avg Loss: {avg_loss:.4f} | "
+              f"Valid: {valid_batches}/{len(loader)} | NaN: {nan_batches} | "
+              f"Time: {elapsed/60:.1f}min")
 
-        if avg_loss < best_loss:
+        # Require at least one valid batch; otherwise best_loss stays inf
+        # and checkpoint is not saved (honest failure signal instead of
+        # saving a randomly-initialised LoRA).
+        if valid_batches > 0 and avg_loss < best_loss:
             best_loss = avg_loss
             save_lora(model, output_dir / "lora_sft_best.bin")
             print(f"  Best LoRA saved (loss: {best_loss:.4f})")
