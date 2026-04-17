@@ -240,26 +240,106 @@ void MidiGPTProcessor::requestVariation()
                 return;
             }
 
-            // Schedule the generated sequence to start playing at the NEXT
-            // beat boundary after the current host position. That way the
-            // first note is audibly in sync even if generation finished
-            // mid-bar. Using "+1 beat" keeps latency small vs "+1 bar".
-            const double startBeat = std::floor (currentBeatAtBlockStart) + 1.0;
-            {
-                const juce::ScopedLock lock (scheduledLock);
-                scheduledOutput = result.generatedSequence;
-                scheduledOutput.updateMatchedPairs();
-                scheduledNextIndex = 0;
-                scheduledStartBeat = startBeat;
-            }
-            lastGenerated = result.generatedSequence;
-            hasScheduledPlayback.store (true);
+            // YY4: push current lastGenerated to undo stack BEFORE replacing.
+            // Fresh generation implicitly invalidates the redo stack (branching
+            // off an older state).
+            if (lastGenerated.getNumEvents() > 0)
+                pushHistory (lastGenerated);
+            redoStack.clear();
+
+            installGeneratedSequence (result.generatedSequence);
 
             fireStatus (GenerationStatus::Ready,
                         juce::String ("생성 완료 — ")
                           + juce::String (result.generatedSequence.getNumEvents())
                           + " 이벤트");
         });
+}
+
+// -----------------------------------------------------------------------------
+// YY4 — shared helper: schedule + store a generated sequence
+// -----------------------------------------------------------------------------
+void MidiGPTProcessor::installGeneratedSequence (juce::MidiMessageSequence seq)
+{
+    // Schedule playback at the next integer beat boundary so the first note
+    // lands audibly in sync (cf. WW4 rationale).
+    const double startBeat = std::floor (currentBeatAtBlockStart) + 1.0;
+    {
+        const juce::ScopedLock lock (scheduledLock);
+        scheduledOutput = seq;
+        scheduledOutput.updateMatchedPairs();
+        scheduledNextIndex = 0;
+        scheduledStartBeat = startBeat;
+    }
+    lastGenerated = std::move (seq);
+    hasScheduledPlayback.store (true);
+}
+
+// -----------------------------------------------------------------------------
+// YY4 — undo / redo
+// -----------------------------------------------------------------------------
+void MidiGPTProcessor::pushHistory (juce::MidiMessageSequence replacedGeneration)
+{
+    undoStack.push_back (std::move (replacedGeneration));
+    if ((int) undoStack.size() > kHistoryLimit)
+        undoStack.erase (undoStack.begin());
+}
+
+bool MidiGPTProcessor::undoGeneration()
+{
+    if (undoStack.empty()) return false;
+
+    // Pop the top of undo → install; current lastGenerated goes onto redo.
+    auto previous = std::move (undoStack.back());
+    undoStack.pop_back();
+
+    if (lastGenerated.getNumEvents() > 0)
+    {
+        redoStack.push_back (lastGenerated);
+        if ((int) redoStack.size() > kHistoryLimit)
+            redoStack.erase (redoStack.begin());
+    }
+
+    installGeneratedSequence (std::move (previous));
+    fireStatus (GenerationStatus::Ready,
+                juce::String ("Undo — 이전 생성 결과 복원"));
+    return true;
+}
+
+bool MidiGPTProcessor::redoGeneration()
+{
+    if (redoStack.empty()) return false;
+
+    auto next = std::move (redoStack.back());
+    redoStack.pop_back();
+
+    if (lastGenerated.getNumEvents() > 0)
+    {
+        undoStack.push_back (lastGenerated);
+        if ((int) undoStack.size() > kHistoryLimit)
+            undoStack.erase (undoStack.begin());
+    }
+
+    installGeneratedSequence (std::move (next));
+    fireStatus (GenerationStatus::Ready,
+                juce::String ("Redo — 다음 생성 결과 복원"));
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// YY5 — load external MIDI as the captured-input prompt (drag-and-drop)
+// -----------------------------------------------------------------------------
+void MidiGPTProcessor::loadAsCapturedInput (const juce::MidiMessageSequence& seq)
+{
+    const juce::ScopedLock lock (captureLock);
+    capturedInput = seq;
+    capturedInput.updateMatchedPairs();
+
+    int noteCount = 0;
+    for (int i = 0; i < capturedInput.getNumEvents(); ++i)
+        if (capturedInput.getEventPointer (i)->message.isNoteOn())
+            ++noteCount;
+    capturedNoteCount.store (noteCount);
 }
 
 void MidiGPTProcessor::clearCapturedInput()

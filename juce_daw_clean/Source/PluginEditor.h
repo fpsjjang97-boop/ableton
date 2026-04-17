@@ -28,9 +28,12 @@
 #include "PluginProcessor.h"
 #include "AI/AIBridge.h"
 #include "PluginUI/MiniPianoRoll.h"
+#include "PluginUI/PresetManager.h"
 
 class MidiGPTEditor : public juce::AudioProcessorEditor,
-                       private juce::Timer
+                       public juce::FileDragAndDropTarget,  // YY5 drag-and-drop
+                       private juce::Timer,
+                       private juce::KeyListener             // YY2 shortcuts
 {
 public:
     explicit MidiGPTEditor (MidiGPTProcessor&);
@@ -39,12 +42,22 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    // YY5 — FileDragAndDropTarget
+    bool isInterestedInFileDrag (const juce::StringArray& files) override;
+    void filesDropped (const juce::StringArray& files, int x, int y) override;
+    void fileDragEnter (const juce::StringArray&, int, int) override { dragHover = true;  repaint(); }
+    void fileDragExit  (const juce::StringArray&)                    override { dragHover = false; repaint(); }
+
 private:
     // juce::Timer — server health polling + piano roll refresh
     void timerCallback() override;
 
+    // juce::KeyListener — YY2 shortcuts
+    bool keyPressed (const juce::KeyPress& key, juce::Component* origin) override;
+
     void handleStatus (MidiGPTProcessor::GenerationStatus st, juce::String msg);
     void refreshPianoRolls();       // repaint input/output panes from current state
+    void applyUndoRedoEnable();     // enable/disable undo/redo buttons from history depth
 
     // --- XX3 Export MIDI --------------------------------------------------
     void onExportMidi();
@@ -61,6 +74,21 @@ private:
 
     // --- XX6 Server Info --------------------------------------------------
     void onServerInfo();
+
+    // --- YY3 Preset manager UI -------------------------------------------
+    void onSavePreset();
+    void onLoadPresetSelected();
+    void onDeletePreset();
+    void refreshPresetCombo();
+    std::unique_ptr<PresetManager> presetManager;
+
+    // --- YY5 drag-and-drop visual feedback -------------------------------
+    bool dragHover { false };
+
+    // --- YY6 Theme toggle ------------------------------------------------
+    void applyTheme (bool dark);
+    bool darkTheme { true };
+    std::unique_ptr<juce::LookAndFeel_V4> customLookAndFeel;
 
     MidiGPTProcessor& processorRef;
 
@@ -81,6 +109,18 @@ private:
     juce::TextButton clearButton    { "Clear Input" };
     juce::TextButton exportButton   { "Export MIDI" };
     juce::TextButton infoButton     { "Server Info" };
+
+    // YY4 Undo/Redo buttons
+    juce::TextButton undoButton     { "Undo" };
+    juce::TextButton redoButton     { "Redo" };
+
+    // YY3 Preset combo + save/delete
+    juce::ComboBox   presetBox;
+    juce::TextButton savePresetButton   { "Save Preset" };
+    juce::TextButton deletePresetButton { "Delete" };
+
+    // YY6 Theme toggle (text reflects CURRENT theme; click cycles)
+    juce::TextButton themeButton    { "Dark" };
 
     juce::Slider     temperatureSlider;
     juce::Label      temperatureLabel { {}, "Temperature" };

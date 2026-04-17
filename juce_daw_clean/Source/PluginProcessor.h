@@ -112,6 +112,29 @@ public:
         return capturedInput;   // MidiMessageSequence is copyable
     }
 
+    // =========================================================================
+    // Sprint 34 YY5 — load an external MIDI sequence as the current prompt
+    // =========================================================================
+    /** Replace the captured-input buffer with an externally-supplied sequence
+        (e.g. drag-and-dropped .mid file). Timestamps should already be in
+        beats. Called on the message thread. */
+    void loadAsCapturedInput (const juce::MidiMessageSequence& seq);
+
+    // =========================================================================
+    // Sprint 34 YY4 — generation-result undo/redo history
+    // =========================================================================
+    /** Push the previous lastGenerated onto history before replacing it.
+        Keeps at most ``kHistoryLimit`` entries. Called internally on
+        successful generation. */
+    void pushHistory (juce::MidiMessageSequence replacedGeneration);
+
+    /** Restore a previous generation. Returns true if an older entry was
+        available. Safe to call from the message thread. */
+    bool undoGeneration();
+    bool redoGeneration();
+    int  undoDepth() const { return static_cast<int> (undoStack.size()); }
+    int  redoDepth() const { return static_cast<int> (redoStack.size()); }
+
     // Public parameter tree (exposed to host automation)
     juce::AudioProcessorValueTreeState parameters;
 
@@ -150,10 +173,18 @@ private:
     // ---- Last finished generation (persisted via getStateInformation) -------
     juce::MidiMessageSequence lastGenerated;
 
+    // ---- YY4 Undo / redo history of lastGenerated ---------------------------
+    // History is message-thread only — push happens in the AIBridge result
+    // callback and undo is driven by the editor. No audio-thread access.
+    static constexpr int kHistoryLimit = 10;
+    std::vector<juce::MidiMessageSequence> undoStack;
+    std::vector<juce::MidiMessageSequence> redoStack;
+
     // ---- Editor feedback ----------------------------------------------------
     StatusCallback statusCallback;
 
     void fireStatus (GenerationStatus st, juce::String msg);
+    void installGeneratedSequence (juce::MidiMessageSequence seq);   // shared by generate + undo
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiGPTProcessor)
 };

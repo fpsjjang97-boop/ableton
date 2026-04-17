@@ -165,9 +165,10 @@ target_sources(MidiGPTPlugin PRIVATE
     Source/PluginEditor.h
     Source/PluginEditor.cpp
 
-    # Plugin-local UI components (Sprint 33 XX1~XX6)
+    # Plugin-local UI components (Sprint 33 XX1~XX6, Sprint 34 YY3)
     Source/PluginUI/MiniPianoRoll.h
     Source/PluginUI/MiniPianoRoll.cpp
+    Source/PluginUI/PresetManager.h
 
     # Shared with standalone — HTTP client to inference_server.py
     Source/AI/AIBridge.h
