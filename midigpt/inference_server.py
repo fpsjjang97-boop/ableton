@@ -169,9 +169,11 @@ async def generate(
     _ensure_loaded()
 
     # --- Save uploaded MIDI to a unique temporary file (thread-safe) -------
+    # Sprint 37.3: 기존엔 REPO_ROOT 에 mktemp — 프로세스가 크래시하면 .mid
+    # 파편이 레포에 남아 git status 를 더럽혔다. 시스템 임시 디렉터리로 이관.
     import tempfile as _tmpmod
-    tmp_in = Path(_tmpmod.mktemp(suffix="_in.mid", dir=str(REPO_ROOT)))
-    tmp_out = Path(_tmpmod.mktemp(suffix="_out.mid", dir=str(REPO_ROOT)))
+    tmp_in = Path(_tmpmod.mktemp(suffix="_in.mid"))
+    tmp_out = Path(_tmpmod.mktemp(suffix="_out.mid"))
     try:
         data = await midi.read()
         tmp_in.write_bytes(data)
@@ -242,8 +244,8 @@ def generate_json(req: GenerateJsonRequest):
     _ensure_loaded()
 
     import tempfile as _tmpmod
-    tmp_in  = Path(_tmpmod.mktemp(suffix="_in.mid", dir=str(REPO_ROOT)))
-    tmp_out = Path(_tmpmod.mktemp(suffix="_out.mid", dir=str(REPO_ROOT)))
+    tmp_in  = Path(_tmpmod.mktemp(suffix="_in.mid"))
+    tmp_out = Path(_tmpmod.mktemp(suffix="_out.mid"))
 
     try:
         # Decode base64 MIDI -> write to temp file for pretty_midi
@@ -351,8 +353,8 @@ def audio_to_midi(req: AudioToMidiRequest):
 
     import tempfile as _tmpmod
     suffix = Path(req.filename).suffix or ".wav"
-    tmp_audio = Path(_tmpmod.mktemp(suffix=suffix, dir=str(REPO_ROOT)))
-    tmp_out_dir = Path(_tmpmod.mkdtemp(prefix="a2m_", dir=str(REPO_ROOT)))
+    tmp_audio = Path(_tmpmod.mktemp(suffix=suffix))
+    tmp_out_dir = Path(_tmpmod.mkdtemp(prefix="a2m_"))
 
     try:
         try:

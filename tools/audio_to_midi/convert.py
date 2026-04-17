@@ -184,9 +184,15 @@ def check_deps():
 def separate_audio(
     audio_path: Path,
     output_dir: Path,
-    model_name: str = "htdemucs",
+    model_name: str = "htdemucs_6s",
 ) -> dict[str, Path]:
-    """Demucs로 음원 분리. vocals/drums/bass/other 4트랙 반환."""
+    """Demucs로 음원 분리.
+
+    기본 모델은 htdemucs_6s (6 stems: vocals/drums/bass/guitar/piano/other).
+    Sprint 37.3: 이전 기본값 htdemucs 는 4-stem (guitar/piano 누락) — CLI
+    와 API 기본값이 불일치해 서버 경로에서 piano/guitar 가 항상 건너뛰어졌다.
+    이제 convert_single / separate_audio 모두 6s 로 통일.
+    """
     print(f"\n[1/3] 음원 분리 (Demucs {model_name})...")
     print(f"  입력: {audio_path.name}")
 
@@ -636,6 +642,13 @@ def split_other_by_register(
         import librosa
         import soundfile as sf
 
+        # Sprint 37.3: output_dir must exist before sf.write — previously
+        # missing mkdir caused "Error opening <path>: System error" whenever
+        # a stem was split from a fresh tmp dir (observed in /audio_to_midi
+        # server log). Fallback caught it but we lost the strings/brass
+        # split silently. Create parent dir up front.
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         y, sr = librosa.load(str(wav_path), sr=44100, mono=False)
         if y.ndim == 1:
             y = np.array([y, y])  # mono to stereo
@@ -739,7 +752,7 @@ def convert_single(
     output_dir: Path,
     keep_vocals: bool = False,
     no_merge: bool = False,
-    demucs_model: str = "htdemucs",
+    demucs_model: str = "htdemucs_6s",
 ) -> Path | None:
     """단일 파일 변환: MP3/WAV → MIDI."""
     song_name = audio_path.stem
@@ -787,7 +800,7 @@ def convert_batch(
     output_dir: Path,
     keep_vocals: bool = False,
     no_merge: bool = False,
-    demucs_model: str = "htdemucs",
+    demucs_model: str = "htdemucs_6s",
 ) -> list[Path]:
     """폴더 내 모든 오디오 파일 일괄 변환."""
     audio_files = sorted([
