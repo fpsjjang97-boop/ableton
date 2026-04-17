@@ -80,6 +80,12 @@ echo   Build complete
 echo ============================================================================
 echo.
 
+REM --- Smoke artefact check (Sprint 35 ZZ2) ---
+call "%~dp0smoke.bat" %BUILD_TYPE%
+if errorlevel 1 (
+    echo [WARN] smoke reported missing artefacts.
+)
+
 REM --- Show output ---
 if exist "build\MidiGPTPlugin_artefacts\%BUILD_TYPE%\VST3\MidiGPT.vst3" (
     echo   VST3:       build\MidiGPTPlugin_artefacts\%BUILD_TYPE%\VST3\MidiGPT.vst3
