@@ -1,10 +1,17 @@
-# MidiGPT — Audio2MIDI optional dependencies
+# MidiGPT - Audio2MIDI optional dependencies
 #
 # Install: pip install -r requirements-audio2midi.txt
-# or run: scripts/setup_audio2midi.bat  (Windows) / .sh (Linux/macOS)
+# or run: scripts/setup_audio2midi.bat (Windows) / .sh (Linux/macOS)
+#
+# IMPORTANT - Python version constraint:
+#   basic-pitch 0.2.5 pins numpy<1.24 which blocks Python 3.13.
+#   Supported: Python 3.10 / 3.11.
+#   If you have 3.13, use `py -3.10 -m pip install -r ...` with 3.10 installed.
 #
 # Size: ~3-5 GB on disk (demucs + basic-pitch models download on first use).
-# Not required for core MIDI generation — only for the drag-an-audio-file path.
+# Not required for core MIDI generation - only for the drag-an-audio-file path.
+#
+# (File kept ASCII-only to avoid cp949 decode issues on old pip on Windows.)
 
 # Source separation (htdemucs_6s: vocals/drums/bass/guitar/piano/other)
 demucs>=4.0.0
