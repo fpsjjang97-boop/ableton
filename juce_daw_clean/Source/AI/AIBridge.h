@@ -76,6 +76,13 @@ public:
     /** Get server status as a juce::var (parsed JSON). */
     juce::var getStatus (int timeoutMs = 2000);
 
+    /** Sprint 37 이슈1 — Detailed capability probe.
+        Returns a juce::var (parsed JSON) from /preflight, or an invalid
+        var (isVoid) if the server is unreachable. The VST editor uses
+        this before Audio2MIDI to show a targeted "missing dep X" message
+        instead of a generic 503 after the user waits for a minute. */
+    juce::var getPreflight (int timeoutMs = 2000);
+
     /** Synchronously load a LoRA adapter on the server. Returns true
         on success. */
     bool loadLora (const juce::String& name, int timeoutMs = 10000);

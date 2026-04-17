@@ -97,6 +97,38 @@ def health():
     }
 
 
+@app.get("/preflight")
+def preflight():
+    """Detailed capability check. The VST plugin calls this once before
+    offering Audio2MIDI so it can show a specific "missing X" message
+    rather than a generic 503 when the user drops an audio file.
+
+    Keys:
+      model_loaded          — MidiGPT weights loaded (generation path)
+      audio2midi_available  — convert.py imports succeeded
+      onsets_frames         — Google Magenta O&F piano transcription available
+      adtof                 — ADTOF drum transcription available
+      missing               — list of pip packages that would fix audio2midi_available
+    """
+    info = {
+        "model_loaded": _inference is not None and _inference.is_loaded,
+        "audio2midi_available": False,
+        "onsets_frames": False,
+        "adtof": False,
+        "missing": [],
+    }
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "tools" / "audio_to_midi"))
+        import convert as a2m_convert  # type: ignore
+        info["audio2midi_available"] = not bool(a2m_convert.MISSING)
+        info["missing"] = list(a2m_convert.MISSING)
+        info["onsets_frames"] = getattr(a2m_convert, "_OAF_AVAILABLE", False)
+        info["adtof"] = getattr(a2m_convert, "_ADTOF_AVAILABLE", False)
+    except ImportError as e:
+        info["missing"] = ["convert.py import failed: " + str(e)]
+    return info
+
+
 @app.get("/status")
 def status():
     if _inference is None:
@@ -302,8 +334,18 @@ def audio_to_midi(req: AudioToMidiRequest):
         raise HTTPException(
             status_code=503,
             detail=(
-                f"Audio2MIDI 의존성 누락: {e}. "
-                f"서버에서 `pip install demucs basic-pitch librosa` 실행 필요."
+                f"Audio2MIDI 모듈 import 실패: {e}. "
+                f"`python scripts/doctor.py` 로 의존성 상태 확인 + "
+                f"`scripts/setup_audio2midi.bat` (Windows) / .sh (Linux) 로 자동 설치 가능."
+            ),
+        )
+    if a2m_convert.MISSING:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Audio2MIDI 의존성 누락: {', '.join(a2m_convert.MISSING)}. "
+                f"`pip install {' '.join(a2m_convert.MISSING)}` 또는 "
+                f"scripts/setup_audio2midi.bat 실행."
             ),
         )
 

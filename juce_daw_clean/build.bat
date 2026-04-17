@@ -32,8 +32,21 @@ if "%1"=="clean" (
     exit /b 0
 )
 
+REM Sprint 37 이슈4 — Optional auto-install of VST3 bundle to the
+REM system-wide VST3 directory so DAWs pick it up without manual copy.
+set INSTALL_VST3=0
+if /i "%1"=="--install" (
+    set INSTALL_VST3=1
+    shift /1
+)
+if /i "%2"=="--install" set INSTALL_VST3=1
+
 set BUILD_TYPE=%1
 if "%BUILD_TYPE%"=="" set BUILD_TYPE=Release
+if /i "%BUILD_TYPE%"=="--install" (
+    set BUILD_TYPE=Release
+    set INSTALL_VST3=1
+)
 
 echo.
 echo ============================================================================
@@ -84,6 +97,25 @@ REM --- Smoke artefact check (Sprint 35 ZZ2) ---
 call "%~dp0smoke.bat" %BUILD_TYPE%
 if errorlevel 1 (
     echo [WARN] smoke reported missing artefacts.
+)
+
+REM --- Sprint 37 이슈4: optional system VST3 install ---
+if "%INSTALL_VST3%"=="1" (
+    echo.
+    echo [install] copying VST3 to "%ProgramFiles%\Common Files\VST3\"...
+    set "VST3_SRC=build\MidiGPTPlugin_artefacts\%BUILD_TYPE%\VST3\MidiGPT.vst3"
+    set "VST3_DST=%ProgramFiles%\Common Files\VST3\MidiGPT.vst3"
+    if exist "%VST3_SRC%" (
+        REM /E = subdirs, /I = assume dst is dir, /Y = no prompt
+        xcopy /E /I /Y "%VST3_SRC%" "%VST3_DST%" >nul
+        if errorlevel 1 (
+            echo   [WARN] 관리자 권한 필요 - 우클릭 "관리자 권한으로 실행" 후 재시도.
+        ) else (
+            echo   [install] OK - Cubase/Ableton/Reaper 에서 자동 인식됨.
+        )
+    ) else (
+        echo   [WARN] VST3 source not found: %VST3_SRC%
+    )
 )
 
 REM --- Show output ---

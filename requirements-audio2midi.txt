@@ -1,0 +1,32 @@
+# MidiGPT — Audio2MIDI optional dependencies
+#
+# Install: pip install -r requirements-audio2midi.txt
+# or run: scripts/setup_audio2midi.bat  (Windows) / .sh (Linux/macOS)
+#
+# Size: ~3-5 GB on disk (demucs + basic-pitch models download on first use).
+# Not required for core MIDI generation — only for the drag-an-audio-file path.
+
+# Source separation (htdemucs_6s: vocals/drums/bass/guitar/piano/other)
+demucs>=4.0.0
+
+# Polyphonic pitch estimation (Spotify Basic Pitch)
+basic-pitch>=0.2.5
+
+# Audio I/O + DSP utilities
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# MIDI reading/writing
+pretty_midi>=0.2.10
+mido>=1.3.0
+
+# Numeric backend
+numpy>=1.24.0
+
+# --- Tier 1 upgrades (optional, install separately if desired) ---
+# Piano-specific SOTA transcription:
+#   magenta>=2.1.4        # heavy; TF1-based, ~1.5GB
+# Drum-specific SOTA transcription:
+#   adtof>=1.0.0          # small; learned drum classifier
+#
+# Install prompts + runs without these (falls back to Basic Pitch / librosa).

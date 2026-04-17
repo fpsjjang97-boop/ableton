@@ -970,6 +970,30 @@ void MidiGPTEditor::filesDropped (const juce::StringArray& files, int /*x*/, int
     // --- ZZ1b Audio2MIDI path (beta) ----------------------------------------
     if (midiFile == juce::File() && audioFile != juce::File() && audioFile.existsAsFile())
     {
+        // Sprint 37 이슈1 — preflight before we waste 30-120s waiting.
+        // A failing preflight gives us a specific missing-dep message NOW
+        // instead of after the user watches a spinner and gives up.
+        auto pf = healthBridge.getPreflight (2000);
+        if (! pf.isObject())
+        {
+            statusLabel.setText (
+                "Audio2MIDI 사용 불가: 서버에 연결할 수 없습니다. "
+                "`python -m midigpt.inference_server` 실행 확인.",
+                juce::dontSendNotification);
+            statusLabel.setColour (juce::Label::textColourId, juce::Colours::red);
+            return;
+        }
+        if (! (bool) pf.getProperty ("audio2midi_available", false))
+        {
+            auto missing = pf.getProperty ("missing", juce::var()).toString();
+            statusLabel.setText (
+                juce::String ("Audio2MIDI 의존성 누락: ") + missing
+                  + ".  `scripts/setup_audio2midi.bat` 실행 필요.",
+                juce::dontSendNotification);
+            statusLabel.setColour (juce::Label::textColourId, juce::Colours::red);
+            return;
+        }
+
         juce::MemoryBlock audioBytes;
         if (! audioFile.loadFileAsData (audioBytes))
         {

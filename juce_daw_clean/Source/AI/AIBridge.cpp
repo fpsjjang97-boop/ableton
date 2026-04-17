@@ -206,6 +206,17 @@ juce::var AIBridge::getStatus (int timeoutMs)
     return juce::JSON::parse (stream->readEntireStreamAsString());
 }
 
+juce::var AIBridge::getPreflight (int timeoutMs)
+{
+    auto url = serverUrl.getChildURL ("preflight");
+    auto options = juce::URL::InputStreamOptions (
+                        juce::URL::ParameterHandling::inAddress)
+                   .withConnectionTimeoutMs (timeoutMs);
+    auto stream = url.createInputStream (options);
+    if (stream == nullptr) return {};
+    return juce::JSON::parse (stream->readEntireStreamAsString());
+}
+
 bool AIBridge::loadLora (const juce::String& name, int timeoutMs)
 {
     juce::DynamicObject::Ptr obj = new juce::DynamicObject();
