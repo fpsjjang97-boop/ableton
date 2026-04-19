@@ -100,6 +100,9 @@ checkpoints/soundfont/
 *.sf2
 *.sf3
 
+# Sprint 46 JJJ1 — MIDI test fixtures (make_test_midi.py --all 로 재생성)
+fixtures/
+
 # Training / server run logs and ephemeral state
 pipeline_run.log
 pipeline_pid.txt
