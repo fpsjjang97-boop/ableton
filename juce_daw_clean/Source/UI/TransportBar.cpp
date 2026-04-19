@@ -7,6 +7,23 @@
 TransportBar::TransportBar(AudioEngine& engine)
     : audioEngine(engine)
 {
+    // Sprint 47 KKK2 — 툴팁 일괄 (TooltipWindow 가 MainWindow 레벨에서 active 하면
+    // 자동 표시. 신규 위젯 추가 시 setTooltip() 호출로 사용자 도움말 통일).
+    rewindButton.setTooltip("맨 앞으로 (Home)");
+    playButton.setTooltip("재생 (Space). 정지 상태에서는 맨 앞에서 시작");
+    stopButton.setTooltip("정지 + 맨 앞으로 (Ctrl+.)");
+    recordButton.setTooltip("녹음 arm — 첫 트랙에 1 bar count-in 후 녹음 (R)");
+    loopButton.setTooltip("루프 토글 (Enter)");
+    metroButton.setTooltip("메트로놈 on/off (Ctrl+M)");
+    tempoSlider.setTooltip("BPM — 20~300, 0.1 단위");
+    positionLabel.setTooltip("현재 위치 (bar.beat.tick)");
+    timeLabel.setTooltip("경과 시간 (mm:ss.ms)");
+    keySelector.setTooltip("키 — 생성 시 harmonic 제약과 step seq 스케일 기반");
+    scaleSelector.setTooltip("스케일 — major/minor/mixolydian 등");
+    snapSelector.setTooltip("퀀타이즈 그리드");
+    countInSelector.setTooltip("녹음 시작 전 대기 마디 수 (Ctrl+Shift+M 로 순환)");
+    tapButton.setTooltip("두 번 이상 탭해서 BPM 감지");
+
     rewindButton.onClick  = [this] { audioEngine.rewind(); };
     addAndMakeVisible(rewindButton);
 

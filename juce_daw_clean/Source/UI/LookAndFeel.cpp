@@ -228,6 +228,66 @@ void MetallicLookAndFeel::drawScrollbar(juce::Graphics& g, juce::ScrollBar&,
 }
 
 // ---------------------------------------------------------------------------
+// Sprint 47 KKK4 — static paint helpers (기존 UI 변경 없이 추가만)
+void MetallicLookAndFeel::drawPanelBackground(juce::Graphics& g,
+                                               juce::Rectangle<float> bounds,
+                                               float cornerRadius)
+{
+    g.setColour(juce::Colour(bgPanel));
+    g.fillRoundedRectangle(bounds, cornerRadius);
+
+    g.setColour(juce::Colour(border));
+    g.drawRoundedRectangle(bounds.reduced(0.5f), cornerRadius, 0.5f);
+}
+
+void MetallicLookAndFeel::drawSectionHeader(juce::Graphics& g,
+                                             juce::Rectangle<int> bounds,
+                                             const juce::String& text,
+                                             float fontSize)
+{
+    g.setColour(juce::Colour(bgHeader));
+    g.fillRect(bounds);
+
+    // Bottom divider — accent 로 섹션 경계 강조
+    g.setColour(juce::Colour(border));
+    g.drawLine(static_cast<float>(bounds.getX()),
+               static_cast<float>(bounds.getBottom() - 1),
+               static_cast<float>(bounds.getRight()),
+               static_cast<float>(bounds.getBottom() - 1),
+               1.0f);
+
+    g.setFont(juce::Font(fontSize, juce::Font::bold));
+    g.setColour(juce::Colour(textPrimary));
+    g.drawFittedText(text, bounds.reduced(spacingM, 0),
+                     juce::Justification::centredLeft, 1);
+}
+
+void MetallicLookAndFeel::drawDivider(juce::Graphics& g,
+                                       juce::Rectangle<int> bounds,
+                                       bool vertical)
+{
+    g.setColour(juce::Colour(border));
+    if (vertical)
+    {
+        int x = bounds.getCentreX();
+        g.drawLine(static_cast<float>(x),
+                   static_cast<float>(bounds.getY()),
+                   static_cast<float>(x),
+                   static_cast<float>(bounds.getBottom()),
+                   1.0f);
+    }
+    else
+    {
+        int y = bounds.getCentreY();
+        g.drawLine(static_cast<float>(bounds.getX()),
+                   static_cast<float>(y),
+                   static_cast<float>(bounds.getRight()),
+                   static_cast<float>(y),
+                   1.0f);
+    }
+}
+
+// ---------------------------------------------------------------------------
 void MetallicLookAndFeel::drawTabButton(juce::TabBarButton& btn, juce::Graphics& g,
                                          bool over, bool /*down*/)
 {
