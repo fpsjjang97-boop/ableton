@@ -29,7 +29,10 @@ from ..model import MidiGPTConfig, MidiGPT
 from ..tokenizer import MidiVocab, MidiEncoder, MidiDecoder
 from ..tokenizer.vocab import VOCAB, NOTE_NAMES, PITCH_MIN, PITCH_MAX
 from ..tokenizer.encoder import SongMeta, ChordEvent
-from ..training.lora import LoRAConfig, apply_lora, load_lora, merge_lora
+from ..training.lora import (
+    LoRAConfig, apply_lora, load_lora, merge_lora,
+    load_lora_weights_only, copy_weights_into_model, zero_lora_weights,
+)
 from .constrained import MidiGrammarFSM
 
 
@@ -254,6 +257,12 @@ class MidiGPTInference:
         self.model_config: MidiGPTConfig | None = None
         self._active_lora: str | None = None
 
+        # Sprint 43 GGG2 — 다중 LoRA 레지스트리.
+        # register_lora 가 파일 → dict preload, activate_lora 가 dict → live 복사.
+        # 기존 load_lora 는 register + activate 조합으로 호환 유지.
+        self._lora_registry: dict[str, dict[str, torch.Tensor]] = {}
+        self._lora_structure_applied: bool = False  # apply_lora 한 번만 호출
+
         if config.model_path and Path(config.model_path).exists():
             self.load_model(config.model_path)
 
@@ -301,20 +310,17 @@ class MidiGPTInference:
         else:
             print("MidiGPT: Model loaded (FP32)")
 
-    def load_lora(self, name: str, path: str | None = None):
-        """Load and activate a LoRA adapter."""
-        if self.model is None:
-            raise RuntimeError("Base model not loaded")
+    def _ensure_lora_structure(self, reference_path: str) -> None:
+        """apply_lora 를 한 번만 호출해 LoRALinear 레이어를 주입.
 
-        if path is None and self.config.lora_paths:
-            path = self.config.lora_paths.get(name)
-
-        if path is None or not Path(path).exists():
-            print(f"MidiGPT: LoRA '{name}' not found at {path}")
+        LoRA 파일에서 r/alpha 를 읽어 모델 기본값과 병합. 구조 주입 후에는
+        _lora_structure_applied=True 로 잠금 — 이후 LoRA 는 weight 만 교체.
+        (다른 r/alpha LoRA 섞어 로드 금지 — copy_weights_into_model 에서 shape 검증.)
+        """
+        if self._lora_structure_applied:
             return
-
-        # Try to read LoRA config from checkpoint; fall back to model defaults
-        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+        checkpoint = torch.load(reference_path, map_location=self.device,
+                                weights_only=False)
         if isinstance(checkpoint, dict) and "lora_config" in checkpoint:
             saved_cfg = checkpoint["lora_config"]
             lora_config = LoRAConfig(
@@ -330,10 +336,55 @@ class MidiGPTInference:
                 target_modules=self.model_config.lora_target_modules,
             )
         apply_lora(self.model, lora_config)
-        load_lora(self.model, path)
+        # 방금 apply 한 LoRA 는 random 초기화 — activate 되기 전까지 zero 로 하여
+        # base 모델 forward 결과와 동일하게 유지.
+        zero_lora_weights(self.model)
+        self._lora_structure_applied = True
+        print(f"MidiGPT: LoRA 구조 주입 (r={lora_config.r})")
+
+    def register_lora(self, name: str, path: str | None = None) -> None:
+        """파일에서 LoRA weights 만 메모리로 로드 (모델은 unchanged).
+
+        Sprint 43 GGG2. 여러 LoRA 를 미리 등록해 두고 `activate_lora(name)` 로
+        빠르게 전환할 수 있다. 첫 register 에서만 apply_lora 호출.
+        """
+        if self.model is None:
+            raise RuntimeError("Base model not loaded")
+        if path is None and self.config.lora_paths:
+            path = self.config.lora_paths.get(name)
+        if path is None or not Path(path).exists():
+            print(f"MidiGPT: LoRA '{name}' not found at {path}")
+            return
+
+        self._ensure_lora_structure(path)
+        self._lora_registry[name] = load_lora_weights_only(path)
+        print(f"MidiGPT: LoRA '{name}' registered (메모리 preload)")
+
+    def activate_lora(self, name: str | None) -> None:
+        """등록된 LoRA 로 live weights 교체. name=None 이면 deactivate (zero)."""
+        if self.model is None:
+            raise RuntimeError("Base model not loaded")
+        if name is None:
+            if self._lora_structure_applied:
+                zero_lora_weights(self.model)
+            self._active_lora = None
+            print("MidiGPT: LoRA deactivated (identity)")
+            return
+        if name not in self._lora_registry:
+            raise KeyError(f"LoRA '{name}' 등록 안 됨 — register_lora 선행 필요")
+        copied = copy_weights_into_model(self.model, self._lora_registry[name])
         self._active_lora = name
         self.model.eval()
-        print(f"MidiGPT: LoRA '{name}' loaded (r={lora_config.r})")
+        print(f"MidiGPT: LoRA '{name}' activated ({copied} layer pairs)")
+
+    def registered_loras(self) -> list[str]:
+        return sorted(self._lora_registry.keys())
+
+    def load_lora(self, name: str, path: str | None = None):
+        """Register + activate — 기존 API 호환 유지."""
+        self.register_lora(name, path)
+        if name in self._lora_registry:
+            self.activate_lora(name)
 
     # ------------------------------------------------------------------
     # Harmonic constraint helpers

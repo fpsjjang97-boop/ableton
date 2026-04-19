@@ -982,6 +982,7 @@ def convert_single(
     keep_vocals: bool = False,
     no_merge: bool = False,
     demucs_model: str = "htdemucs_6s",
+    refine: bool = False,
 ) -> Path | None:
     """단일 파일 변환: MP3/WAV → MIDI."""
     song_name = audio_path.stem
@@ -1012,6 +1013,24 @@ def convert_single(
     final_path = song_output / f"{song_name}_converted.mid"
     merge_midi_tracks(midi_paths, final_path, song_name=song_name, bpm=bpm,
                       audio_path_for_beats=audio_path)
+
+    # Sprint 43 GGG5 — Stage E: source-filter refine (opt-in).
+    # 실패해도 merged MIDI 는 유지 → 회귀 없음 (패턴 C 단일 정책: refine 은 optional post-step).
+    if refine:
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from refine import refine_midi  # type: ignore
+            refined_path = song_output / f"{song_name}_refined.mid"
+            report = refine_midi(audio_path, final_path, refined_path,
+                                 max_iters=2)
+            print(f"  [refine] iters={report.iters} "
+                  f"initial_diff={report.initial_diff_l1:.2f} "
+                  f"final_diff={report.final_diff_l1:.2f} "
+                  f"removed={report.notes_removed}")
+            final_path = refined_path
+        except Exception as e:
+            # Tier 2 는 optional — 실패해도 원본 merged MIDI 경로 그대로 반환.
+            print(f"  [refine] skip ({type(e).__name__}: {e})")
 
     elapsed = time.time() - start
     print(f"\n완료! ({elapsed:.1f}s)")
@@ -1099,6 +1118,8 @@ def main():
     parser.add_argument("--demucs_model", type=str, default="htdemucs_6s",
                         choices=["htdemucs", "htdemucs_ft", "htdemucs_6s", "mdx_extra"],
                         help="Demucs 모델 (htdemucs_6s: 6트랙 분리, htdemucs_ft: 4트랙 고정밀)")
+    parser.add_argument("--refine", action="store_true",
+                        help="Sprint 43 GGG5 Tier 2 source-filter 반복 정제 (optional)")
 
     args = parser.parse_args()
 
@@ -1125,6 +1146,7 @@ def main():
             keep_vocals=args.keep_vocals,
             no_merge=args.no_merge,
             demucs_model=args.demucs_model,
+            refine=args.refine,
         )
         results = [result] if result else []
 

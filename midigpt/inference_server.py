@@ -80,6 +80,17 @@ class LoadLoraRequest(BaseModel):
     path: Optional[str] = None
 
 
+# Sprint 43 GGG3 — 다중 LoRA 핫스왑
+class RegisterLoraRequest(BaseModel):
+    name: str
+    path: Optional[str] = None
+
+
+class ActivateLoraRequest(BaseModel):
+    # None (JSON null) 을 보내면 deactivate (zero LoRA → base forward)
+    name: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # App + state
 # ---------------------------------------------------------------------------
@@ -150,6 +161,48 @@ def load_lora(req: LoadLoraRequest):
         return {"ok": True, "active_lora": _inference.active_lora}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Sprint 43 GGG3 — 다중 LoRA 핫스왑 (load_lora 는 호환용으로 유지)
+@app.post("/register_lora")
+def register_lora(req: RegisterLoraRequest):
+    """파일에서 메모리로 preload. 모델은 unchanged. Activate 는 별도."""
+    _ensure_loaded()
+    try:
+        _inference.register_lora(req.name, req.path)
+        return {
+            "ok": True,
+            "registered": _inference.registered_loras(),
+            "active_lora": _inference.active_lora,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/activate_lora")
+def activate_lora(req: ActivateLoraRequest):
+    """등록된 LoRA 로 즉시 교체. name=null 이면 deactivate."""
+    _ensure_loaded()
+    try:
+        _inference.activate_lora(req.name)
+        return {
+            "ok": True,
+            "active_lora": _inference.active_lora,
+            "registered": _inference.registered_loras(),
+        }
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/loras")
+def list_loras():
+    _ensure_loaded()
+    return {
+        "registered": _inference.registered_loras(),
+        "active": _inference.active_lora,
+    }
 
 
 @app.post("/generate")
@@ -466,7 +519,8 @@ def main():
         lora_paths=lora_paths if lora_paths else None,
     ))
     print(f"[MidiGPT Server] Loaded. Listening on http://{args.host}:{args.port}")
-    print(f"[MidiGPT Server] Endpoints: /health /status /generate /load_lora")
+    print(f"[MidiGPT Server] Endpoints: /health /status /generate /load_lora "
+          f"/register_lora /activate_lora /loras")
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 

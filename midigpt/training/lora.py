@@ -175,3 +175,70 @@ def merge_lora(model: nn.Module):
 
             merged = module.merge()
             setattr(parent, attr_name, merged)
+
+
+# ---------------------------------------------------------------------------
+# Sprint 43 GGG1 — hot-swap 지원 helper
+# ---------------------------------------------------------------------------
+def load_lora_weights_only(path: str | Path) -> dict[str, torch.Tensor]:
+    """Load LoRA state dict from disk without touching any model.
+
+    Sprint 43 GGG1: register/activate 분리를 위해 단순 '파일 → 메모리' 만 담당.
+    반환: `{"<layer.name>.lora_A": Tensor, "<layer.name>.lora_B": Tensor, ...}`
+
+    `load_lora()` 와 호환 (동일 key 규칙 — save_lora 가 기록한 그대로).
+    """
+    state = torch.load(str(path), map_location="cpu", weights_only=True)
+    if not isinstance(state, dict):
+        raise ValueError(f"LoRA checkpoint 스키마 비정상: {type(state).__name__}")
+    # 허용 키: *.lora_A, *.lora_B, *.r, *.alpha (메타)
+    return state
+
+
+def copy_weights_into_model(
+    model: nn.Module,
+    weights: dict[str, torch.Tensor],
+) -> int:
+    """Copy preloaded LoRA weights into existing LoRALinear layers.
+
+    LoRA 구조(적용)는 이미 되어 있다고 가정(`apply_lora` 선행 필요).
+    tensor 는 live 레이어의 device/dtype 으로 자동 변환. Returns the number
+    of (lora_A, lora_B) pairs written.
+
+    패턴 D 방어: Parameter.data 로 in-place 복사 — device 불일치 시 명시 error.
+    """
+    copied = 0
+    for name, module in model.named_modules():
+        if not isinstance(module, LoRALinear):
+            continue
+        a_key = f"{name}.lora_A"
+        b_key = f"{name}.lora_B"
+        if a_key in weights:
+            w = weights[a_key].to(module.lora_A.device, module.lora_A.dtype)
+            if w.shape != module.lora_A.shape:
+                raise ValueError(
+                    f"LoRA shape 불일치 {a_key}: "
+                    f"파일 {tuple(w.shape)} vs 모델 {tuple(module.lora_A.shape)} "
+                    f"— r 값 또는 target_modules 다른 LoRA 를 register 시도?"
+                )
+            module.lora_A.data.copy_(w)
+            copied += 1
+        if b_key in weights:
+            w = weights[b_key].to(module.lora_B.device, module.lora_B.dtype)
+            module.lora_B.data.copy_(w)
+    return copied
+
+
+def zero_lora_weights(model: nn.Module) -> int:
+    """Zero out all LoRA A/B tensors → identity (base model forward only).
+
+    Sprint 43 GGG2 deactivate 경로. LoRALinear 구조는 유지되므로 재활성화는
+    copy_weights_into_model 한 번으로 즉시 복원 (파일 I/O 없음).
+    """
+    n = 0
+    for module in model.modules():
+        if isinstance(module, LoRALinear):
+            module.lora_A.data.zero_()
+            module.lora_B.data.zero_()
+            n += 1
+    return n
