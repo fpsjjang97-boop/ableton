@@ -22,6 +22,7 @@ detect_bpm() 과 라이트한 유틸 함수를 대상으로 "서버 켜지 않�
 """
 from __future__ import annotations
 
+import argparse
 import math
 import struct
 import sys
@@ -102,7 +103,101 @@ class Case:
         self.detail = f"bpm={bpm:.1f} — {msg}"
 
 
+def _clean_notes_tests() -> tuple[int, int]:
+    """clean_notes 유틸 유닛 테스트 (Sprint 42 FFF3).
+
+    pretty_midi 의존. 없으면 skip.
+    """
+    try:
+        import pretty_midi
+    except ImportError:
+        print("  [SKIP] clean_notes — pretty_midi 미설치")
+        return 0, 0
+
+    from convert import clean_notes, quantize_notes
+
+    passed = total = 0
+
+    # 1) 너무 짧은 노트 제거 (< 30ms 기본 / < 10ms drums)
+    inst = pretty_midi.Instrument(program=0)
+    inst.notes.append(pretty_midi.Note(velocity=80, pitch=60, start=0.0, end=0.005))  # 5ms
+    inst.notes.append(pretty_midi.Note(velocity=80, pitch=60, start=0.1, end=0.2))   # 100ms
+    clean_notes(inst, stem_name="other")
+    total += 1
+    if len(inst.notes) == 1 and inst.notes[0].end == 0.2:
+        print("  [PASS] clean_notes — 5ms 노트 제거, 100ms 유지 (other)")
+        passed += 1
+    else:
+        print(f"  [FAIL] clean_notes (other): {[(n.start, n.end) for n in inst.notes]}")
+
+    # 2) 드럼: 10ms 기준 완화
+    inst = pretty_midi.Instrument(program=0)
+    inst.notes.append(pretty_midi.Note(velocity=80, pitch=36, start=0.0, end=0.015))  # 15ms
+    clean_notes(inst, stem_name="drums")
+    total += 1
+    if len(inst.notes) == 1:
+        print("  [PASS] clean_notes — 15ms 드럼 노트 유지 (drums min=10ms)")
+        passed += 1
+    else:
+        print(f"  [FAIL] clean_notes drums: {[(n.start, n.end) for n in inst.notes]}")
+
+    # 3) 겹치는 동일 피치 병합 (gap < 20ms)
+    inst = pretty_midi.Instrument(program=0)
+    inst.notes.append(pretty_midi.Note(velocity=60, pitch=60, start=0.0, end=0.1))
+    inst.notes.append(pretty_midi.Note(velocity=80, pitch=60, start=0.11, end=0.2))  # gap 10ms
+    clean_notes(inst, stem_name="other")
+    total += 1
+    if len(inst.notes) == 1 and inst.notes[0].end == 0.2 and inst.notes[0].velocity == 80:
+        print("  [PASS] clean_notes — 가까운 동일 피치 병합, 큰 velocity 유지")
+        passed += 1
+    else:
+        print(f"  [FAIL] 동일 피치 병합: {[(n.pitch, n.start, n.end, n.velocity) for n in inst.notes]}")
+
+    # 4) velocity clamp (>127 또는 <1)
+    inst = pretty_midi.Instrument(program=0)
+    inst.notes.append(pretty_midi.Note(velocity=200, pitch=60, start=0.0, end=0.2))  # clip to 127
+    inst.notes.append(pretty_midi.Note(velocity=0, pitch=62, start=0.5, end=0.7))    # clip to 1
+    clean_notes(inst, stem_name="other")
+    total += 1
+    vels = [n.velocity for n in inst.notes]
+    if set(vels) == {127, 1}:
+        print(f"  [PASS] clean_notes — velocity clamp: {vels}")
+        passed += 1
+    else:
+        print(f"  [FAIL] velocity clamp: {vels}")
+
+    # 5) quantize_notes — 0.01 그리드
+    inst = pretty_midi.Instrument(program=0)
+    inst.notes.append(pretty_midi.Note(velocity=80, pitch=60, start=0.037, end=0.192))
+    quantize_notes(inst, grid=0.01)
+    total += 1
+    n = inst.notes[0]
+    if abs(n.start - 0.04) < 1e-6 and abs(n.end - 0.19) < 1e-6:
+        print(f"  [PASS] quantize_notes — 0.037→0.04, 0.192→0.19 @ grid 0.01")
+        passed += 1
+    else:
+        print(f"  [FAIL] quantize: {n.start}, {n.end}")
+
+    # 6) quantize_notes — end <= start 방어 (0 길이 노트)
+    inst = pretty_midi.Instrument(program=0)
+    inst.notes.append(pretty_midi.Note(velocity=80, pitch=60, start=0.1, end=0.105))
+    quantize_notes(inst, grid=0.1)  # 0.1, 0.105 → 0.1, 0.1 → end==start 방어로 end = start+grid
+    total += 1
+    n = inst.notes[0]
+    if n.end > n.start:
+        print(f"  [PASS] quantize_notes — end==start 방어 작동 ({n.start} < {n.end})")
+        passed += 1
+    else:
+        print(f"  [FAIL] quantize 방어: start={n.start} end={n.end}")
+
+    return passed, total
+
+
 def main() -> int:
+    # argparse 먼저 — --help 가 heavy import 전에 리턴하도록
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.parse_args()
+
     from convert import detect_bpm
 
     print("=" * 60)
@@ -152,6 +247,13 @@ def main() -> int:
 
     passed = sum(1 for c in cases if c.ok)
     total = len(cases)
+
+    # Sprint 42 FFF3 — clean_notes / quantize_notes 유닛 테스트
+    print("\n  clean_notes / quantize_notes 유닛:")
+    cn_pass, cn_total = _clean_notes_tests()
+    passed += cn_pass
+    total += cn_total
+
     print("=" * 60)
     if passed == total:
         print(f"  ALL PASS ({passed}/{total})")

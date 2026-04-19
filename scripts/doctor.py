@@ -13,6 +13,7 @@ Sprint 37 — 4개 예상 이슈를 한 스크립트로 검진:
 """
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import json
 import os
@@ -23,6 +24,13 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -236,11 +244,10 @@ def check_sft_clean() -> Check:
 # Main
 # ---------------------------------------------------------------------------
 def main():
-    if sys.platform == "win32":
-        try:
-            sys.stdout.reconfigure(encoding="utf-8")
-        except Exception:
-            pass
+    ap = argparse.ArgumentParser(
+        description="MidiGPT 환경/준비 상태 점검 (7개 체크). 인자 없음 — 바로 실행."
+    )
+    ap.parse_args()  # --help 지원용
 
     print("=" * 60)
     print("  MidiGPT Doctor — 실행 전 준비 상태 점검")

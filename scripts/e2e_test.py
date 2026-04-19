@@ -30,6 +30,15 @@ from urllib.request import Request, urlopen
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Sprint 42 FFF4: argparse.print_help() 은 module import 직후에도 실행되므로
+# stdout UTF-8 재구성은 module top 에서 선행해야 한다 (파일 top 에 이미 없음).
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 
 class TestResult:
     def __init__(self, name: str):
@@ -180,12 +189,6 @@ def main():
     parser.add_argument("--skip-audio", action="store_true",
                         help="audio_to_midi 단계 생략")
     args = parser.parse_args()
-
-    if sys.platform == "win32":
-        try:
-            sys.stdout.reconfigure(encoding="utf-8")
-        except Exception:
-            pass
 
     base = args.server
     if base.startswith(":"):

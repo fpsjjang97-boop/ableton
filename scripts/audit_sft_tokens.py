@@ -54,7 +54,12 @@ def _hash_seq(seq: list[int]) -> str:
 
 def audit(data_dir: Path, block_size: int, out: Path,
           ckpt_vocab_size: int | None = None) -> int:
-    sft_dir = data_dir / "sft"
+    # data_dir 가 이미 sft_*.json 을 포함하면 직접 사용 (sft_clean/ 등),
+    # 아니면 관례대로 {data_dir}/sft 로 내려간다.
+    if any(data_dir.glob("sft_*.json")):
+        sft_dir = data_dir
+    else:
+        sft_dir = data_dir / "sft"
     if not sft_dir.exists():
         print(f"[ERROR] SFT 디렉토리 없음: {sft_dir}")
         return 2

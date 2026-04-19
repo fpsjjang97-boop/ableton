@@ -45,6 +45,13 @@ from typing import Optional
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 OUTPUT_DIR = REPO_ROOT / "output"
 REVIEWS_DIR = REPO_ROOT / "reviews"
 DPO_PAIRS_DIR = REPO_ROOT / "midigpt" / "dpo_pairs"

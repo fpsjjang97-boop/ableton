@@ -69,6 +69,10 @@ class GenerateParams(BaseModel):
     min_new_tokens: int = 256
     repetition_penalty: float = 1.1
     no_repeat_ngram_size: int = 4
+    # Sprint 41 EEE1 / 42 FFF1: FSM grammar 제어 (기본 True — 중복 노트 억제).
+    # 디버깅/비교 목적이 아니면 끄지 말 것.
+    use_grammar: bool = True
+    grammar_dedup_pitches: bool = True
 
 
 class LoadLoraRequest(BaseModel):
@@ -161,6 +165,8 @@ async def generate(
     min_new_tokens: int = 256,
     repetition_penalty: float = 1.1,
     no_repeat_ngram_size: int = 4,
+    use_grammar: bool = True,
+    grammar_dedup_pitches: bool = True,
 ):
     """Generate MIDI variation(s) from an uploaded MIDI file.
 
@@ -194,6 +200,8 @@ async def generate(
             repetition_penalty=repetition_penalty,
             no_repeat_ngram_size=no_repeat_ngram_size,
             use_kv_cache=True,
+            use_grammar=use_grammar,
+            grammar_dedup_pitches=grammar_dedup_pitches,
         )
 
         midi_bytes = tmp_out.read_bytes()
@@ -234,6 +242,9 @@ class GenerateJsonRequest(BaseModel):
     min_new_tokens: int = 256
     repetition_penalty: float = 1.1
     no_repeat_ngram_size: int = 4
+    # Sprint 42 FFF1: FSM grammar (대부분 True 유지 권장; False 는 디버깅용)
+    use_grammar: bool = True
+    grammar_dedup_pitches: bool = True
 
 
 @app.post("/generate_json")
@@ -271,6 +282,8 @@ def generate_json(req: GenerateJsonRequest):
             repetition_penalty=req.repetition_penalty,
             no_repeat_ngram_size=req.no_repeat_ngram_size,
             use_kv_cache=True,
+            use_grammar=req.use_grammar,
+            grammar_dedup_pitches=req.grammar_dedup_pitches,
         )
 
         out_bytes = tmp_out.read_bytes()

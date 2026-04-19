@@ -100,6 +100,23 @@ Correct fix (2주+):
 
 ---
 
+## Sprint 41 EEE2 적용 결과 + Sprint 42 FFF2 재감사 (2026-04-19)
+
+`scripts/clean_sft_pairs.py --src ./midigpt_pipeline/sft --dst ./midigpt_pipeline/sft_clean --block_size 2048 --ckpt_vocab_size 420`
+
+| 지표 | 원본 `sft/` | 정제 `sft_clean/` | 변화 |
+|---|---:|---:|---|
+| 총 페어 | 14,622 | **7,913** | -6,709 (dup 제거) |
+| OOR token | 0 | 0 | ✅ |
+| Empty pair | 0 | 0 | ✅ |
+| **Short effective (<4)** | **8,832 (60.4 %)** | **0** | 🟢 **완전 해소** — trim 적용 |
+| Suspicious special | 0 | 0 | ✅ |
+| **Duplicate groups** | **3,086** | **0** | 🟢 **완전 해소** |
+
+재학습 준비물 상태: **모든 품질 지표 그린**. 동업자가 `--data_dir midigpt_pipeline/sft_clean` 로 train_sft_lora.py 실행 가능.
+
+---
+
 ## JSON 리포트
 `midigpt_pipeline/sft_audit.json` — 페어별 상세. 재학습 전 exclusion list 로 직접 사용 가능.
 

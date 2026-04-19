@@ -31,6 +31,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # Pretty output helpers (no external dependency)
@@ -283,6 +290,11 @@ def check_disk_space() -> None:
 # Main
 # ---------------------------------------------------------------------------
 def main() -> int:
+    import argparse
+    argparse.ArgumentParser(
+        description="MidiGPT 환경 sanity check (Python/packages/CUDA/vocab/data). 인자 없음."
+    ).parse_args()
+
     print(BOLD("MidiGPT setup check"))
     print(f"Repo root: {REPO_ROOT}")
 
