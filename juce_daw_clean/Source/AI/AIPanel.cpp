@@ -40,7 +40,22 @@ AIPanel::AIPanel(AudioEngine& engine)
     statusLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible(statusLabel);
 
-    startTimerHz(1);
+    // Sprint 48 LLL — AIPanel::timerCallback 이 GUI 스레드에서 동기 HTTP
+    // checkHealth(500ms) 를 매초 호출해 "응답 없음" 을 유발했다. 근본 수정:
+    //   1) 간격을 3초로 완화 (서버 상태는 초단위로 바뀌지 않음)
+    //   2) 실제 요청은 probeHealthAsync() 가 juce::Thread::launch 로 백그라운드에서
+    //   3) 결과는 MessageManager::callAsync 로 GUI 스레드에 post
+    //   4) healthProbeInFlight 로 중첩 호출 차단 (서버 다운이면 probe 가 길어질 수 있음)
+    startTimer(3000);
+}
+
+AIPanel::~AIPanel()
+{
+    // Sprint 48 LLL — 백그라운드 probe 가 AIPanel 사망 후 GUI 포스트하지 않도록
+    // 플래그. 완전한 join 은 AIBridge 내부 AsyncWorker 가 관리; 여기선 post 후
+    // captured 'this' 접근만 차단하면 충분.
+    shuttingDown.store(true);
+    stopTimer();
 }
 
 void AIPanel::paint(juce::Graphics& g)
@@ -77,17 +92,45 @@ void AIPanel::resized()
 
 void AIPanel::timerCallback()
 {
-    // Periodic server health check
-    bool ok = aiBridge.checkHealth(500);
-    if (ok != serverConnected)
+    // Sprint 48 LLL — 실제 HTTP 는 백그라운드. 메인은 결과 반영만.
+    probeHealthAsync();
+}
+
+void AIPanel::probeHealthAsync()
+{
+    if (healthProbeInFlight.load()) return;
+    healthProbeInFlight.store(true);
+
+    juce::Component::SafePointer<AIPanel> safeThis(this);
+    juce::Thread::launch([safeThis]()
     {
-        serverConnected = ok;
-        statusLabel.setText(ok ? "Server Connected" : "Disconnected",
-                            juce::dontSendNotification);
-        statusLabel.setColour(juce::Label::textColourId,
-                              ok ? juce::Colours::limegreen : juce::Colours::grey);
-        generateButton.setEnabled(ok);
-    }
+        // 경계: safeThis 이 dangling 이 아닌지는 MessageManager::callAsync 가
+        // post 된 뒤 메인에서 확인. 여기서는 AIBridge 사본이 필요한데, AIBridge
+        // 는 AIPanel 소유이므로 panel 생존 시에만 유효.
+        bool ok = false;
+        if (auto* p = safeThis.getComponent())
+        {
+            if (! p->shuttingDown.load())
+                ok = p->aiBridge.checkHealth(500);
+        }
+        juce::MessageManager::callAsync([safeThis, ok]()
+        {
+            if (auto* p = safeThis.getComponent())
+            {
+                p->healthProbeInFlight.store(false);
+                if (p->shuttingDown.load()) return;
+                if (ok != p->serverConnected)
+                {
+                    p->serverConnected = ok;
+                    p->statusLabel.setText(ok ? "Server Connected" : "Disconnected",
+                                           juce::dontSendNotification);
+                    p->statusLabel.setColour(juce::Label::textColourId,
+                                              ok ? juce::Colours::limegreen : juce::Colours::grey);
+                    p->generateButton.setEnabled(ok);
+                }
+            }
+        });
+    });
 }
 
 void AIPanel::onCheckServer()

@@ -13,6 +13,12 @@ cmake_minimum_required(VERSION 3.22)
 
 project(MidiGPTDAW VERSION 0.1.0)
 
+# Sprint 47 재빌드 대응 — MSVC 가 소스를 cp949 로 해석해 한글 리터럴에서
+# C2001/C1075 발생. 전역 /utf-8 로 source/execution charset 을 UTF-8 로 고정.
+if (MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 # -----------------------------------------------------------------------------
 # JUCE dependency
 # -----------------------------------------------------------------------------

@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <atomic>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "AIBridge.h"
 #include "../Core/AudioEngine.h"
@@ -16,6 +18,7 @@ class AIPanel : public juce::Component,
 {
 public:
     AIPanel(AudioEngine& engine);
+    ~AIPanel() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -30,6 +33,13 @@ private:
 
     int targetTrackId { -1 };
     bool serverConnected { false };
+
+    // Sprint 48 LLL 수정: 동기 HTTP 를 GUI 스레드에서 돌리던 것이 "응답 없음"
+    // 트리거였음. 한 번에 최대 하나의 백그라운드 probe 만 돌게 guard + 결과는
+    // MessageManager::callAsync 로 메인에 post.
+    std::atomic<bool> healthProbeInFlight { false };
+    std::atomic<bool> shuttingDown { false };
+    void probeHealthAsync();
 
     juce::TextButton generateButton { "Generate Variation" };
     juce::TextButton connectButton  { "Check Server" };
