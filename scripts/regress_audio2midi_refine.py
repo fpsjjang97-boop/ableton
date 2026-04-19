@@ -63,6 +63,11 @@ def _build_midi_with_ghost(path: Path):
 
 
 def main():
+    import argparse
+    argparse.ArgumentParser(
+        description="Audio2MIDI source-filter refine 회귀 스모크. 인자 없음."
+    ).parse_args()
+
     from refine import refine_midi
 
     print("=" * 60)
@@ -105,11 +110,13 @@ def main():
             print(f"  [FAIL] diff 악화: {rd['initial_diff_l1']:.2f} → {rd['final_diff_l1']:.2f}")
             fails += 1
 
-        # 3. note 수 불변량 (refine 은 추가가 아닌 제거만)
-        if rd["notes_after"] <= rd["notes_before"]:
-            print(f"  [OK] notes {rd['notes_before']} → {rd['notes_after']} (monotone 감소)")
+        # 3. note 수 불변량 (Sprint 44 HHH1 이후: before - removed + added == after)
+        expected = rd["notes_before"] - rd["notes_removed"] + rd["notes_added"]
+        if rd["notes_after"] == expected:
+            print(f"  [OK] note 회계: {rd['notes_before']} - {rd['notes_removed']} "
+                  f"+ {rd['notes_added']} = {rd['notes_after']}")
         else:
-            print(f"  [FAIL] notes 증가: {rd['notes_before']} → {rd['notes_after']}")
+            print(f"  [FAIL] 회계 불일치: expected {expected}, got {rd['notes_after']}")
             fails += 1
 
         # 4. 출력 파일 존재 + 읽기 가능

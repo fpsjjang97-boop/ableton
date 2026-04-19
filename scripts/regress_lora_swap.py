@@ -161,6 +161,37 @@ def main():
             print(f"  [FAIL] registered_loras = {regs} (기대 ['A','B'])")
             fails += 1
 
+        # 6. Sprint 44 HHH2 — blend 검증: A(0.5) + B(0.5) 가중합 값과 일치
+        eng.blend_loras({"A": 0.5, "B": 0.5})
+        fp_blend = _sample_fingerprint(eng).clone()
+        # 기대값: (A_weights + B_weights) * 0.5
+        a_state = torch.load(path_A, weights_only=True)
+        b_state = torch.load(path_B, weights_only=True)
+        first_key = next(k for k in a_state if k.endswith(".lora_A"))
+        exp_blend = 0.5 * a_state[first_key].float().flatten()[:4] + \
+                    0.5 * b_state[first_key].float().flatten()[:4]
+        # fp16 live weight vs fp32 expected → atol 1e-3 허용 (LoRA 가중합 정밀도 충분)
+        if torch.allclose(fp_blend[:4], exp_blend, atol=1e-3):
+            print(f"  [OK]   blend_loras A(0.5)+B(0.5) 값 일치 (fp16 atol 1e-3)")
+        else:
+            print(f"  [FAIL] blend 값 불일치: live={fp_blend[:4]} exp={exp_blend}")
+            fails += 1
+
+        # 7. active_lora 표기 "blend:(...)"
+        if eng.active_lora and eng.active_lora.startswith("blend:("):
+            print(f"  [OK]   active_lora tag = {eng.active_lora}")
+        else:
+            print(f"  [FAIL] active_lora = {eng.active_lora} (기대 blend:...)")
+            fails += 1
+
+        # 8. blend 에 미등록 이름 → KeyError
+        try:
+            eng.blend_loras({"A": 0.5, "NONEXIST": 0.5})
+            print("  [FAIL] blend 에 미등록 이름 — KeyError 안 남")
+            fails += 1
+        except KeyError:
+            print("  [OK]   blend 미등록 이름 → KeyError")
+
     finally:
         import shutil
         shutil.rmtree(tmp, ignore_errors=True)

@@ -380,11 +380,42 @@ class MidiGPTInference:
     def registered_loras(self) -> list[str]:
         return sorted(self._lora_registry.keys())
 
-    def load_lora(self, name: str, path: str | None = None):
-        """Register + activate — 기존 API 호환 유지."""
-        self.register_lora(name, path)
-        if name in self._lora_registry:
-            self.activate_lora(name)
+    def blend_loras(self, weights: dict[str, float]) -> None:
+        """Sprint 44 HHH2 — 여러 등록된 LoRA 의 가중 평균으로 활성화.
+
+        weights 합이 1.0 이어야 할 필요는 없음 (over/under-drive 허용).
+        미등록 이름 → KeyError. 빈 dict → deactivate.
+        active_lora = "blend:(jazz:0.7|classical:0.3)" 형식으로 표기.
+        """
+        if self.model is None:
+            raise RuntimeError("Base model not loaded")
+        if not weights:
+            self.activate_lora(None)
+            return
+        unknown = [n for n in weights if n not in self._lora_registry]
+        if unknown:
+            raise KeyError(f"LoRA '{unknown}' 등록 안 됨 — register_lora 선행")
+        if not self._lora_structure_applied:
+            raise RuntimeError("LoRA 구조 미주입 — register_lora 를 먼저 호출해야 함")
+
+        from ..training.lora import LoRALinear
+        # 가중합 dict 만들기: 각 key 는 state_dict 의 "<layer>.lora_A/B"
+        blended: dict[str, torch.Tensor] = {}
+        for name, w in weights.items():
+            for k, v in self._lora_registry[name].items():
+                if not (k.endswith(".lora_A") or k.endswith(".lora_B")):
+                    continue
+                if k in blended:
+                    blended[k] = blended[k] + float(w) * v.float()
+                else:
+                    blended[k] = float(w) * v.float()
+
+        # live 모델에 복사 — copy_weights_into_model 사용 (shape 검증 재사용)
+        copied = copy_weights_into_model(self.model, blended)
+        self.model.eval()
+        tag = "|".join(f"{n}:{w:g}" for n, w in weights.items())
+        self._active_lora = f"blend:({tag})"
+        print(f"MidiGPT: LoRA blend activated ({copied} layer pairs) — {tag}")
 
     # ------------------------------------------------------------------
     # Harmonic constraint helpers

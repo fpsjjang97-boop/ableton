@@ -91,6 +91,11 @@ class ActivateLoraRequest(BaseModel):
     name: Optional[str] = None
 
 
+class BlendLorasRequest(BaseModel):
+    # {"jazz": 0.7, "classical": 0.3}. 빈 dict 는 deactivate.
+    weights: dict[str, float]
+
+
 # ---------------------------------------------------------------------------
 # App + state
 # ---------------------------------------------------------------------------
@@ -203,6 +208,23 @@ def list_loras():
         "registered": _inference.registered_loras(),
         "active": _inference.active_lora,
     }
+
+
+@app.post("/blend_loras")
+def blend_loras(req: BlendLorasRequest):
+    """Sprint 44 HHH2 — 여러 LoRA 의 가중 평균으로 활성화."""
+    _ensure_loaded()
+    try:
+        _inference.blend_loras(req.weights)
+        return {
+            "ok": True,
+            "active_lora": _inference.active_lora,
+            "registered": _inference.registered_loras(),
+        }
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/generate")

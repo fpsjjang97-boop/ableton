@@ -172,6 +172,78 @@ def _remove_ghost_notes(pm, intervals, min_velocity: int = 30):
     return removed
 
 
+def _fill_missed_notes(pm, audio_path, intervals, sr: int = 22050):
+    """Sprint 44 HHH1 — hot frame 내 원본 노트가 "없거나 매우 적은" 구간을
+    basic_pitch (낮은 threshold) 로 재채보해 놓친 노트를 채운다.
+
+    basic_pitch 없거나 오디오 crop 이 실패하면 silent skip.
+    반환: 추가된 노트 수.
+    """
+    try:
+        from basic_pitch.inference import predict as bp_predict
+    except ImportError:
+        return 0
+
+    import numpy as np
+    import pretty_midi
+    import librosa
+
+    # 후보 구간: hot interval 중 기존 노트가 0개인 (= 완전 미검출) 구간
+    def _notes_in(t0: float, t1: float) -> int:
+        return sum(
+            1
+            for inst in pm.instruments
+            for n in inst.notes
+            if (t0 <= n.start < t1) or (t0 < n.end <= t1)
+        )
+
+    missed = [(t0, t1) for t0, t1 in intervals
+              if (t1 - t0) >= 0.2 and _notes_in(t0, t1) == 0]
+    if not missed:
+        return 0
+
+    # 짧은 구간만 한 번에 묶어 재채보 — 전체 오디오 재채보는 비용 큼
+    try:
+        y, _ = librosa.load(str(audio_path), sr=sr, mono=True)
+    except Exception:
+        return 0
+
+    added = 0
+    for t0, t1 in missed[:10]:  # 과도한 반복 방지 — 최대 10 구간
+        i0, i1 = int(t0 * sr), min(int(t1 * sr), len(y))
+        if i1 - i0 < int(0.2 * sr):
+            continue
+        import tempfile
+        import soundfile as sf  # librosa 의존성에 포함
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf:
+            wav_path = tf.name
+        try:
+            sf.write(wav_path, y[i0:i1], sr)
+            _, pm_new, _ = bp_predict(wav_path, onset_threshold=0.3)
+            for inst in pm_new.instruments:
+                for n in inst.notes:
+                    # 구간 시작 기준으로 시프트
+                    shifted = pretty_midi.Note(
+                        velocity=max(1, min(127, int(n.velocity))),
+                        pitch=n.pitch,
+                        start=t0 + n.start,
+                        end=t0 + n.end,
+                    )
+                    if not pm.instruments:
+                        pm.instruments.append(pretty_midi.Instrument(program=0))
+                    pm.instruments[0].notes.append(shifted)
+                    added += 1
+        except Exception:
+            continue
+        finally:
+            try:
+                Path(wav_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+    return added
+
+
 def refine_midi(
     audio_path: str | Path,
     midi_path: str | Path,
@@ -226,8 +298,12 @@ def refine_midi(
         removed = _remove_ghost_notes(pm, intervals)
         report.notes_removed += removed
 
-        if removed == 0:
-            # 더 이상 제거할 유령 없음 — 조기 수렴
+        # Sprint 44 HHH1 — 미검출 영역 재채보 (basic_pitch 있을 때만)
+        added = _fill_missed_notes(pm, audio_path, intervals, sr=sr)
+        report.notes_added += added
+
+        if removed == 0 and added == 0:
+            # 더 이상 변경 없음 — 조기 수렴
             break
 
         report.iters = it + 1

@@ -61,6 +61,12 @@ CHECKS: list[tuple[str, list[str], bool, int]] = [
       "--ckpt", "checkpoints/midigpt_best.pt"], False, 60),
     ("doctor (환경 체크, 서버 없이도 진행)",
      ["doctor.py"], False, 60),
+    # Sprint 44 HHH4 확장
+    ("LoRA 핫스왑 + blend 회귀 (Sprint 43 GGG2 + 44 HHH2)",
+     ["regress_lora_swap.py", "--base_model",
+      "checkpoints/midigpt_best.pt"], False, 120),
+    ("Audio2MIDI refine 스모크 (Sprint 43 GGG4 + 44 HHH1)",
+     ["regress_audio2midi_refine.py"], True, 300),
 ]
 
 
