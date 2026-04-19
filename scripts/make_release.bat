@@ -88,11 +88,21 @@ if errorlevel 1 (
 
 for %%F in ("%ZIPFILE%") do set "SZ=%%~zF"
 set /a "SZMB=SZ/1048576"
+
+REM --- SHA256 manifest (Sprint 40 DDD6) ---
+echo [7/7] SHA256 manifest...
+python scripts\make_release_manifest.py --staging "%STAGING%" --zip "%ZIPFILE%"
+if errorlevel 1 (
+    echo [WARN] manifest 생성 실패 — release 는 성공했으나 체크섬 파일 없음.
+)
+
 echo.
 echo ============================================================
 echo   Release bundle ready:
 echo     %ZIPFILE%
 echo     size: %SZMB% MB
+echo     SHA256: %ZIPFILE%.sha256
+echo     MANIFEST: %STAGING%\MANIFEST.sha256
 echo.
 echo   다음:
 echo     - 서버 / 체크포인트는 별도 배포 ^(553 MB 초과^)

@@ -90,6 +90,10 @@ juce_app_quarantine/
 # Audit / temp outputs
 audit_after_fix.csv
 _tmp_plugin_*.mid
+midigpt_pipeline/sft_audit*.json
+
+# Third-party cloned repos (ADTOF 등 — download_checkpoints.py 가 재생성)
+third_party/
 
 # Training / server run logs and ephemeral state
 pipeline_run.log
