@@ -1051,10 +1051,17 @@ class MidiGPTInference:
         repetition_penalty: float = 1.0,
         no_repeat_ngram_size: int = 0,
         use_kv_cache: bool = True,
+        use_grammar: bool = True,
+        grammar_forward_bar_jump: int = 1,
+        grammar_dedup_pitches: bool = True,
     ) -> str:
         """Generate variation and save as MIDI file.
 
         See :meth:`generate_variation` for parameter documentation.
+
+        Grammar (Sprint 41 EEE1): mirrors ``generate_variation`` — FSM 을 생성
+        하고 프롬프트로 워밍 후 ``_generate_with_harmony`` 에 전달.  이전에는
+        이 경로에서 FSM 이 누락되어 중복 노트가 디코드되고 있었다(패턴 C).
         """
         if self.model is None:
             raise RuntimeError("Model not loaded")
@@ -1069,6 +1076,18 @@ class MidiGPTInference:
 
         input_tensor = torch.tensor([input_ids], dtype=torch.long, device=self.device)
 
+        # Fresh grammar per call; warm with the prompt so Bar/Pos/Track state
+        # carries into generation — identical to generate_variation sampling path.
+        grammar: Optional[MidiGrammarFSM] = None
+        if use_grammar:
+            grammar = MidiGrammarFSM(
+                vocab=self.vocab,
+                allow_forward_bar_jump=grammar_forward_bar_jump,
+                dedup_pitches=grammar_dedup_pitches,
+            )
+            for tid in input_ids:
+                grammar.observe(tid, batch=0)
+
         with torch.no_grad():
             output = self._generate_with_harmony(
                 input_tensor,
@@ -1081,6 +1100,7 @@ class MidiGPTInference:
                 repetition_penalty=repetition_penalty,
                 no_repeat_ngram_size=no_repeat_ngram_size,
                 use_kv_cache=use_kv_cache,
+                grammar=grammar,
             )
 
         variation_ids = output[0].tolist()[len(input_ids):]

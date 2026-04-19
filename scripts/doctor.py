@@ -158,6 +158,81 @@ def check_model_ckpt() -> Check:
 
 
 # ---------------------------------------------------------------------------
+# 6. Checkpoint <-> VOCAB 호환성 (Sprint 41 EEE4, ref Sprint 40 DDD2)
+# ---------------------------------------------------------------------------
+def check_vocab_compat() -> Check:
+    c = Check("체크포인트-VOCAB vocab_size 호환성")
+    # torch 는 무거운 import 이므로 필요 시에만 로드
+    try:
+        import torch  # noqa
+    except ImportError:
+        return c.set(True, "torch 미설치 — 검사 skip")
+    try:
+        sys.path.insert(0, str(REPO_ROOT))
+        from midigpt.tokenizer.vocab import VOCAB
+    except Exception as e:
+        return c.set(False, f"VOCAB 로드 실패: {e}",
+                     "midigpt/tokenizer/vocab.py 확인")
+
+    best = REPO_ROOT / "checkpoints" / "midigpt_best.pt"
+    if not best.exists():
+        return c.set(True, "midigpt_best.pt 없음 — 검사 skip",
+                     "")
+    try:
+        ck = torch.load(str(best), map_location="cpu", weights_only=True)
+    except Exception as e:
+        return c.set(False, f"체크포인트 읽기 실패: {type(e).__name__}",
+                     "checkpoints/midigpt_best.pt 파일 확인")
+    cfg = ck.get("config", {})
+    ckpt_vs = cfg.get("vocab_size")
+    if ckpt_vs is None:
+        return c.set(True, "config.vocab_size 없음 — 구버전 체크포인트, 검사 skip")
+
+    if ckpt_vs == VOCAB.size:
+        return c.set(True, f"일치 — {VOCAB.size} tokens")
+    diff = VOCAB.size - ckpt_vs
+    return c.set(
+        False,
+        f"vocab 불일치 — ckpt={ckpt_vs}, current={VOCAB.size} ({diff:+d} 토큰)",
+        f"python scripts/verify_checkpoint_vocab.py --ckpt {best.as_posix()}"
+        f"   (v1.x → v2.0 migration 필요시 재학습 또는 migration plan)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 7. SFT 데이터 정제 상태 (Sprint 41 EEE4, ref Sprint 40 DDD1)
+# ---------------------------------------------------------------------------
+def check_sft_clean() -> Check:
+    c = Check("SFT 페어 정제 상태 (sft_clean/)")
+    sft_clean = REPO_ROOT / "midigpt_pipeline" / "sft_clean"
+    sft_raw = REPO_ROOT / "midigpt_pipeline" / "sft"
+    if not sft_raw.exists():
+        return c.set(True, "midigpt_pipeline/sft/ 없음 — 파이프라인 미실행, 검사 skip")
+
+    if not sft_clean.exists():
+        return c.set(
+            False,
+            "sft_clean/ 없음 — 재학습 전 페어 정제 권장",
+            "python scripts/clean_sft_pairs.py --src ./midigpt_pipeline/sft "
+            "--dst ./midigpt_pipeline/sft_clean --block_size 2048"
+        )
+
+    raw_count = len(list(sft_raw.glob("sft_*.json")))
+    clean_count = len(list(sft_clean.glob("sft_*.json")))
+    summary = sft_clean / "_summary_clean.json"
+    detail = f"sft/={raw_count}  sft_clean/={clean_count}"
+    if summary.exists():
+        try:
+            s = json.loads(summary.read_text(encoding="utf-8"))
+            detail += f"  (trimmed={s.get('trimmed', '?')}  "
+            detail += f"dup_removed={s.get('skipped', {}).get('duplicate', '?')})"
+        except Exception:
+            pass
+    return c.set(clean_count > 0, detail,
+                 "sft_clean/ 비어있음 — clean_sft_pairs.py 재실행")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
@@ -174,21 +249,27 @@ def main():
 
     all_checks: list[Check] = []
 
-    print("\n[1/5] 추론 서버")
+    print("\n[1/7] 추론 서버")
     c = check_server(); c.print(); all_checks.append(c)
 
-    print("\n[2/5] Audio2MIDI 의존성")
+    print("\n[2/7] Audio2MIDI 의존성")
     c = check_a2m_deps(); c.print(); all_checks.append(c)
 
-    print("\n[3/5] Tier 1 체크포인트 (optional)")
+    print("\n[3/7] Tier 1 체크포인트 (optional)")
     for c in check_tier1_ckpt():
         c.print(); all_checks.append(c)
 
-    print("\n[4/5] VST3 설치")
+    print("\n[4/7] VST3 설치")
     c = check_vst3_install(); c.print(); all_checks.append(c)
 
-    print("\n[5/5] MidiGPT 모델 체크포인트")
+    print("\n[5/7] MidiGPT 모델 체크포인트")
     c = check_model_ckpt(); c.print(); all_checks.append(c)
+
+    print("\n[6/7] 체크포인트-VOCAB 호환성 (Sprint 40 DDD2)")
+    c = check_vocab_compat(); c.print(); all_checks.append(c)
+
+    print("\n[7/7] SFT 페어 정제 상태 (Sprint 40 DDD1)")
+    c = check_sft_clean(); c.print(); all_checks.append(c)
 
     # --- Summary ---
     failed = [c for c in all_checks if not c.ok]
