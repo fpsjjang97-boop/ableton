@@ -254,7 +254,8 @@ MidiGPTEditor::MidiGPTEditor (MidiGPTProcessor& p)
     // session ended uncleanly. Using MessageManager::callAsync to defer
     // until the constructor returns — AlertWindow inside ctor can trip
     // some VST3 hosts.
-    juce::Component::SafePointer<MidiGPTEditor> safeThis (this);
+    // Sprint 48 MMM2 — line 212 의 safeThis 를 그대로 재사용 (중복 선언이
+    // C2086/C2374). 같은 스코프에 같은 이름 Local 변수 두 번 금지.
     juce::MessageManager::callAsync ([safeThis]() mutable
     {
         if (auto* self = safeThis.getComponent())
@@ -1093,7 +1094,17 @@ void MidiGPTEditor::filesDropped (const juce::StringArray& files, int /*x*/, int
     else
     {
         // SMPTE fallback: seconds → beats via first tempo event.
-        mf.convertTimestampsToSeconds();
+        // Sprint 48 MMM3 — juce::MidiFile::convertTimestampsToSeconds 는
+        // 최신 JUCE 에서 제거됨. SMPTE time format 을 수동 디코드:
+        //   timeFormat (negative) = (high byte: -fps as signed int8)
+        //                         | (low byte: ticks per frame)
+        //   seconds_per_tick = 1 / (fps * ticksPerFrame)
+        int fps = -(static_cast<signed char> ((timeFormat >> 8) & 0xFF));
+        int ticksPerFrame = timeFormat & 0xFF;
+        const double secondsPerTick = (fps > 0 && ticksPerFrame > 0)
+            ? 1.0 / (static_cast<double> (fps) * ticksPerFrame)
+            : 1.0 / 960.0;  // 안전 기본값 (~30fps * 32tpf)
+
         double bpm = 120.0;
         if (auto* track0 = mf.getTrack (0))
         {
@@ -1107,6 +1118,7 @@ void MidiGPTEditor::filesDropped (const juce::StringArray& files, int /*x*/, int
                 }
             }
         }
+        const double ticksToBeats = secondsPerTick * (bpm / 60.0);
         for (int t = 0; t < mf.getNumTracks(); ++t)
         {
             if (auto* track = mf.getTrack (t))
@@ -1115,7 +1127,7 @@ void MidiGPTEditor::filesDropped (const juce::StringArray& files, int /*x*/, int
                 {
                     auto* evt = track->getEventPointer (e);
                     auto copyMsg = evt->message;
-                    copyMsg.setTimeStamp (evt->message.getTimeStamp() * (bpm / 60.0));
+                    copyMsg.setTimeStamp (evt->message.getTimeStamp() * ticksToBeats);
                     flat.addEvent (copyMsg, 0.0);
                 }
             }

@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include <juce_core/juce_core.h>
 
 class I18n
@@ -45,9 +47,12 @@ public:
 private:
     struct Row { const char* key; const char* ko; const char* en; };
 
-    static const juce::Array<Row>& table()
+    // Sprint 48 MMM1 — juce::Array 는 brace-enclosed aggregate Row 초기화를
+    // MSVC 일부 버전에서 거부(C2440). std::vector 는 aggregate initializer 를
+    // 표준적으로 지원. lookup 만 쓰므로 추가 메모리 오버헤드 무시가능.
+    static const std::vector<Row>& table()
     {
-        static const juce::Array<Row> rows
+        static const std::vector<Row> rows
         {
             // --- Status / feedback
             { "status.ready",             "준비됨",                         "Ready" },
