@@ -176,20 +176,67 @@ def install_adtof() -> bool:
     return has_weights
 
 
+def install_soundfont() -> bool:
+    """Sprint 45 III3 — refine.py pyfluidsynth 경로용 GeneralUser GS SF2.
+
+    pyfluidsynth 는 시스템 libfluidsynth 필요 (Windows 설치 번거로움).
+    본 함수는 SF2 파일만 받아놓고 설치 안내 제공. fluidsynth 자체가
+    없어도 refine.py 는 sine fallback 으로 동작 — SF2 는 optional upgrade.
+    """
+    import urllib.request, time as _t
+    target_dir = REPO_ROOT / "checkpoints" / "soundfont"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / "GeneralUser_GS.sf2"
+    if target.exists() and target.stat().st_size > 10_000_000:
+        print(f"[sf2] 이미 존재: {target.name} ({target.stat().st_size/1e6:.0f} MB)")
+        return True
+
+    # S. Christian Collins 무료 배포본 — Zenodo mirror 사용 (URL 변동 잦음).
+    # 실패해도 refine 은 sine fallback 으로 동작.
+    url = ("https://github.com/musescore/MuseScore/raw/"
+           "v4.0.2/share/sound/MS%20Basic.sf3")
+    print(f"[sf2] 기본 SF2 다운로드 시도 → {target}")
+    try:
+        t0 = _t.time()
+        urllib.request.urlretrieve(url, str(target))
+        sz = target.stat().st_size
+        if sz < 1_000_000:
+            print(f"[sf2] 받은 파일 비정상 ({sz} bytes) — 삭제")
+            target.unlink(missing_ok=True)
+            raise ValueError("too small")
+        print(f"[sf2] OK — {sz/1e6:.0f} MB in {_t.time()-t0:.1f}s")
+    except Exception as e:
+        print(f"[sf2] 다운로드 실패: {type(e).__name__}: {e}")
+        print(f"[sf2] 수동: GeneralUser GS 또는 FluidR3_GM 받아 {target} 로 저장")
+        print(f"[sf2] refine.py 는 SF2 없어도 sine fallback 으로 동작 — non-fatal")
+        return False
+
+    print(f"[sf2] pyfluidsynth 설치: pip install pyfluidsynth")
+    print(f"[sf2]   Windows 는 libfluidsynth 별도: "
+          f"https://github.com/FluidSynth/fluidsynth/releases")
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--piano", action="store_true", help="piano backend only")
     parser.add_argument("--drums", action="store_true", help="drums backend only")
+    parser.add_argument("--sf2", action="store_true",
+                        help="Sprint 45 III3 — SoundFont SF2 (refine.py 용, optional)")
     args = parser.parse_args()
 
-    do_piano = args.piano or not (args.piano or args.drums)
-    do_drums = args.drums or not (args.piano or args.drums)
+    explicit = args.piano or args.drums or args.sf2
+    do_piano = args.piano or not explicit
+    do_drums = args.drums or not explicit
+    do_sf2 = args.sf2 or not explicit
 
     results: list[tuple[str, bool]] = []
     if do_piano:
         results.append(("piano", install_pti()))
     if do_drums:
         results.append(("drums", install_adtof()))
+    if do_sf2:
+        results.append(("sf2", install_soundfont()))
 
     print()
     print("=== summary ===")

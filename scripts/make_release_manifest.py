@@ -117,13 +117,23 @@ def run(staging: Path | None, zip_path: Path | None) -> int:
         print(f"    {info}  ({zs/1e6:.1f} MB)")
 
         # RELEASE_INFO.txt
+        # Sprint 45 III4 — 버전/주요 변경 cross-ref
+        version_note = zip_path.stem.replace("MidiGPT-", "").replace("-win64", "")
         rel_info_lines = [
             f"MidiGPT Release — {zip_path.stem}",
+            f"Version:   {version_note}",
             f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
             f"",
             f"ZIP:    {zip_path.name}",
             f"Size:   {zs/1e6:.1f} MB",
             f"SHA256: {zh}",
+            f"",
+            f"주요 변경 (자세한 내용은 CHANGELOG.md):",
+            f"  - 다중 LoRA 핫스왑 + 블렌딩 (Sprint 43~44)",
+            f"  - Audio2MIDI source-filter refine (Sprint 43~44)",
+            f"  - 톤 분류기 간이 strings/brass/woodwind (Sprint 44)",
+            f"  - SFT 페어 정제 도구 + 회귀 테스트 세트 (Sprint 40~44)",
+            f"  - 데모 preflight 8 체크 자동화 (Sprint 42~44)",
             f"",
             f"설치:",
             f"  1. zip 압축 해제",

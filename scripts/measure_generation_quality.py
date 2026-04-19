@@ -233,19 +233,51 @@ def measure(gen_dir: Path, input_midi: Path | None, out: Path | None) -> int:
     return 1 if failures else 0
 
 
+def _classify_audio_if_available(audio: Path) -> dict | None:
+    """Sprint 45 III5 — tone_classify 연동 (optional)."""
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "tools" / "audio_to_midi"))
+        from tone_classify import classify_other
+        family, conf, info = classify_other(audio)
+        return {"family": family, "confidence": conf,
+                "scores": info.get("scores")}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--gen_dir", default="./output", help="생성 MIDI 폴더")
     ap.add_argument("--input_midi", default=None,
                     help="기준 입력 MIDI (density 비율 계산용, 선택)")
+    ap.add_argument("--audio", default=None,
+                    help="원본 오디오 (tone_classify 결과 리포트에 포함, Sprint 45 III5)")
     ap.add_argument("--out", default=None, help="JSON 리포트 경로 (선택)")
     args = ap.parse_args()
 
-    sys.exit(measure(
+    rc = measure(
         Path(args.gen_dir),
         Path(args.input_midi) if args.input_midi else None,
         Path(args.out) if args.out else None,
-    ))
+    )
+
+    # Sprint 45 III5 — tone 정보를 기존 리포트에 덧붙이기 (비침습적)
+    if args.audio and args.out and Path(args.out).exists():
+        tone = _classify_audio_if_available(Path(args.audio))
+        if tone:
+            import json as _json
+            try:
+                with open(args.out, "r", encoding="utf-8") as fp:
+                    rep = _json.load(fp)
+                rep["tone_classify"] = tone
+                with open(args.out, "w", encoding="utf-8") as fp:
+                    _json.dump(rep, fp, ensure_ascii=False, indent=2)
+                print(f"[tone] family={tone.get('family')} "
+                      f"conf={tone.get('confidence', 0):.2f}")
+            except Exception as e:
+                print(f"[tone] 리포트 패치 실패: {e}")
+
+    sys.exit(rc)
 
 
 if __name__ == "__main__":

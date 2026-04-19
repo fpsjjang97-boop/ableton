@@ -95,6 +95,11 @@ midigpt_pipeline/sft_audit*.json
 # Third-party cloned repos (ADTOF 등 — download_checkpoints.py 가 재생성)
 third_party/
 
+# Sprint 45 III3 — SoundFont (download_checkpoints.py --sf2 로 재생성)
+checkpoints/soundfont/
+*.sf2
+*.sf3
+
 # Training / server run logs and ephemeral state
 pipeline_run.log
 pipeline_pid.txt

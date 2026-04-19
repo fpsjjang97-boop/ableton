@@ -4,6 +4,66 @@
 
 ---
 
+## [0.9.1-beta] — 2026-04-19 (Sprint 40~45)
+
+### 진단 도구 (Sprint 40~41)
+- **feat(ops)** SFT 페어 토큰 감사 `scripts/audit_sft_tokens.py` —
+  OOR / 길이 / 중복 / 특수토큰 위치 검사. `--ckpt_vocab_size` 로
+  체크포인트 embedding 범위 대조.
+- **feat(ops)** LoRA dtype/device 런타임 감사 `scripts/audit_lora_dtype.py` —
+  checkpoint 로드 + apply_lora + forward 스모크 (fp32 + fp16).
+- **feat(ops)** 체크포인트 vocab 호환성 `scripts/verify_checkpoint_vocab.py` —
+  ckpt.vocab_size vs VOCAB.size 차이 리포트.
+- **feat(data)** SFT 페어 정제 `scripts/clean_sft_pairs.py` —
+  block_size trim + dedup + 특수토큰 필터. 원본 14,622 → 7,913 clean.
+
+### Inference (Sprint 41~43)
+- **fix(inference)** `generate_to_midi` 가 FSM 을 전달하지 않던 회귀
+  복원 (패턴 C 단일화). `use_grammar` 파라미터 추가. 서버 두 경로
+  동시 수정.
+- **feat(inference)** 다중 LoRA 핫스왑 — `register_lora`, `activate_lora`,
+  `registered_loras`. 파일 I/O 없이 전환 <5ms. 기존 `load_lora`
+  호환 유지 (내부적으로 register+activate 조합).
+- **feat(inference)** LoRA blending — `blend_loras({name: weight, ...})`.
+  가중 평균 활성화, `active_lora = "blend:(...)"` 표기.
+- **feat(server)** `/register_lora /activate_lora /blend_loras /loras`
+  엔드포인트. `/load_lora` 유지 (구 클라이언트 호환).
+- **feat(server)** CLI `--lora name=path,...` + `--lora_config <json>` 로
+  startup 시 여러 preset auto-register.
+
+### Audio2MIDI (Sprint 43~44)
+- **feat(a2m)** Source-filter 반복 정제 `tools/audio_to_midi/refine.py` —
+  synth vs original mel diff 에서 hot frame 추출 → ghost 제거 (velocity<30)
+  + 미검출 구간 basic_pitch 재채보 (낮은 threshold).
+- **feat(a2m)** `convert.py --refine` opt-in flag. 실패 시 silent skip.
+- **feat(a2m)** 톤 분류기 `tools/audio_to_midi/tone_classify.py` —
+  librosa 기본 피처 6-dim → strings/brass/woodwind 3-class 규칙 기반.
+- **feat(ops)** `scripts/download_checkpoints.py --sf2` — GeneralUser/MS Basic
+  SoundFont 자동 획득 (pyfluidsynth upgrade path).
+
+### 배포 / QA (Sprint 40~45)
+- **feat(release)** SHA256 manifest `scripts/make_release_manifest.py` +
+  `make_release.bat [7/7]` 통합. RELEASE_INFO.txt 자동 생성.
+- **feat(qa)** 오프라인 엣지 테스트 `scripts/audio2midi_edge_cases.py` —
+  BPM=0 / 짧은 / 손상 WAV / clean_notes / quantize_notes (14/14 PASS).
+- **feat(qa)** 전체 scripts `--help` 스모크 `scripts/smoke_all_scripts.py` —
+  UTF-8 encoding 통일 (18/18 PASS).
+- **feat(qa)** FSM dedup 회귀 `scripts/regress_fsm_dedup.py`,
+  LoRA swap/blend 회귀 `scripts/regress_lora_swap.py`,
+  refine smoke `scripts/regress_audio2midi_refine.py`.
+- **feat(qa)** 데모 직전 단일 진입 `scripts/demo_preflight.py` —
+  8 체크 집합.
+- **feat(qa)** 오프라인 E2E 파이프라인 `scripts/e2e_pipeline.py` —
+  audio → convert+refine → quality measure → tone classify → JSON.
+- **feat(examples)** LoRA 핫스왑 클라이언트 예시 (Python + curl).
+
+### 호환성
+- 체크포인트: 기존 `midigpt_best.pt` (vocab_size=420) 그대로 호환.
+- Vocab v1.x↔v2.0: 107 토큰 차이 (Art_*/Dyn_*/Expr_*/Mod_*/Pedal_*/PB_*/
+  InstFam_*/확장 styles+tracks). MVP 는 v1.x 유지.
+
+---
+
 ## [Unreleased] — 2026-04-17 ~
 
 ### MidiGPT LLM (6차 리포트 대응)

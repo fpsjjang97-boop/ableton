@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import sys
 from pathlib import Path
 from typing import Optional
@@ -523,26 +524,79 @@ def main():
     parser.add_argument("--lora_citypop", type=str, default=None)
     parser.add_argument("--lora_metal", type=str, default=None)
     parser.add_argument("--lora_classical", type=str, default=None)
+    # Sprint 45 III1 — 일반화된 LoRA preset:
+    #   --lora name1=path1,name2=path2        (CLI 콤마 구분)
+    #   --lora_config config.json             (JSON: {"name": "path", ...})
+    # 기존 --lora_{jazz/citypop/metal/classical} 은 하위호환 유지.
+    parser.add_argument("--lora", type=str, default=None,
+                        help="name=path 쌍을 콤마로 (예: jazz=a.bin,pop=b.bin)")
+    parser.add_argument("--lora_config", type=str, default=None,
+                        help="JSON 파일에서 LoRA preset 읽기")
+    parser.add_argument("--no_autoactivate", action="store_true",
+                        help="preset 자동 register 만 하고 첫 항목 activate 스킵")
     args = parser.parse_args()
 
-    lora_paths = {}
-    if args.lora_jazz:
-        lora_paths["jazz"] = args.lora_jazz
-    if args.lora_citypop:
-        lora_paths["citypop"] = args.lora_citypop
-    if args.lora_metal:
-        lora_paths["metal"] = args.lora_metal
-    if args.lora_classical:
-        lora_paths["classical"] = args.lora_classical
+    lora_paths: dict[str, str] = {}
+    # 기존 4 프리셋
+    for name_attr, preset_name in (("lora_jazz", "jazz"),
+                                    ("lora_citypop", "citypop"),
+                                    ("lora_metal", "metal"),
+                                    ("lora_classical", "classical")):
+        v = getattr(args, name_attr)
+        if v:
+            lora_paths[preset_name] = v
+    # 일반화된 --lora_config (JSON)
+    if args.lora_config:
+        try:
+            cfg_path = Path(args.lora_config)
+            data = json.loads(cfg_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                print(f"[MidiGPT Server] --lora_config 포맷 오류: dict 필요")
+            else:
+                for k, v in data.items():
+                    lora_paths[str(k)] = str(v)
+        except Exception as e:
+            print(f"[MidiGPT Server] --lora_config 로드 실패: {type(e).__name__}: {e}")
+    # CLI 콤마 구분
+    if args.lora:
+        for pair in args.lora.split(","):
+            if "=" not in pair:
+                print(f"[MidiGPT Server] --lora 항목 무시 (= 없음): {pair}")
+                continue
+            n, p = pair.split("=", 1)
+            n, p = n.strip(), p.strip()
+            if n and p:
+                lora_paths[n] = p
 
     print(f"[MidiGPT Server] Loading model: {args.model}")
     _inference = MidiGPTInference(InferenceConfig(
         model_path=args.model,
         lora_paths=lora_paths if lora_paths else None,
     ))
+
+    # Sprint 45 III1 — 모든 preset 을 startup 시 register (파일 존재 시).
+    # Activate 는 첫 항목만 (no_autoactivate 면 skip).
+    registered = []
+    for name, path in lora_paths.items():
+        if not Path(path).exists():
+            print(f"[MidiGPT Server] LoRA '{name}' 경로 부재 — skip: {path}")
+            continue
+        try:
+            _inference.register_lora(name, path)
+            registered.append(name)
+        except Exception as e:
+            print(f"[MidiGPT Server] LoRA '{name}' register 실패: {e}")
+    if registered and not args.no_autoactivate:
+        try:
+            _inference.activate_lora(registered[0])
+            print(f"[MidiGPT Server] Auto-activated: {registered[0]}")
+        except Exception as e:
+            print(f"[MidiGPT Server] Auto-activate 실패: {e}")
+
     print(f"[MidiGPT Server] Loaded. Listening on http://{args.host}:{args.port}")
+    print(f"[MidiGPT Server] Registered LoRAs: {registered or 'none'}")
     print(f"[MidiGPT Server] Endpoints: /health /status /generate /load_lora "
-          f"/register_lora /activate_lora /loras")
+          f"/register_lora /activate_lora /blend_loras /loras")
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
