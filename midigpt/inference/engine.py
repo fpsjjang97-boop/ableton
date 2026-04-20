@@ -14,6 +14,7 @@ Features:
 """
 from __future__ import annotations
 
+import copy
 import math
 import os
 import time
@@ -613,6 +614,9 @@ class MidiGPTInference:
         beam_width: int = 4,
         length_penalty: float = 1.0,
         chords: list | None = None,
+        grammar: Optional[MidiGrammarFSM] = None,
+        repetition_penalty: float = 1.0,
+        no_repeat_ngram_size: int = 0,
     ) -> list[tuple[list[int], float]]:
         """Return top ``beam_width`` sequences sorted by score (highest first).
 
@@ -626,6 +630,16 @@ class MidiGPTInference:
             length_penalty: Exponent applied to sequence length in scoring.
                 ``>1`` prefers longer sequences, ``<1`` prefers shorter ones.
             chords: Optional chord events for harmonic masking.
+            grammar: Optional ``MidiGrammarFSM`` already warmed with the
+                prompt. If provided, the same grammar is cloned per beam so
+                each beam carries independent Bar/Pos/Track/Pitch state.
+                This closes the prior gap where the sampling path used the
+                FSM (bar monotonicity, pitch dedup) but the beam path did
+                not — a rules/05 패턴 C violation.
+            repetition_penalty: CTRL-style penalty applied per beam before
+                topk (1.0 = disabled).
+            no_repeat_ngram_size: HuggingFace-style n-gram blocking per
+                beam (0 = disabled).
 
         Returns:
             List of ``(token_ids, score)`` tuples sorted by descending score.
@@ -636,16 +650,21 @@ class MidiGPTInference:
         eos_id = self.vocab.eos_id
         prompt_len = input_ids.size(1)
 
-        # Each beam: (token_id_list, cumulative_log_prob)
-        active_beams: list[tuple[list[int], float]] = [
-            (input_ids[0].tolist(), 0.0),
+        # Each beam: (token_id_list, cumulative_log_prob, grammar_or_none).
+        # Grammar state is per-beam because beams diverge — sharing one FSM
+        # instance across beams would corrupt Bar/Pos/Pitch dedup state.
+        root_grammar = copy.deepcopy(grammar) if grammar is not None else None
+        active_beams: list[tuple[list[int], float, Optional[MidiGrammarFSM]]] = [
+            (input_ids[0].tolist(), 0.0, root_grammar),
         ]
         finished_beams: list[tuple[list[int], float]] = []
 
         for step in range(max_tokens):
-            all_candidates: list[tuple[list[int], float]] = []
+            all_candidates: list[
+                tuple[list[int], float, Optional[MidiGrammarFSM]]
+            ] = []
 
-            for seq, cum_log_prob in active_beams:
+            for seq, cum_log_prob, beam_grammar in active_beams:
                 seq_tensor = torch.tensor(
                     [seq], dtype=torch.long, device=self.device,
                 )
@@ -666,6 +685,25 @@ class MidiGPTInference:
                 context = seq
                 logits[0] = self._apply_harmonic_mask(logits[0], context)
 
+                # Grammar FSM (Bar monotonicity, pitch dedup, Pitch→Vel→Dur)
+                if beam_grammar is not None:
+                    logits[0] = beam_grammar.apply(logits[0], batch=0)
+
+                # Repetition guards — same policy as sampling path so the
+                # bar-loop symptom (Type 2) cannot silently re-emerge when
+                # a caller flips use_beam_search=True.
+                if repetition_penalty != 1.0 or no_repeat_ngram_size > 0:
+                    seq_ctx = seq_tensor if seq_tensor.size(1) <= block_size \
+                        else seq_tensor[:, -block_size:]
+                    if repetition_penalty != 1.0:
+                        logits = self._apply_repetition_penalty(
+                            logits, seq_ctx, repetition_penalty,
+                        )
+                    if no_repeat_ngram_size > 0:
+                        logits = self._block_repeat_ngrams(
+                            logits, seq_ctx, no_repeat_ngram_size,
+                        )
+
                 # Convert to log probabilities
                 log_probs = F.log_softmax(logits[0], dim=-1)  # (V,)
 
@@ -685,7 +723,16 @@ class MidiGPTInference:
                         score = new_cum / (gen_len ** length_penalty)
                         finished_beams.append((new_seq, score))
                     else:
-                        all_candidates.append((new_seq, new_cum))
+                        # Clone the parent beam's grammar and observe the
+                        # new token so the child beam enters the next step
+                        # with correctly advanced state.
+                        child_grammar = (
+                            copy.deepcopy(beam_grammar)
+                            if beam_grammar is not None else None
+                        )
+                        if child_grammar is not None:
+                            child_grammar.observe(token_id, batch=0)
+                        all_candidates.append((new_seq, new_cum, child_grammar))
 
             # If no active candidates remain, stop
             if not all_candidates:
@@ -701,7 +748,7 @@ class MidiGPTInference:
                 break
 
         # Move remaining active beams to finished (force-finish)
-        for seq, cum_log_prob in active_beams:
+        for seq, cum_log_prob, _g in active_beams:
             gen_len = len(seq) - prompt_len
             if gen_len > 0:
                 score = cum_log_prob / (gen_len ** length_penalty)
@@ -1017,6 +1064,18 @@ class MidiGPTInference:
 
         if use_beam_search:
             # --- Beam search path ---
+            # Construct the FSM once and warm it with the prompt; beam_search
+            # clones it per beam so state does not leak between beams.
+            beam_grammar: Optional[MidiGrammarFSM] = None
+            if use_grammar:
+                beam_grammar = MidiGrammarFSM(
+                    vocab=self.vocab,
+                    allow_forward_bar_jump=grammar_forward_bar_jump,
+                    dedup_pitches=grammar_dedup_pitches,
+                )
+                for tid in input_ids:
+                    beam_grammar.observe(tid, batch=0)
+
             input_tensor = torch.tensor(
                 [input_ids], dtype=torch.long, device=self.device,
             )
@@ -1027,6 +1086,9 @@ class MidiGPTInference:
                 beam_width=beam_width,
                 length_penalty=length_penalty,
                 chords=chords,
+                grammar=beam_grammar,
+                repetition_penalty=repetition_penalty,
+                no_repeat_ngram_size=no_repeat_ngram_size,
             )
             for seq, _score in beam_results:
                 variation_ids = seq[sep_pos:]

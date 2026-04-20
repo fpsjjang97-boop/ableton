@@ -153,6 +153,12 @@ def step_generate(
                     repetition_penalty=repetition_penalty,
                     no_repeat_ngram_size=no_repeat_ngram_size,
                     use_kv_cache=True,
+                    # Explicit FSM parameters — rules/05 패턴 C: policy
+                    # must not rely on implicit defaults that could silently
+                    # diverge if engine.generate_to_midi defaults change.
+                    use_grammar=True,
+                    grammar_dedup_pitches=True,
+                    grammar_forward_bar_jump=1,
                 )
                 write_meta(
                     out_path,

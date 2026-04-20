@@ -3,6 +3,7 @@ import sys
 sys.path.insert(0, ".")
 
 from midigpt.inference.engine import InferenceConfig, MidiGPTInference
+from midigpt.inference.constrained import MidiGrammarFSM
 from midigpt.tokenizer.encoder import SongMeta
 import torch
 
@@ -26,16 +27,31 @@ if input_ids and input_ids[-1] == engine.vocab.eos_id:
     input_ids = input_ids[:-1]
 input_ids.append(engine.vocab.sep_id)
 
-# Generate
+# Generate — match the production inference policy (rules/05 패턴 C): FSM
+# grammar, EOS suppression, and repetition guards applied just like
+# generate_to_midi() does. Previously this debug script ran unprotected
+# and disagreed with what the server / production CLI actually emit.
+grammar = MidiGrammarFSM(
+    vocab=engine.vocab,
+    allow_forward_bar_jump=1,
+    dedup_pitches=True,
+)
+for tid in input_ids:
+    grammar.observe(tid, batch=0)
+
 input_tensor = torch.tensor([input_ids], dtype=torch.long, device=engine.device)
 with torch.no_grad():
     output = engine._generate_with_harmony(
         input_tensor,
         max_new_tokens=512,
+        min_new_tokens=256,
         temperature=0.85,
         top_k=50,
         top_p=0.95,
         eos_id=engine.vocab.eos_id,
+        repetition_penalty=1.1,
+        no_repeat_ngram_size=4,
+        grammar=grammar,
     )
 
 generated_ids = output[0].tolist()[len(input_ids):]

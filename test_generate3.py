@@ -4,7 +4,20 @@ sys.path.insert(0, ".")
 
 import torch
 from midigpt.inference.engine import InferenceConfig, MidiGPTInference
+from midigpt.inference.constrained import MidiGrammarFSM
 from midigpt.tokenizer.vocab import VOCAB
+
+
+def _fresh_grammar(engine, prompt_ids):
+    """Build a MidiGrammarFSM warmed with the prompt, matching production."""
+    g = MidiGrammarFSM(
+        vocab=engine.vocab,
+        allow_forward_bar_jump=1,
+        dedup_pitches=True,
+    )
+    for tid in prompt_ids:
+        g.observe(tid, batch=0)
+    return g
 
 config = InferenceConfig(
     model_path="./checkpoints/midigpt_latest.pt",
@@ -22,10 +35,14 @@ with torch.no_grad():
     output = engine._generate_with_harmony(
         input_tensor,
         max_new_tokens=2048,
+        min_new_tokens=256,
         temperature=0.85,
         top_k=50,
         top_p=0.95,
         eos_id=VOCAB.eos_id,
+        repetition_penalty=1.1,
+        no_repeat_ngram_size=4,
+        grammar=_fresh_grammar(engine, bos_ids),
     )
 
 gen_ids = output[0].tolist()
@@ -74,10 +91,14 @@ if bar2_pos:
         output = engine._generate_with_harmony(
             input_tensor,
             max_new_tokens=2048,
+            min_new_tokens=256,
             temperature=0.85,
             top_k=50,
             top_p=0.95,
             eos_id=VOCAB.eos_id,
+            repetition_penalty=1.1,
+            no_repeat_ngram_size=4,
+            grammar=_fresh_grammar(engine, prompt),
         )
 
     gen_ids2 = output[0].tolist()[len(prompt):]
