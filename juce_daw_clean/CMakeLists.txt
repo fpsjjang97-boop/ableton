@@ -25,6 +25,35 @@ endif()
 add_subdirectory(external/JUCE EXCLUDE_FROM_ALL)
 
 # -----------------------------------------------------------------------------
+# Sprint 49 NNN1 — r8brain-free-src (high-quality resampler, opt-in)
+# -----------------------------------------------------------------------------
+# When MIDIGPTDAW_WITH_R8BRAIN=ON is passed at CMake configure time, we
+# FetchContent the library (MIT license) and compile it as a static lib.
+# Default OFF so existing builds are not forced to reach the internet.
+#
+# Override the fetch with -DFETCHCONTENT_SOURCE_DIR_R8BRAIN_FREE_SRC=... to
+# point at a local clone (air-gapped environments).
+option(MIDIGPTDAW_WITH_R8BRAIN
+       "Fetch r8brain-free-src and enable it as a ResamplerWrapper backend" OFF)
+
+if(MIDIGPTDAW_WITH_R8BRAIN)
+    include(FetchContent)
+    FetchContent_Declare(
+        r8brain_free_src
+        GIT_REPOSITORY https://github.com/avaneev/r8brain-free-src.git
+        GIT_TAG        master   # pin to a specific tag in NNN2
+    )
+    FetchContent_MakeAvailable(r8brain_free_src)
+
+    add_library(midigpt_r8brain STATIC
+        ${r8brain_free_src_SOURCE_DIR}/r8bbase.cpp
+        ${r8brain_free_src_SOURCE_DIR}/pffft.cpp
+    )
+    target_include_directories(midigpt_r8brain PUBLIC ${r8brain_free_src_SOURCE_DIR})
+    message(STATUS "MidiGPTDAW: r8brain-free-src enabled at ${r8brain_free_src_SOURCE_DIR}")
+endif()
+
+# -----------------------------------------------------------------------------
 # Application target
 # -----------------------------------------------------------------------------
 juce_add_gui_app(MidiGPTDAW
@@ -87,6 +116,9 @@ target_sources(MidiGPTDAW PRIVATE
     Source/Audio/AudioClip.h
     Source/Audio/OfflineRenderer.h
     Source/Audio/OfflineRenderer.cpp
+    # Sprint 49 NNN1 — backend-agnostic resampler wrapper (scaffold only)
+    Source/Audio/ResamplerWrapper.h
+    Source/Audio/ResamplerWrapper.cpp
 
     # Routing (F7)
     Source/Core/Bus.h
@@ -133,6 +165,12 @@ target_link_libraries(MidiGPTDAW PRIVATE
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
+
+# NNN1 — opt-in r8brain backend link (default OFF → no-op).
+if(MIDIGPTDAW_WITH_R8BRAIN)
+    target_compile_definitions(MidiGPTDAW PRIVATE MIDIGPTDAW_WITH_R8BRAIN=1)
+    target_link_libraries(MidiGPTDAW PRIVATE midigpt_r8brain)
+endif()
 
 # -----------------------------------------------------------------------------
 # C++ standard
