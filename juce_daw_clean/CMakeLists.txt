@@ -328,4 +328,28 @@ if(MIDIGPTDAW_BUILD_TESTS)
         target_compile_definitions(MidiGPTResamplerTest PRIVATE MIDIGPTDAW_WITH_R8BRAIN=1)
         target_link_libraries(MidiGPTResamplerTest PRIVATE midigpt_r8brain)
     endif()
+
+    # Sprint 50 OOO5 — TimeStretchWrapper test harness
+    juce_add_console_app(MidiGPTStretchTest
+        PRODUCT_NAME "MidiGPTStretchTest"
+    )
+    target_sources(MidiGPTStretchTest PRIVATE
+        Source/Audio/TimeStretchWrapper.h
+        Source/Audio/TimeStretchWrapper.cpp
+        Source/Audio/ClipStretchUtil.h
+        Source/Audio/ClipStretchUtil.cpp
+        tests/test_stretch.cpp
+    )
+    target_link_libraries(MidiGPTStretchTest PRIVATE
+        juce::juce_audio_basics
+        juce::juce_core
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+    )
+    target_compile_features(MidiGPTStretchTest PRIVATE cxx_std_17)
+
+    if(MIDIGPTDAW_WITH_RUBBERBAND)
+        target_compile_definitions(MidiGPTStretchTest PRIVATE MIDIGPTDAW_WITH_RUBBERBAND=1)
+        target_link_libraries(MidiGPTStretchTest PRIVATE rubberband)
+    endif()
 endif()
