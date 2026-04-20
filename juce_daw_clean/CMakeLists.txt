@@ -244,3 +244,38 @@ target_link_libraries(MidiGPTPlugin PRIVATE
 )
 
 target_compile_features(MidiGPTPlugin PRIVATE cxx_std_17)
+
+# =============================================================================
+# Sprint 49 NNN3 — ResamplerWrapper test harness (opt-in)
+# -----------------------------------------------------------------------------
+# Console app that validates ResamplerWrapper correctness + THD+N quality.
+# Run manually after building to gate future swaps of the resampler backend
+# (Lagrange default / r8brain / future WindowedSinc). Opt-in so the main
+# DAW/plugin build isn't slowed by this extra target.
+# =============================================================================
+option(MIDIGPTDAW_BUILD_TESTS "Build ResamplerWrapper + future test targets" OFF)
+
+if(MIDIGPTDAW_BUILD_TESTS)
+    juce_add_console_app(MidiGPTResamplerTest
+        PRODUCT_NAME "MidiGPTResamplerTest"
+    )
+    target_sources(MidiGPTResamplerTest PRIVATE
+        Source/Audio/ResamplerWrapper.h
+        Source/Audio/ResamplerWrapper.cpp
+        tests/test_resampler.cpp
+    )
+    target_link_libraries(MidiGPTResamplerTest PRIVATE
+        juce::juce_audio_basics
+        juce::juce_audio_formats
+        juce::juce_core
+        juce::juce_dsp
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+    )
+    target_compile_features(MidiGPTResamplerTest PRIVATE cxx_std_17)
+
+    if(MIDIGPTDAW_WITH_R8BRAIN)
+        target_compile_definitions(MidiGPTResamplerTest PRIVATE MIDIGPTDAW_WITH_R8BRAIN=1)
+        target_link_libraries(MidiGPTResamplerTest PRIVATE midigpt_r8brain)
+    endif()
+endif()
