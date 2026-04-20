@@ -1,0 +1,318 @@
+================================================================
+MidiGPT 7차 베타 리포트 — 개발자 회신
+대상: 테스터(유환) | 날짜: 2026-04-20
+대응 커밋: d99bca0
+================================================================
+
+7차 리포트에서 가장 반가웠던 건 "SFT 가 이번에 처음으로 정상 완료"
+라는 결과였습니다. 5차 때 잡은 NaN/FP16/LoRA 3건이 실전에서 안정화된
+셈이니, 파이프라인 근간은 이제 재현 가능하다고 봅니다.
+
+다만 청취 결과 체감 품질이 올라오지 않은 건 **"데이터가 1/6 로
+줄어서"** 가 아니라 **"페어 길이 문제로 실제 학습 신호 대부분이
+버려지고 있었기 때문"** 이었습니다. 7차 로그 자체에 이미 그 숫자가
+박혀 있었는데 처음엔 저도 놓쳤습니다:
+
+    [INFO] SFT load: 171 ok, 0 schema-invalid, 0 malformed,
+           336 truncated-too-much
+
+생성된 페어 507개 중 66% (336개) 가 loader 단계에서 silent 하게
+drop 됐습니다. dataset.py 의 ``truncated-too-much`` 카운트는 "input +
+SEP + output 길이가 block_size(2048) 를 넘어서 output label 이
+4 미만으로 남은 페어" 입니다. 학습에 들어간 것은 171개뿐. 20 epoch
+을 돌려도 시퀀스 컨벤션이 충분히 안 잡히는 게 당연합니다.
+
+즉 근본 원인은 세 가지 증상이 하나의 뿌리에서 분기한 구조였습니다:
+
+    (1) 중간 공백 — Bar 연속성 학습 신호 부족 + 학습/추론 분포 불일치
+    (2) 중복 노트 — beam 경로에서 FSM 이 미적용 (sampling 경로만 OK)
+    (3) 데이터 부족 체감 — 양이 아니라 페어 포맷/길이가 원인
+
+7차 리포트에 적어주신 표면 증상과 실제 근본 원인이 다시 갈라진
+케이스라 5차 때와 같은 패턴을 또 피하지 못했습니다. 이번 대응에서
+구조적으로 고친 내용을 아래에 정리합니다.
+
+
+================================================================
+[1순위] SFT 페어 truncated-too-much 66% drop — bar-window 청킹
+================================================================
+
+■ 리포트 표면 원인
+  "POP909 제외 + midi_data 만 써서 데이터가 1/6 로 줄었다"
+
+■ 실제 근본 원인
+  build_sft_pairs.py 의 continuation 전략이 "전곡을 25/50/75% 에서
+  한 번 자름" 이었습니다. midi_data 의 ALL mix 버전은 16,000 ~
+  16,700 토큰 규모라, 어떻게 잘라도 한쪽이 block_size(2048) 를
+  넘었습니다. dataset.py 의 label 가용성 필터가 "작동은 제대로
+  했지만" loader 가 말없이 66% 를 drop 하는 식으로 귀결된 것.
+
+  POP909 가 있을 때 통과율이 높았던 이유도 이것입니다. POP909 는
+  트랙이 적고 곡이 짧아 전곡 단일 split 이 어차피 block_size 안에
+  들어왔을 뿐, 양(5,852 vs 1,000) 자체가 결정적이지 않았습니다.
+
+■ 수정 내용 (midigpt/build_sft_pairs.py)
+  continuation 을 bar-window 슬라이딩 구조로 교체:
+
+    window_bars = 16 (기본)
+    stride_bars = 8 (50% overlap)
+    split_ratios = [0.25, 0.50, 0.75]
+    max_pair_tokens = 2040 (block_size - SEP - 안전여유)
+    max_pairs_per_file = 50
+
+  각 윈도우 안에서만 split 하므로 페어가 본질적으로 block_size
+  안에 들어옵니다. variation / track_completion 전략에도 동일
+  길이 가드(_pair_fits)를 적용해 세 전략 모두 "생성됐지만 buried
+  되는" 페어를 만들지 않도록 통일했습니다.
+
+  부가 변경:
+    - pair 마다 metadata 에 window_start_bar, window_end_bar,
+      split_bar 저장 (역추적 가능)
+    - summary.json 에 drop 사유별 카운터 기록 (length / empty /
+      tokenize). 다음 실행 때 "왜 적게 생성됐는지" 바로 확인 가능
+    - 광범위 except Exception 을 (OSError, ValueError, IndexError,
+      KeyError) 등 구체 예외로 좁힘 (rules/05 패턴 G)
+
+■ 예상 효과
+  7차 기준 65 파일 × 3 split × 평균 4 윈도우 = **780 ~ 2,500 페어**
+  가 생성되고, 이 중 대부분이 block_size 안에 들어오므로 drop rate
+  는 10% 미만 전망. effective pair 가 171 → 500 ~ 2,000 으로 8배
+  이상 확장됩니다. 동일 20 epoch 이면 학습 신호량도 그만큼 증가.
+
+
+================================================================
+[2순위] 중간 공백 (Bar 점프) — 학습/추론 분포 일치화
+================================================================
+
+■ 리포트 표면 원인
+  "SFT 가 이번에 정상 완료됐는데도 공백 증상 여전함"
+
+■ 실제 근본 원인 (두 겹)
+
+  (a) [1순위] 와 동일. 171 페어로는 모델이 Bar_N → Bar_N+1 패턴을
+      충분히 학습하지 못 함.
+
+  (b) 학습/추론 분포 불일치.
+      기존 continuation 은 output 의 start_time 에서 split_time 을
+      빼서 "output 이 time 0 부터 시작" 하도록 리베이스했습니다.
+      결과: 모델이 SEP 다음에 항상 Bar_0 을 보도록 학습됨.
+      추론 시: input 마지막 Bar 가 Bar_5 이면 FSM 의 current_bar=5.
+      모델이 학습대로 Bar_0 을 emit 시도 → FSM 의 backward-jump
+      가드가 차단 → 모델이 혼란 → 가장 낮은 허용 토큰 (Bar_5 또는
+      Bar_6) 이 아니라 다른 방향으로 튀어 공백 발생.
+
+■ 수정 내용
+  bar-window 청킹에서 output 의 time-rebase 를 제거. 윈도우 안에서
+  notes 를 필터만 하고, encoder 에게 max_bars=w_end 를 넘겨주면
+  encoder 가 "노트 없는 bar 는 skip" 로직을 그대로 써서 자연스레
+  Bar_{split_bar} 부터 emit 합니다. 결과적으로 학습 신호가
+
+      ... Bar_5 Pos_28 ... <SEP> Bar_5 Pos_30 ... (이어짐)
+
+  형태가 되어 추론 시 FSM 의 current_bar 와 충돌 없이 자연스럽게
+  이어집니다.
+
+■ 예상 효과
+  empty_bar_ratio 실측 기준 21% (현재 output/ 25개 베이스라인) →
+  3% 미만 목표. max bar_jump 62 → 1 이하 (FSM 이 강제 차단).
+
+
+================================================================
+[3순위] 노트 중복 — beam 경로 FSM 누락 해소
+================================================================
+
+■ 리포트 표면 원인
+  "여러 트랙에서 동일 위치에 MIDI 노트가 2개씩 겹침. 6차 이후 미해결"
+
+■ 실제 근본 원인 (전수 조사 결과)
+  sampling 경로 (_generate_with_harmony) 는 이미 MidiGrammarFSM 의
+  pitch dedup 과 Bar 단조성을 적용하고 있었지만, **beam_search 경로
+  는 FSM 을 아예 instantiate 하지 않고** 있었습니다. generate_variation
+  에서 use_beam_search=True 로 분기되는 순간 FSM 이 통째로
+  우회되고 있었던 것입니다. 동시에 repetition_penalty /
+  no_repeat_ngram_size 도 beam 경로에는 적용되지 않아 Bar 루프
+  (Type 2) 도 이쪽에서 발생 가능했습니다.
+
+  rules/05 패턴 C (정책이 여러 호출부에 흩어져 한 쪽만 고쳐짐) 의
+  전형이었습니다. 5차 EOS suppression 사고와 같은 구조.
+
+■ 수정 내용 (midigpt/inference/engine.py)
+  - beam_search() 에 grammar / repetition_penalty /
+    no_repeat_ngram_size 파라미터를 추가하고, sampling 경로와 동일
+    하게 적용.
+  - beam 마다 grammar 를 copy.deepcopy 로 분기해 상태 오염 방지
+    (Bar/Pos/Track/Pitch 가 beam 간 섞이지 않도록).
+  - generate_variation 의 beam 분기에서 FSM 을 prompt 로 warm 하고
+    beam_search 에 주입.
+
+  전수 조사에서 추가로 발견된 minor 패턴 C 도 정리:
+    - test_generate2.py, test_generate3.py 가 _generate_with_harmony
+      를 grammar=None 으로 직접 호출하고 있었음 → 서버/production 과
+      동일한 FSM + repetition 정책 적용
+    - scripts/run_self_improvement_loop.py 가 FSM 파라미터를
+      implicit default 에만 의존 → explicit 인수로 고정
+
+■ 예상 효과
+  duplicate_note_count 실측 689 (현재 베이스라인) → 0. sampling +
+  beam 어느 경로로 생성해도 동일 결과.
+
+
+================================================================
+[6차 이월] C.BASS → strings 분류 — 이미 반영 완료
+================================================================
+
+6차 리포트에 적어주신 "C.BASS = 콘트라베이스 → strings" 는 이미
+commit (6차 직후) 에 반영되어 있습니다. 위치:
+
+    midigpt/tokenizer/encoder.py:410-415
+    # 2026-04-17: 테스터 확인 — C.BASS = 콘트라베이스
+    if any(k in name_lower for k in ("c.bass", "c_bass", "cbass")):
+        return "strings"
+
+이 분기가 bass 일반 매치보다 앞에 있어 E.BASS (일렉베이스) 는
+계속 bass 로, C.BASS / C_BASS / CBASS 만 strings 로 분류됩니다.
+
+7차 생성 결과가 아직 이 분류를 안 따르는 것처럼 보이면 다음 두
+가지 중 하나입니다:
+  (1) midi_data 의 원본 트랙 이름이 "CONTRABASS" 나 "DOUBLEBASS"
+      로 되어 있음 — 이 경우는 이미 strings 로 분류됨. 확인 요청
+  (2) 학습 데이터 안에 C.BASS 표기가 아예 없어 모델이 해당 분류를
+      본 적이 없음 — 분류기는 맞지만 학습 신호가 없는 상태
+
+어느 쪽인지 실제 생성 결과의 트랙 이름 한 개만 공유해주시면
+판정 가능합니다.
+
+
+================================================================
+[재학습 가이드] 동업자 작업 체크리스트
+================================================================
+
+pre-train 체크포인트는 유지됩니다 (tokenizer/vocab 불변).
+**SFT 만 재실행** 하면 됩니다.
+
+    cd /path/to/ableton
+    git pull                              # d99bca0 수신
+    rm -rf midigpt_pipeline/sft           # 기존 171 페어 폐기
+    python -m midigpt.pipeline \
+        --midi_dir ./midi_data \
+        --skip_to sft                     # pre-train 재사용, SFT 부터
+
+첫 pair 빌드 출력에서 다음 수치를 확인:
+
+    Total SFT pairs: 700 ~ 2000  (기존 507 → 크게 증가)
+    Skipped at build time: (소수)
+      length=?  empty=?  tokenize=?
+
+그 다음 SFT 로딩 시:
+
+    [INFO] SFT load: <대부분> ok, 0 truncated-too-much
+
+여기서 truncated-too-much 가 여전히 >10% 면 --window_bars / --max_pair_tokens
+를 조정해야 하니 알려주세요.
+
+
+================================================================
+[회귀 게이트] 재학습 후 수치 판정
+================================================================
+
+비-GPU 회귀 스크립트를 추가했습니다. test_generate 로 N 개를 뽑은
+다음 아래를 돌려주세요:
+
+    python scripts/regress_bar_continuity.py ./output/
+
+측정 지표:
+  - avg empty_bar_ratio  (목표 <= 5%)
+  - max bar_jump         (목표 <= 1, FSM 가드 작동 시 자동 0)
+  - max bar_loop_notes   (목표 <  128)
+  - total duplicate_notes(목표 == 0)
+
+현재(7차 결과물) 기준 베이스라인:
+
+    avg empty_bar_ratio : 0.2111 (21%)   FAIL
+    max bar_jump        : 62             FAIL
+    max bar_loop_notes  : 203            FAIL
+    total duplicate_notes : 689          FAIL
+
+재학습 후 실측이 목표선을 통과하면 "실질 해결" 로 확정합니다.
+만약 empty_bar_ratio 는 내려갔는데 bar_loop_notes 가 여전히 높으면
+temperature / top_p / no_repeat_ngram_size 튜닝으로 넘어가고, 그 외
+패턴이면 구조적 문제로 다시 분석합니다.
+
+
+================================================================
+[테스터 질문 답] 데이터 확보 방향
+================================================================
+
+7차 말미의 "POP909 를 완전히 제외한 상태에서 품질을 높이려면 학습
+데이터를 더 확보해야 할 것 같음" 질문에 대한 답입니다.
+
+결론부터: **지금은 데이터 추가보다 이번 청킹 수정의 효과를 먼저
+측정하는 편이 효율적** 입니다. effective pair 가 171 → 수백~수천으로
+늘어난 상태에서 체감 품질이 어디까지 올라오는지 보고, 그 다음에
+필요한 만큼만 데이터를 확충하는 순서를 권장합니다.
+
+추가가 필요해진 시점을 대비한 대안 (우선순위 순):
+
+  (1) **midi_data 자체 확장** (가장 안전)
+      - 현 65 파일 중 Pop/City Pop/J-Pop 류 비중이 절반 이상.
+        Orchestra / Rock / Metal 을 20 ~ 30 파일 추가하면 장르
+        균형이 좋아짐.
+      - 동업자가 직접 편곡하거나 free MIDI archive 정리 후 저작권
+        클리어 파일만 추가.
+
+  (2) **Lakh MIDI Dataset (LMD-clean subset, ~15K 파일)**
+      - POP909 와 달리 특정 곡 편집본이 아니라 다장르 pop/rock.
+        copyright status: research-use permissive (Colin Raffel).
+      - 품질 편차가 크므로 scripts/midi_stats.py 로 트랙 수/길이
+        필터 후 사용 권장.
+
+  (3) **GiantMIDI-Piano (~10K 솔로 피아노 파일)**
+      - 피아노 단독 장르에 편향되지만, 멜로디/화성 기본기에 유효.
+      - POP909 를 뺀 빈자리에 "순수 피아노 재즈/클래식" 쪽 보충용.
+
+  (4) **MAESTRO v3.0 (~1,300 클래식 피아노)**
+      - 품질 매우 높음. 수량 적지만 reference 역할.
+
+data 제외 기준은 그대로 유지 (POP909 제외, commercial-restricted
+데이터셋 제외). 추가 시 scripts/download_datasets.py 확장 스크립트
+작성 요청 주시면 제가 만들어드릴 수 있습니다.
+
+
+================================================================
+[미조치 — 추후 논의]
+================================================================
+
+전수 조사에서 하나 더 발견됐지만 이번 커밋에는 포함하지 않은 건:
+
+  **DAW(VST 플러그인) 이 서버에 use_grammar / grammar_dedup_pitches
+  를 전송하지 않음**
+
+  C++ AIBridge.cpp 가 10개 파라미터만 보내고, FSM 관련 플래그는
+  서버 기본값(True, True) 에 고정돼 있습니다. 버그가 아니라 설계
+  이슈 — 사용자가 VST 에서 FSM on/off 를 못 고르는 상태. 기본값이
+  맞기 때문에 기능상 문제는 없지만, 튜닝 권한이 없습니다.
+
+  다음 DAW 스프린트 때 "Advanced" 섹션으로 노출할지 논의 예정.
+
+
+================================================================
+[요약]
+================================================================
+
+이번 대응:
+  1. bar-window 청킹으로 effective pair 8배+ 확장 + 길이 drop 제거
+  2. output time-rebase 제거로 학습/추론 Bar 분포 일치
+  3. beam 경로 FSM / repetition 통합 — 중복 노트·Bar 루프 차단
+  4. C.BASS 는 이미 반영 완료 (6차 커밋)
+  5. 회귀 수치 게이트 스크립트 제공
+
+동업자 작업:
+  git pull && rm -rf midigpt_pipeline/sft
+  python -m midigpt.pipeline --midi_dir ./midi_data --skip_to sft
+  python scripts/regress_bar_continuity.py ./output/
+
+결과 받은 뒤 수치 기준으로 실질 해결 여부 판정합니다.
+
+================================================================
+끝 — 2026-04-20 지수
+================================================================
