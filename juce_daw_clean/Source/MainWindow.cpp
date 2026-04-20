@@ -56,15 +56,26 @@ MainWindow::MainWindow(const juce::String& name)
     setResizeLimits(1280, 720, 4096, 2160);
     centreWithSize(1600, 900);
 
-    // Attach OpenGL to the content component AFTER setContentOwned so we
-    // pick up the MainContent as the render target. Continuous repainting
-    // keeps every child repainting every frame — bypasses the cold-start
-    // WM_PAINT cascade bug on some Windows/GPU combos.
-    openGLContext.setContinuousRepainting (true);
-    if (auto* content = getContentComponent())
-        openGLContext.attachTo (*content);
+    // OpenGL attach is opt-in via `--opengl` CLI arg. Previously always-on,
+    // but on some Windows/GPU combos the GL context failed silently and
+    // made the paint pipeline WORSE. Default off — software paint path.
+    const auto args = juce::JUCEApplication::getCommandLineParameters();
+    if (args.contains ("--opengl"))
+    {
+        openGLContext.setContinuousRepainting (true);
+        if (auto* content = getContentComponent())
+            openGLContext.attachTo (*content);
+    }
 
     setVisible(true);
+
+    // Front-and-centre: bring to top briefly so the window is impossible
+    // to miss on first launch. Then release always-on-top so the user
+    // can normally layer other windows above.
+    toFront (true);
+    juce::Timer::callAfterDelay (250, [this]() {
+        setAlwaysOnTop (false);
+    });
 }
 
 MainWindow::~MainWindow()
@@ -652,6 +663,27 @@ MainWindow::MainContent::~MainContent()
 
 void MainWindow::MainContent::timerCallback()
 {
+    // Cold-start repaint loop — during the first ~3 seconds, force every
+    // descendant component to repaint on every timer tick (30 Hz). This
+    // is the paint-on-hover hammer: if Windows' WM_PAINT cascade is failing
+    // to reach children, this ensures they all get marked dirty every
+    // frame, so any WM_PAINT that does arrive processes them. After
+    // coldStartTicks expires we drop to the normal behaviour so the timer
+    // isn't burning CPU forever.
+    static int coldStartTicks = 30 * 3;   // 3 seconds at 30 Hz
+    if (coldStartTicks > 0)
+    {
+        --coldStartTicks;
+        std::function<void(juce::Component*)> walk = [&](juce::Component* n)
+        {
+            if (n == nullptr) return;
+            n->repaint();
+            for (int i = 0; i < n->getNumChildComponents(); ++i)
+                walk (n->getChildComponent(i));
+        };
+        walk (this);
+    }
+
     pianoRoll.setPlayheadBeat(audioEngine.getPositionBeats());
     if (audioEngine.isPlaying())
         pianoRoll.repaint();
