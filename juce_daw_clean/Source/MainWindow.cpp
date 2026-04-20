@@ -225,17 +225,89 @@ MainWindow::MainContent::MainContent()
 
     setSize(1600, 900);
 
-    // Review fix — JUCE's default first-paint path leaves some child
-    // components unpainted until the user mouses over them. Force a full
-    // tree repaint after initial layout so every panel draws its final
-    // state on the first frame instead of "appearing" on hover.
+    // Force a full layout.
     resized();
-    for (auto* child : getChildren())
-        if (child != nullptr) child->repaint();
-    repaint();
+
+    // Aggressive first-paint kick. Symptom: individual panels stay invisible
+    // until the mouse hovers over them (classic JUCE cold-start: dirty
+    // flags set in ctor get cleared by the first OS paint that only redraws
+    // the root). Schedule a RECURSIVE repaint on the next message-loop
+    // turn so the OS paint event that follows cover every descendant,
+    // and repeat once more after 100ms in case some panels were still
+    // initializing on the first pass.
+    auto kickRepaint = [self = juce::Component::SafePointer<MainContent>(this)]()
+    {
+        auto* c = self.getComponent();
+        if (c == nullptr) return;
+        std::function<void(juce::Component*)> walk = [&](juce::Component* n)
+        {
+            if (n == nullptr) return;
+            n->repaint();
+            for (int i = 0; i < n->getNumChildComponents(); ++i)
+                walk (n->getChildComponent(i));
+        };
+        walk (c);
+        writeDiagLine ("paint-kick cascade fired, children="
+                      + juce::String (c->getNumChildComponents()));
+    };
+
+    // Window nudge — force the OS compositor to invalidate the full frame.
+    // Known JUCE Windows cold-start issue: the first OS paint only covers
+    // the root, leaving descendant components unpainted until mouseMove
+    // retriggers. Growing and shrinking the top-level window by 1 px causes
+    // WM_SIZE → full WM_PAINT on every child. User symptom: "마우스가
+    // 지나가거나 클릭해야 보임" — this fires a synthetic "mouse" by
+    // resizing immediately.
+    auto nudgeWindow = [self = juce::Component::SafePointer<MainContent>(this)]()
+    {
+        auto* c = self.getComponent();
+        if (c == nullptr) return;
+        auto* top = c->getTopLevelComponent();
+        if (top == nullptr) return;
+        const auto b = top->getBounds();
+        top->setBounds (b.withWidth (b.getWidth() + 1));
+        top->setBounds (b);
+        writeDiagLine ("window nudge fired (size="
+                      + juce::String (b.getWidth()) + "x"
+                      + juce::String (b.getHeight()) + ")");
+    };
+
+    juce::MessageManager::callAsync (kickRepaint);
+    juce::Timer::callAfterDelay (80,  nudgeWindow);
+    juce::Timer::callAfterDelay (160, kickRepaint);
+    juce::Timer::callAfterDelay (500, [this]() { runSelfCheck(); });
 
     // HH5 — check for crash recovery on startup
     checkCrashRecovery();
+}
+
+// ---------------------------------------------------------------------------
+// Runtime self-check — walks the component tree and logs state to
+// daw_debug.log so remote users can share findings without a debugger.
+// ---------------------------------------------------------------------------
+void MainWindow::MainContent::runSelfCheck()
+{
+    writeDiagLine ("== self-check ==");
+    writeDiagLine ("window size = " + juce::String (getWidth())
+                  + " x " + juce::String (getHeight()));
+
+    std::function<void(juce::Component*, int)> walk = [&](juce::Component* n, int depth)
+    {
+        if (n == nullptr) return;
+        juce::String indent;
+        for (int i = 0; i < depth; ++i) indent += "  ";
+        const auto b = n->getBounds();
+        writeDiagLine (indent + "[" + juce::String (depth) + "] '"
+            + n->getName() + "' "
+            + (n->isVisible() ? "V" : "-")
+            + (n->isOpaque() ? "O" : "-")
+            + " bounds=" + b.toString()
+            + " type=" + juce::String (typeid(*n).name()));
+        for (int i = 0; i < n->getNumChildComponents(); ++i)
+            walk (n->getChildComponent(i), depth + 1);
+    };
+    walk (this, 0);
+    writeDiagLine ("== /self-check ==");
 }
 
 bool MainWindow::MainContent::keyPressed(const juce::KeyPress& key, juce::Component*)

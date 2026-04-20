@@ -134,6 +134,13 @@ public: // VV2 — needs access from closeButtonPressed
         // %APPDATA%\MidiGPT\daw_debug.log; reset on each launch.
         static juce::File getDiagLogFile();
         static void writeDiagLine (const juce::String& line);
+
+        // Runtime self-check: walks the component tree, logs every direct
+        // child of MainContent + bottomTabs with type/name/bounds/visible,
+        // and flags suspicious states (0x0 visible components, duplicate
+        // names, overlap) to daw_debug.log. Runs once ~500 ms after
+        // startup so all first-frame paints have had a chance to fire.
+        void runSelfCheck();
     };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
