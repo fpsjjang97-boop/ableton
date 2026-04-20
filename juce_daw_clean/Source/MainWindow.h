@@ -9,6 +9,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_data_structures/juce_data_structures.h>
+#include <juce_opengl/juce_opengl.h>
 #include "Core/AudioEngine.h"
 #include "UI/LookAndFeel.h"
 #include "UI/TransportBar.h"
@@ -29,6 +30,15 @@ public:
 
 private:
     MetallicLookAndFeel metalLookAndFeel;
+
+    // Attach OpenGL to the content component so rendering uses GPU via
+    // JUCE's GL renderer instead of Windows GDI/Direct2D. This bypasses
+    // the cold-start WM_PAINT cascade problem where descendant components
+    // don't receive the first paint event until a mouse-move invalidates
+    // their region. Symptom user reported: "마우스가 지나가거나 클릭해야
+    // 보임". OpenGL context drives its own swap at vsync and repaints
+    // every child every frame.
+    juce::OpenGLContext openGLContext;
 
     class StatusBar : public juce::Component
     {

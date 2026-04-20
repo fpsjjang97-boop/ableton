@@ -55,11 +55,21 @@ MainWindow::MainWindow(const juce::String& name)
     setResizable(true, true);
     setResizeLimits(1280, 720, 4096, 2160);
     centreWithSize(1600, 900);
+
+    // Attach OpenGL to the content component AFTER setContentOwned so we
+    // pick up the MainContent as the render target. Continuous repainting
+    // keeps every child repainting every frame — bypasses the cold-start
+    // WM_PAINT cascade bug on some Windows/GPU combos.
+    openGLContext.setContinuousRepainting (true);
+    if (auto* content = getContentComponent())
+        openGLContext.attachTo (*content);
+
     setVisible(true);
 }
 
 MainWindow::~MainWindow()
 {
+    openGLContext.detach();
     juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
 }
 
