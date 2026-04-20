@@ -3,6 +3,7 @@
  */
 
 #include "MixerPanel.h"
+#include "LookAndFeel.h"   // palette tokens (review fix)
 
 MixerPanel::MixerPanel(AudioEngine& engine)
     : audioEngine(engine)
@@ -45,7 +46,7 @@ void MixerPanel::buildBusStrip(ChannelStrip& cs, int busId)
     cs.muteBtn = std::make_unique<juce::TextButton>("M");
     cs.muteBtn->setClickingTogglesState(true);
     cs.muteBtn->setToggleState(bus->mute, juce::dontSendNotification);
-    cs.muteBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFFF5722));
+    cs.muteBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(MetallicLookAndFeel::warning));
     cs.muteBtn->setTooltip("버스 음소거");  // KKK3
     cs.muteBtn->onClick = [this, busId, &m = *cs.muteBtn] {
         if (auto* b = audioEngine.getBusModel().getBus(busId))
@@ -113,7 +114,7 @@ void MixerPanel::rebuildStrips()
         cs.muteBtn = std::make_unique<juce::TextButton>("M");
         cs.muteBtn->setClickingTogglesState(true);
         cs.muteBtn->setToggleState(track.mute, juce::dontSendNotification);
-        cs.muteBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFFF5722));
+        cs.muteBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(MetallicLookAndFeel::warning));
         cs.muteBtn->setTooltip("트랙 음소거");  // Sprint 47 KKK3
         cs.muteBtn->onClick = [this, id = track.id, &m = *cs.muteBtn] {
             if (auto* t = audioEngine.getTrackModel().getTrack(id))
@@ -125,7 +126,7 @@ void MixerPanel::rebuildStrips()
         cs.soloBtn = std::make_unique<juce::TextButton>("S");
         cs.soloBtn->setClickingTogglesState(true);
         cs.soloBtn->setToggleState(track.solo, juce::dontSendNotification);
-        cs.soloBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFFFC107));
+        cs.soloBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(MetallicLookAndFeel::meterYellow));
         cs.soloBtn->setTooltip("트랙 솔로 — 다른 트랙 자동 음소거");  // Sprint 47 KKK3
         cs.soloBtn->onClick = [this, id = track.id, &s = *cs.soloBtn] {
             if (auto* t = audioEngine.getTrackModel().getTrack(id))
@@ -159,7 +160,7 @@ void MixerPanel::rebuildStrips()
             cs.fxBypassBtn = std::make_unique<juce::TextButton>("FX");
             cs.fxBypassBtn->setClickingTogglesState(true);
             cs.fxBypassBtn->setToggleState(! track.plugins[0].bypass, juce::dontSendNotification);
-            cs.fxBypassBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF2196F3));
+            cs.fxBypassBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(MetallicLookAndFeel::accent));
             cs.fxBypassBtn->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF333333));
             cs.fxBypassBtn->setTooltip("FX 체인 활성/바이패스 (첫 슬롯)");  // Sprint 47 KKK3
             cs.fxBypassBtn->onClick = [this, id = track.id, &btn = *cs.fxBypassBtn] {
@@ -271,18 +272,20 @@ void MixerPanel::rebuildStrips()
     addAndMakeVisible(*masterStrip.dbLabel);
 
     resized();
+    repaint();         // review fix — without this, strips paint only on hover
 }
 
 void MixerPanel::refresh()
 {
     rebuildStrips();
+    repaint();
 }
 
 void MixerPanel::drawVuMeter(juce::Graphics& g, int x, int y, int w, int h,
                               float level, float peak)
 {
     // Background
-    g.setColour(juce::Colour(0xFF0E0E0E));
+    g.setColour(juce::Colour(MetallicLookAndFeel::bgDarkest));
     g.fillRect(x, y, w, h);
 
     float barH = level * h;
@@ -298,7 +301,7 @@ void MixerPanel::drawVuMeter(juce::Graphics& g, int x, int y, int w, int h,
     if (barH > greenH)
     {
         float yH = juce::jmin(barH - greenH, yellowH);
-        g.setColour(juce::Colour(0xFFFFC107));
+        g.setColour(juce::Colour(MetallicLookAndFeel::meterYellow));
         g.fillRect((float)x, (float)(y + h - greenH) - yH, (float)w, yH);
     }
 
@@ -358,7 +361,7 @@ void MixerPanel::mouseWheelMove(const juce::MouseEvent&,
 
 void MixerPanel::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF0E0E0E));
+    g.fillAll(juce::Colour(MetallicLookAndFeel::bgDarkest));
 
     // CC4 — apply scroll offset
     const int sx = -scrollX;

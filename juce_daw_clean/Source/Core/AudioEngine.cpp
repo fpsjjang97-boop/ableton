@@ -131,7 +131,12 @@ void AudioEngine::play()
         midiEngine.setPlaying(true);
     }
     lastMetronomeBeat = -1.0;
-    testBeepSamples = testBeepLength;
+    // Re-trigger the 0.5 s confidence beep on every transport start so the
+    // user hears immediate feedback even if the current project has no
+    // notes near the playhead. Previously this was set to `testBeepLength`
+    // which disabled the beep entirely (condition `testBeepSamples <
+    // testBeepLength` evaluated false).
+    testBeepSamples = 0;
 }
 
 void AudioEngine::stop()

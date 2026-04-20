@@ -12,28 +12,34 @@
 class MetallicLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
-    // Colour palette
-    static constexpr juce::uint32 bgDarkest   = 0xFF0E0E0E;
-    static constexpr juce::uint32 bgDark      = 0xFF161616;
-    static constexpr juce::uint32 bgMid       = 0xFF1E1E1E;
-    static constexpr juce::uint32 bgPanel     = 0xFF1A1A1A;
-    static constexpr juce::uint32 bgHeader    = 0xFF1C1C1C;
-    static constexpr juce::uint32 bgSelected  = 0xFF3A3A3A;
-    static constexpr juce::uint32 bgHover     = 0xFF2A2A2A;
-    static constexpr juce::uint32 accent      = 0xFFC0C0C0;
-    static constexpr juce::uint32 accentLight = 0xFFE0E0E0;
+    // Colour palette — Cakewalk × Ableton Live 11 hybrid (Sprint 51 UI pass).
+    // Base stack borrows Live 11's very-dark neutral charcoal with crisp
+    // flat separation between panels; accent + selection borrow Cakewalk's
+    // signature warm amber gold so interactive elements feel "warm" rather
+    // than the icy blue of the prior Unity pass. Meter/status colours kept
+    // accessible (standard green/yellow/red). Tweak constexpr here to
+    // propagate project-wide.
+    static constexpr juce::uint32 bgDarkest   = 0xFF1B1B1B;   // app frame / root (Live 11 black)
+    static constexpr juce::uint32 bgDark      = 0xFF242424;   // track rows, slider track
+    static constexpr juce::uint32 bgMid       = 0xFF333333;   // buttons, combo, text editor
+    static constexpr juce::uint32 bgPanel     = 0xFF2A2A2A;   // arrangement row shade, panels
+    static constexpr juce::uint32 bgHeader    = 0xFF383838;   // track header, top bars
+    static constexpr juce::uint32 bgSelected  = 0xFFE9A41F;   // Cakewalk amber selection
+    static constexpr juce::uint32 bgHover     = 0xFF404040;
+    static constexpr juce::uint32 accent      = 0xFFE9A41F;   // Cakewalk amber — primary accent
+    static constexpr juce::uint32 accentLight = 0xFFFFC04D;   // hover/active (softer amber)
     static constexpr juce::uint32 textPrimary = 0xFFE8E8E8;
-    static constexpr juce::uint32 textSecondary = 0xFF909090;
-    static constexpr juce::uint32 textDim     = 0xFF505050;
-    static constexpr juce::uint32 border      = 0xFF2A2A2A;
-    static constexpr juce::uint32 gridBar     = 0xFF333333;
-    static constexpr juce::uint32 clipColour  = 0xFF5E81AC;
-    static constexpr juce::uint32 clipSelected = 0xFF88C0D0;
+    static constexpr juce::uint32 textSecondary = 0xFFA8A8A8;
+    static constexpr juce::uint32 textDim     = 0xFF5E5E5E;
+    static constexpr juce::uint32 border      = 0xFF181818;   // Live 11-style hard border
+    static constexpr juce::uint32 gridBar     = 0xFF3A3A3A;
+    static constexpr juce::uint32 clipColour  = 0xFF6A9BD8;   // calm blue — Live 11 default clip
+    static constexpr juce::uint32 clipSelected = 0xFFFFC04D;  // amber on selection
     static constexpr juce::uint32 meterGreen  = 0xFF4CAF50;
     static constexpr juce::uint32 meterYellow = 0xFFFFC107;
     static constexpr juce::uint32 meterRed    = 0xFFF44336;
-    static constexpr juce::uint32 velocityHigh = 0xFFAAAAAA;
-    static constexpr juce::uint32 velocityLow  = 0xFF555555;
+    static constexpr juce::uint32 velocityHigh = 0xFFD0D0D0;
+    static constexpr juce::uint32 velocityLow  = 0xFF606060;
 
     // Sprint 47 KKK1 — semantic color tokens (기존 grayscale 에 상태색 추가)
     // 사용 원칙: warning/danger 는 파괴적 동작 직전, success 는 완료 확인,

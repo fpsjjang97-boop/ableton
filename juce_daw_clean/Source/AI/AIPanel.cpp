@@ -2,12 +2,13 @@
  * MidiGPT DAW - AIPanel.cpp
  */
 
+#include "../UI/LookAndFeel.h"
 #include "AIPanel.h"
 
 AIPanel::AIPanel(AudioEngine& engine)
     : audioEngine(engine)
 {
-    generateButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF4A90D9));
+    generateButton.setColour(juce::TextButton::buttonColourId, juce::Colour(MetallicLookAndFeel::accent));
     generateButton.onClick = [this] { onGenerate(); };
     addAndMakeVisible(generateButton);
 
@@ -60,13 +61,13 @@ AIPanel::~AIPanel()
 
 void AIPanel::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF1E1E2E));
+    g.fillAll(juce::Colour(MetallicLookAndFeel::bgPanel));
 
     g.setColour(juce::Colours::white);
     g.setFont(14.0f);
     g.drawText("MidiGPT AI", 8, 4, getWidth(), 20, juce::Justification::centredLeft);
 
-    g.setColour(juce::Colour(0xFF333355));
+    g.setColour(juce::Colour(MetallicLookAndFeel::bgHeader));
     g.drawHorizontalLine(26, 0.0f, (float)getWidth());
 }
 
@@ -176,10 +177,22 @@ void AIPanel::onGenerate()
         {
             if (result.success)
             {
-                // Add generated MIDI as a new clip on the same track
+                // Add generated MIDI as a new clip on the same track.
+                // Guard against the track's clip list being empty (the
+                // only existing clip could have been deleted between the
+                // request and this callback); default to beat 0 in that
+                // case so the generated content still lands somewhere
+                // sensible.
                 MidiClip newClip;
-                newClip.startBeat = trackPtr->clips.back().startBeat
-                                  + trackPtr->clips.back().lengthBeats;
+                if (trackPtr != nullptr && ! trackPtr->clips.empty())
+                {
+                    const auto& last = trackPtr->clips.back();
+                    newClip.startBeat = last.startBeat + last.lengthBeats;
+                }
+                else
+                {
+                    newClip.startBeat = 0.0;
+                }
                 newClip.sequence = std::move(result.generatedSequence);
 
                 // Calculate clip length from sequence

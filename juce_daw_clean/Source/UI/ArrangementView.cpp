@@ -6,6 +6,7 @@
 #include "../Automation/AutomationEditor.h"
 #include "../Plugin/PluginEditorWindow.h"
 #include "../Command/EditCommands.h"
+#include "LookAndFeel.h"          // palette tokens (review fix — unify hex → token)
 
 ArrangementView::ArrangementView(AudioEngine& engine)
     : audioEngine(engine)
@@ -111,7 +112,7 @@ double ArrangementView::xToBeat(float x) const
 
 void ArrangementView::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF181818));
+    g.fillAll(juce::Colour(MetallicLookAndFeel::bgDarkest));
 
     auto& tracks = audioEngine.getTrackModel().getTracks();
     // CC1 — use visible tracks for rendering
@@ -131,7 +132,7 @@ void ArrangementView::paint(juce::Graphics& g)
         if (y + th < 0 || y > getHeight()) continue;
 
         // Header bg
-        g.setColour(juce::Colour(0xFF252525));
+        g.setColour(juce::Colour(MetallicLookAndFeel::bgHeader));
         g.fillRect(0, y, headerWidth, th);
 
         // Colour bar
@@ -149,23 +150,24 @@ void ArrangementView::paint(juce::Graphics& g)
         g.setFont(10.0f);
         {
             const bool armed = (audioEngine.getAudioRecordingTrack() == track.id);
-            g.setColour(armed ? juce::Colour(0xFFE53935)
-                              : juce::Colour(0xFF555555));
+            g.setColour(armed ? juce::Colour(MetallicLookAndFeel::danger)
+                              : juce::Colour(MetallicLookAndFeel::textDim));
             g.drawText("R", headerBtnLeft(0), y, headerBtnW, th, juce::Justification::centred);
         }
         if (track.mute)
         {
-            g.setColour(juce::Colour(0xFFFF5722));
+            g.setColour(juce::Colour(MetallicLookAndFeel::warning));
             g.drawText("M", headerBtnLeft(1), y, headerBtnW, th, juce::Justification::centred);
         }
         if (track.solo)
         {
-            g.setColour(juce::Colour(0xFFFFC107));
+            g.setColour(juce::Colour(MetallicLookAndFeel::meterYellow));
             g.drawText("S", headerBtnLeft(2), y, headerBtnW, th, juce::Justification::centred);
         }
 
-        // Timeline row bg
-        g.setColour(vi % 2 == 0 ? juce::Colour(0xFF1C1C1C) : juce::Colour(0xFF202020));
+        // Timeline row bg — alternate row shading uses palette tokens.
+        g.setColour(vi % 2 == 0 ? juce::Colour(MetallicLookAndFeel::bgPanel)
+                                : juce::Colour(MetallicLookAndFeel::bgDark));
         g.fillRect(headerWidth, y, (int)timelineW, th);
 
         // Clips

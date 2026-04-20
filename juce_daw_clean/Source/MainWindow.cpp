@@ -65,6 +65,17 @@ MainWindow::~MainWindow()
 
 void MainWindow::closeButtonPressed()
 {
+    // Clean exit deletes the crash-recovery file so the next launch does
+    // not show the "Restore?" popup. panicSave() writes this file every
+    // 2 minutes regardless of crash state; keeping it around after a
+    // normal close was confusing (the popup appeared every session).
+    auto cleanupRecovery = []()
+    {
+        auto rec = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                       .getChildFile("MidiGPTDAW_recovery.mgp");
+        if (rec.existsAsFile()) rec.deleteFile();
+    };
+
     // VV2 — confirm quit if dirty
     auto* content = dynamic_cast<MainContent*>(getContentComponent());
     if (content != nullptr && content->isDirty())
@@ -75,12 +86,13 @@ void MainWindow::closeButtonPressed()
                 .withTitle("Quit")
                 .withMessage("Save changes before quitting?")
                 .withButton("Save").withButton("Quit").withButton("Cancel"),
-            [content](int r) {
-                if (r == 1) { content->saveProject(); juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
-                else if (r == 2) juce::JUCEApplication::getInstance()->systemRequestedQuit();
+            [content, cleanupRecovery](int r) {
+                if (r == 1) { content->saveProject(); cleanupRecovery(); juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
+                else if (r == 2) { cleanupRecovery(); juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
             });
         return;
     }
+    cleanupRecovery();
     juce::JUCEApplication::getInstance()->systemRequestedQuit();
 }
 
@@ -127,12 +139,17 @@ MainWindow::MainContent::MainContent()
     ccLane.setRecordingPredicate(recPred);
     stepSeqView.setRecordingPredicate(recPred);
 
-    // Bottom tabs
-    bottomTabs.addTab("Piano Roll", juce::Colour(0xFF1A1A2E), &pianoRoll, false);
-    bottomTabs.addTab("CC Lane",    juce::Colour(0xFF1A1A1A), &ccLane, false);
-    bottomTabs.addTab("Step Seq",   juce::Colour(0xFF1A1A1A), &stepSeqView, false);
-    bottomTabs.addTab("Mixer",      juce::Colour(0xFF1A1A1A), &mixerPanel, false);
+    // Bottom tabs — use palette tokens so background follows LookAndFeel
+    // instead of baked-in hex. Piano Roll (index 0) is selected explicitly
+    // after mount so the component actually paints on first frame; prior
+    // to this, the tab row was visible but no content showed until the
+    // user clicked a tab.
+    bottomTabs.addTab("Piano Roll", juce::Colour(MetallicLookAndFeel::bgPanel),    &pianoRoll,    false);
+    bottomTabs.addTab("CC Lane",    juce::Colour(MetallicLookAndFeel::bgPanel),    &ccLane,       false);
+    bottomTabs.addTab("Step Seq",   juce::Colour(MetallicLookAndFeel::bgPanel),    &stepSeqView,  false);
+    bottomTabs.addTab("Mixer",      juce::Colour(MetallicLookAndFeel::bgPanel),    &mixerPanel,   false);
     addAndMakeVisible(bottomTabs);
+    bottomTabs.setCurrentTabIndex(0);     // initial activation (review fix)
 
     // Wire clip selection + MM6 auto-scroll mixer
     arrangementView.onClipSelected = [this](MidiClip* clip)
@@ -159,13 +176,34 @@ MainWindow::MainContent::MainContent()
         statusBar.setMessage(msg);
     };
 
-    // Default track with empty clip
+    // Default track with a short demo clip so pressing Play on a fresh
+    // project immediately produces audible synth output. Previously the
+    // clip was empty (silence), which read as "DAW broken" to new users.
     auto& track = audioEngine.getTrackModel().addTrack("MidiGPT Track 1");
     audioEngine.prebuildTrackSynth(track.id); // T1 — GUI-thread alloc
-    MidiClip emptyClip;
-    emptyClip.startBeat = 0;
-    emptyClip.lengthBeats = 16.0;
-    track.clips.push_back(emptyClip);
+    MidiClip demoClip;
+    demoClip.startBeat = 0;
+    demoClip.lengthBeats = 16.0;
+    {
+        // 4-note C major arpeggio over the first beat (C4 E4 G4 C5, 1/4
+        // notes). Users can immediately verify audio output and overwrite
+        // the notes from the Piano Roll.
+        auto addNote = [&](int pitch, double startBeat, double durBeats)
+        {
+            auto on  = juce::MidiMessage::noteOn (1, pitch, (juce::uint8) 100);
+            auto off = juce::MidiMessage::noteOff(1, pitch);
+            on .setTimeStamp(startBeat);
+            off.setTimeStamp(startBeat + durBeats);
+            demoClip.sequence.addEvent(on);
+            demoClip.sequence.addEvent(off);
+        };
+        addNote(60, 0.00, 0.5);   // C4
+        addNote(64, 0.50, 0.5);   // E4
+        addNote(67, 1.00, 0.5);   // G4
+        addNote(72, 1.50, 0.5);   // C5
+        demoClip.sequence.updateMatchedPairs();
+    }
+    track.clips.push_back(demoClip);
 
     pianoRoll.setClip(&track.clips.front());
     mixerPanel.refresh();
@@ -186,6 +224,15 @@ MainWindow::MainContent::MainContent()
         statusBar.setMessage("WARNING: No audio device detected! Go to Help > Audio Settings");
 
     setSize(1600, 900);
+
+    // Review fix — JUCE's default first-paint path leaves some child
+    // components unpainted until the user mouses over them. Force a full
+    // tree repaint after initial layout so every panel draws its final
+    // state on the first frame instead of "appearing" on hover.
+    resized();
+    for (auto* child : getChildren())
+        if (child != nullptr) child->repaint();
+    repaint();
 
     // HH5 — check for crash recovery on startup
     checkCrashRecovery();
@@ -563,17 +610,24 @@ void MainWindow::MainContent::resized()
 {
     auto area = getLocalBounds();
 
+    // Top strip: menu bar + transport (Live 11 / Cakewalk both keep these
+    // anchored at the top of the window; we keep the order menu→transport).
     menuBar.setBounds(area.removeFromTop(24));
     transportBar.setBounds(area.removeFromTop(36));
     statusBar.setBounds(area.removeFromBottom(22));
 
-    // AI panel on right
-    aiPanel.setBounds(area.removeFromRight(250));
+    // Left sidebar — AI panel repurposed as Live 11-style "Browser":
+    // persistent left column with the app's context panel. Cakewalk's
+    // Inspector lives in a similar left slot. Width matches Live's
+    // default browser (~270 px).
+    aiPanel.setBounds(area.removeFromLeft(270));
 
-    // Bottom tabs
+    // Multidock / bottom tabs — Cakewalk Multidock + Live clip/device
+    // view convention: a tabbed dock at the bottom ~1/3 of remaining
+    // height. Kept at 300 px so arrangement stays dominant.
     bottomTabs.setBounds(area.removeFromBottom(300));
 
-    // Arrangement fills the rest
+    // Arrangement / session canvas fills the rest (center column).
     arrangementView.setBounds(area);
 }
 
@@ -604,6 +658,11 @@ juce::PopupMenu MainWindow::MainContent::getMenuForIndex(int idx, const juce::St
             menu.addItem(107, "Import Audio...",      true, false);
             menu.addItem(108, "Render to WAV...",     true, false);
             menu.addItem(110, "Export Audio Stems...", true, false); // II6
+            menu.addSeparator();
+            // Audio→MIDI: surface the existing tools/audio_to_midi pipeline
+            // so users can discover it from the standalone app. Item ID 112
+            // opens a dialog pointing at scripts/e2e_pipeline.py.
+            menu.addItem(112, "Audio → MIDI (external)...", true, false);
             menu.addSeparator();
             {
                 // Z5 — recent files submenu (ids 170..179)
@@ -728,6 +787,20 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
         case 109: exportMidiStems(); break; // AA5
         case 107: importAudioFile(); break;
         case 108: renderToWav(); break;
+        case 112: // Audio→MIDI pipeline — info dialog (external script)
+        {
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::MessageBoxIconType::InfoIcon,
+                "Audio → MIDI",
+                "Audio-to-MIDI conversion runs via the Python pipeline:\n\n"
+                "    python scripts/e2e_pipeline.py --audio <input.wav> "
+                "--output <output.mid>\n\n"
+                "The pipeline uses basic_pitch + source-filter refine and "
+                "writes a .mid file you can drag into the Arrangement or\n"
+                "load with File → Import MIDI.\n\n"
+                "A direct in-DAW action is planned for a future sprint.");
+            break;
+        }
         case 110: // II6 — export audio stems
         {
             auto chooser = std::make_shared<juce::FileChooser>(
@@ -1043,8 +1116,8 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
         case 412: arrangementView.setSnapBeats(1.0); statusBar.setMessage("Snap: 1 Beat"); break;
         case 413: arrangementView.setSnapBeats(0.5); statusBar.setMessage("Snap: 1/8"); break;
         case 414: arrangementView.setSnapBeats(0.25); statusBar.setMessage("Snap: 1/16"); break;
-        case 402: // Mixer
-            bottomTabs.setCurrentTabIndex(1);
+        case 402: // Mixer (tab index 3 — Piano=0, CC=1, StepSeq=2, Mixer=3)
+            bottomTabs.setCurrentTabIndex(3);
             break;
         case 403: // Piano Roll
             bottomTabs.setCurrentTabIndex(0);

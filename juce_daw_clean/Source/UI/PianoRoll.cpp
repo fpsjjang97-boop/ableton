@@ -6,6 +6,7 @@
 
 #include "PianoRoll.h"
 #include "../Command/EditCommands.h"
+#include "LookAndFeel.h"   // palette tokens (review fix)
 
 PianoRoll::PianoRoll()
 {
@@ -35,7 +36,7 @@ double PianoRoll::snapBeat(double beat) const
 // ---------------------------------------------------------------------------
 void PianoRoll::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF1A1A2E));
+    g.fillAll(juce::Colour(MetallicLookAndFeel::bgDarkest));
     drawGrid(g);
     drawNotes(g);
     drawPlayhead(g);
@@ -57,7 +58,7 @@ void PianoRoll::paint(juce::Graphics& g)
 
 void PianoRoll::drawHeader(juce::Graphics& g)
 {
-    g.setColour(juce::Colour(0xFF1C1C1C));
+    g.setColour(juce::Colour(MetallicLookAndFeel::bgDark));
     g.fillRect(0, 0, getWidth(), headerH);
 
     g.setColour(juce::Colour(0xFF909090));
@@ -77,6 +78,9 @@ void PianoRoll::drawHeader(juce::Graphics& g)
 
 void PianoRoll::drawPianoKeys(juce::Graphics& g)
 {
+    // High-contrast keys so the piano column is actually visible against
+    // the dark background — mimics Ableton Live / Cakewalk where white
+    // keys are near-white and black keys are near-black.
     int bottom = gridAreaBottom();
     for (int note = 0; note < 128; ++note)
     {
@@ -84,26 +88,31 @@ void PianoRoll::drawPianoKeys(juce::Graphics& g)
         if (y + noteHeight < headerH || y > bottom) continue;
 
         bool isBlack = juce::MidiMessage::isMidiNoteBlack(note);
-        g.setColour(isBlack ? juce::Colour(0xFF1A1A1A) : juce::Colour(0xFF2C2C2C));
+        g.setColour(isBlack ? juce::Colour(0xFF1A1A1A) : juce::Colour(0xFFCCCCCC));
         g.fillRect(0.0f, y, (float)pianoKeyWidth, noteHeight);
 
-        g.setColour(juce::Colour(0xFF111111));
+        // Key separator — dark line between white keys, lighter on black.
+        g.setColour(isBlack ? juce::Colour(0xFF000000) : juce::Colour(0xFF808080));
         g.drawHorizontalLine(static_cast<int>(y + noteHeight), 0.0f, (float)pianoKeyWidth);
 
         if (note % 12 == 0)
         {
-            g.setColour(juce::Colour(0xFF909090));
-            g.setFont(9.0f);
+            // C note labels are dark text on white keys for readability.
+            g.setColour(juce::Colour(0xFF1A1A1A));
+            g.setFont(juce::Font(9.0f, juce::Font::bold));
             g.drawText("C" + juce::String(note / 12 - 1), 2, (int)y, pianoKeyWidth - 4,
                        (int)noteHeight, juce::Justification::centredLeft);
         }
     }
-    g.setColour(juce::Colour(0xFF333333));
+    // Divider between key column and grid.
+    g.setColour(juce::Colour(MetallicLookAndFeel::border));
     g.drawVerticalLine(pianoKeyWidth, (float)headerH, (float)bottom);
 }
 
 void PianoRoll::drawGrid(juce::Graphics& g)
 {
+    // Grid rows: alternate shading between black-note and white-note rows
+    // so the pitch axis is visually scannable even on an empty clip.
     int bottom = gridAreaBottom(), right = gridAreaRight();
 
     for (int note = 0; note < 128; ++note)
@@ -112,12 +121,14 @@ void PianoRoll::drawGrid(juce::Graphics& g)
         if (y + noteHeight < headerH || y > bottom) continue;
 
         bool isBlack = juce::MidiMessage::isMidiNoteBlack(note);
-        g.setColour(isBlack ? juce::Colour(0xFF141414) : juce::Colour(0xFF1A1A2E));
+        g.setColour(isBlack ? juce::Colour(MetallicLookAndFeel::bgDark)
+                            : juce::Colour(MetallicLookAndFeel::bgPanel));
         g.fillRect((float)pianoKeyWidth, y, (float)(right - pianoKeyWidth), noteHeight);
 
         if (note % 12 == 0)
         {
-            g.setColour(juce::Colour(0xFF333355));
+            // C-row accent line — Cakewalk-style amber tint for octave marker.
+            g.setColour(juce::Colour(MetallicLookAndFeel::accent).withAlpha(0.25f));
             g.drawHorizontalLine((int)y, (float)pianoKeyWidth, (float)right);
         }
     }
