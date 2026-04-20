@@ -58,6 +58,37 @@ if(MIDIGPTDAW_WITH_R8BRAIN)
 endif()
 
 # -----------------------------------------------------------------------------
+# Sprint 50 OOO1 — RubberBand v4 (pitch/time stretch, opt-in, GPL!)
+# -----------------------------------------------------------------------------
+# **Licence warning**: RubberBand is licensed GPL-v2+ OR commercial
+# (Breakfast Quay). Enabling this option links the core library into
+# MidiGPTDAW and the resulting binary inherits GPL terms for distribution,
+# unless a commercial licence is purchased. Default OFF keeps the build
+# licence-clean.
+#
+# Override fetch: -DFETCHCONTENT_SOURCE_DIR_RUBBERBAND_SRC=/path/to/local
+option(MIDIGPTDAW_WITH_RUBBERBAND
+       "Fetch breakfastquay/rubberband and enable TimeStretchWrapper (GPL!)" OFF)
+
+if(MIDIGPTDAW_WITH_RUBBERBAND)
+    # Tamp down rubberband's auxiliary targets before pulling it in.
+    set(RUBBERBAND_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(RUBBERBAND_BUILD_CLI     OFF CACHE BOOL "" FORCE)
+    set(RUBBERBAND_BUILD_VAMP    OFF CACHE BOOL "" FORCE)
+    set(RUBBERBAND_BUILD_LADSPA  OFF CACHE BOOL "" FORCE)
+    set(RUBBERBAND_BUILD_TESTS   OFF CACHE BOOL "" FORCE)
+
+    include(FetchContent)
+    FetchContent_Declare(
+        rubberband_src
+        GIT_REPOSITORY https://github.com/breakfastquay/rubberband.git
+        GIT_TAG        v4.0.0
+    )
+    FetchContent_MakeAvailable(rubberband_src)
+    message(STATUS "MidiGPTDAW: rubberband v4 enabled (expected target: rubberband)")
+endif()
+
+# -----------------------------------------------------------------------------
 # Application target
 # -----------------------------------------------------------------------------
 juce_add_gui_app(MidiGPTDAW
@@ -123,6 +154,9 @@ target_sources(MidiGPTDAW PRIVATE
     # Sprint 49 NNN1 — backend-agnostic resampler wrapper (scaffold only)
     Source/Audio/ResamplerWrapper.h
     Source/Audio/ResamplerWrapper.cpp
+    # Sprint 50 OOO1 — pitch/time stretch wrapper (RubberBand opt-in)
+    Source/Audio/TimeStretchWrapper.h
+    Source/Audio/TimeStretchWrapper.cpp
 
     # Routing (F7)
     Source/Core/Bus.h
@@ -174,6 +208,15 @@ target_link_libraries(MidiGPTDAW PRIVATE
 if(MIDIGPTDAW_WITH_R8BRAIN)
     target_compile_definitions(MidiGPTDAW PRIVATE MIDIGPTDAW_WITH_R8BRAIN=1)
     target_link_libraries(MidiGPTDAW PRIVATE midigpt_r8brain)
+endif()
+
+# OOO1 — opt-in rubberband backend link (default OFF → no-op).
+if(MIDIGPTDAW_WITH_RUBBERBAND)
+    target_compile_definitions(MidiGPTDAW PRIVATE MIDIGPTDAW_WITH_RUBBERBAND=1)
+    # rubberband's CMake normally exports a target named "rubberband".
+    # If a future tag bump changes this (e.g. rubberband::rubberband), fix
+    # here — a hard CMake error on unknown target beats silent disabling.
+    target_link_libraries(MidiGPTDAW PRIVATE rubberband)
 endif()
 
 # -----------------------------------------------------------------------------
