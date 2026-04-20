@@ -128,6 +128,12 @@ public: // VV2 — needs access from closeButtonPressed
         void panicSave();
         void checkCrashRecovery();
         juce::File getCrashRecoveryFile() const;
+
+        // Sprint 51 review — file-based diagnostic log (for remote bug
+        // triage without attaching a debugger). Written to
+        // %APPDATA%\MidiGPT\daw_debug.log; reset on each launch.
+        static juce::File getDiagLogFile();
+        static void writeDiagLine (const juce::String& line);
     };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)

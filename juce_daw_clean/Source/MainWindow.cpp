@@ -610,40 +610,71 @@ void MainWindow::MainContent::resized()
 {
     auto area = getLocalBounds();
 
-    // Top strip: menu bar + transport (Live 11 / Cakewalk both keep these
-    // anchored at the top of the window; we keep the order menu→transport).
     menuBar.setBounds(area.removeFromTop(24));
     transportBar.setBounds(area.removeFromTop(36));
     statusBar.setBounds(area.removeFromBottom(22));
 
-    // Left sidebar — AI panel repurposed as Live 11-style "Browser":
-    // persistent left column with the app's context panel. Cakewalk's
-    // Inspector lives in a similar left slot. Width matches Live's
-    // default browser (~270 px).
-    aiPanel.setBounds(area.removeFromLeft(270));
+    // AI panel — reverted to RIGHT side; the Sprint 51 left-move caused a
+    // ghost double-render we could not isolate. Restore original layout
+    // and pursue the Live 11 Browser sidebar via a dedicated redesign later.
+    aiPanel.setBounds(area.removeFromRight(250));
 
-    // Multidock / bottom tabs — Cakewalk Multidock + Live clip/device
-    // view convention: a tabbed dock at the bottom ~1/3 of remaining
-    // height. Kept at 300 px so arrangement stays dominant.
+    // Bottom multidock tabs.
     bottomTabs.setBounds(area.removeFromBottom(300));
 
-    // Arrangement / session canvas fills the rest (center column).
+    // Arrangement fills the rest.
     arrangementView.setBounds(area);
 
-    // Review fix — force the active tab's content component to re-layout
-    // and paint. JUCE TabbedComponent caches bounds from the FIRST time
-    // a tab is selected; if that happened before MainContent was sized
-    // (our ctor calls setCurrentTabIndex before setSize), the content
-    // gets 0×0 bounds and stays blank until the user toggles tabs.
+    // File-based diagnostic log so we can reason about runtime state
+    // without a debugger. Every resized() call appends bounds of the
+    // key children. Users can share this file to confirm which build
+    // is actually running and what the live layout looks like.
+    writeDiagLine ("resized w=" + juce::String (getWidth())
+                  + " h=" + juce::String (getHeight())
+                  + " ai="  + aiPanel.getBounds().toString()
+                  + " tabs=" + bottomTabs.getBounds().toString()
+                  + " arr="  + arrangementView.getBounds().toString());
+
+    // Force the active tab's content to lay out + paint immediately. JUCE
+    // TabbedComponent caches bounds from the first setCurrentTabIndex,
+    // which fires in our ctor before setSize expanded the window; the
+    // content stays at 0×0 until the user toggles tabs.
     if (auto* cur = bottomTabs.getCurrentContentComponent())
     {
-        // TabbedComponent lays out content inside bounds minus the tab bar.
         const int tabBarH = bottomTabs.getTabBarDepth();
         auto inner = bottomTabs.getLocalBounds().withTrimmedTop(tabBarH);
         cur->setBounds(inner);
         cur->setVisible(true);
         cur->repaint();
+        writeDiagLine ("tab content bounds=" + cur->getBounds().toString()
+                      + " name='" + juce::String(cur->getName()) + "'");
     }
+    else
+    {
+        writeDiagLine ("tab content NULL — bottomTabs has no current content");
+    }
+}
+
+juce::File MainWindow::MainContent::getDiagLogFile()
+{
+    // %APPDATA%\MidiGPT\daw_debug.log — stable path the user can open with
+    // Notepad and paste into a bug report.
+    auto dir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                   .getChildFile ("MidiGPT");
+    dir.createDirectory();
+    return dir.getChildFile ("daw_debug.log");
+}
+
+void MainWindow::MainContent::writeDiagLine (const juce::String& line)
+{
+    static std::once_flag header;
+    auto f = getDiagLogFile();
+    std::call_once (header, [&] {
+        // Truncate on each run so the file only contains the latest session.
+        f.replaceWithText ("[MidiGPT DAW diag log — session started]\n", false, false, "\n");
+    });
+    f.appendText (juce::Time::getCurrentTime().toISO8601 (true)
+                  + "  " + line + "\n", false, false, "\n");
 }
 
 // =============================================================================
