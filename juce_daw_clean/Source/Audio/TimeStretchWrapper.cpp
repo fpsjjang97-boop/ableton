@@ -27,16 +27,16 @@ struct TimeStretchWrapper::RBImpl
 TimeStretchWrapper::TimeStretchWrapper()  = default;
 TimeStretchWrapper::~TimeStretchWrapper() = default;
 
-bool TimeStretchWrapper::stretch (const juce::AudioBuffer<float>& src,
-                                   juce::AudioBuffer<float>&       dst,
-                                   double sampleRate,
-                                   double timeRatio,
-                                   double pitchScale)
+int TimeStretchWrapper::stretch (const juce::AudioBuffer<float>& src,
+                                  juce::AudioBuffer<float>&       dst,
+                                  double sampleRate,
+                                  double timeRatio,
+                                  double pitchScale)
 {
     const int numCh = juce::jmin (src.getNumChannels(), dst.getNumChannels());
     const int numIn = src.getNumSamples();
-    if (numCh <= 0 || numIn <= 0) return false;
-    if (sampleRate <= 0.0 || timeRatio <= 0.0 || pitchScale <= 0.0) return false;
+    if (numCh <= 0 || numIn <= 0) return 0;
+    if (sampleRate <= 0.0 || timeRatio <= 0.0 || pitchScale <= 0.0) return 0;
 
    #if MIDIGPTDAW_WITH_RUBBERBAND
     using RB = RubberBand::RubberBandStretcher;
@@ -76,16 +76,15 @@ bool TimeStretchWrapper::stretch (const juce::AudioBuffer<float>& src,
         if (got == 0) break;          // safety against infinite loop
         outPos += (int) got;
     }
-    return outPos > 0;
+    return outPos;
    #else
-    // Default build — passthrough copy. Callers should inspect hasBackend()
-    // and fall back to AudioClip.playbackRate (coupled pitch+time) when
-    // TimeStretchWrapper reports no backend.
-    juce::ignoreUnused (sampleRate, timeRatio, pitchScale);
-    const int n = juce::jmin (numIn, dst.getNumSamples());
-    for (int ch = 0; ch < numCh; ++ch)
-        dst.copyFrom (ch, 0, src, ch, 0, n);
-    return false;
+    // Default build — no backend. Return 0 so callers uniformly detect
+    // "nothing happened" and fall back to AudioClip.playbackRate / pitch
+    // (coupled). Do NOT copy src→dst here: returning 0 without mutating
+    // dst is a simpler contract for ClipStretchUtil's "leave clip alone
+    // on failure" semantics.
+    juce::ignoreUnused (src, dst, sampleRate, timeRatio, pitchScale, numCh, numIn);
+    return 0;
    #endif
 }
 

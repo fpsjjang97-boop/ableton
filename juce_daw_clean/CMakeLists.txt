@@ -157,6 +157,9 @@ target_sources(MidiGPTDAW PRIVATE
     # Sprint 50 OOO1 — pitch/time stretch wrapper (RubberBand opt-in)
     Source/Audio/TimeStretchWrapper.h
     Source/Audio/TimeStretchWrapper.cpp
+    # Sprint 50 OOO2 — offline AudioClip stretch helper
+    Source/Audio/ClipStretchUtil.h
+    Source/Audio/ClipStretchUtil.cpp
 
     # Routing (F7)
     Source/Core/Bus.h

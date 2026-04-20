@@ -44,14 +44,15 @@ public:
         @param sampleRate  Sample rate of both src and dst.
         @param timeRatio   > 1.0 stretches longer; < 1.0 shorter.
         @param pitchScale  > 1.0 shifts up; < 1.0 shifts down.
-        @returns true iff an actual stretch was performed (RubberBand
-                 active and valid inputs). Returns false in the passthrough
-                 fallback path. */
-    bool stretch (const juce::AudioBuffer<float>& src,
-                  juce::AudioBuffer<float>&       dst,
-                  double sampleRate,
-                  double timeRatio,
-                  double pitchScale);
+        @returns Number of output samples written per channel. 0 if no
+                 backend is available (hasBackend() == false) OR inputs
+                 are invalid. The passthrough path also returns 0 so
+                 callers treat "nothing happened" uniformly. */
+    int stretch (const juce::AudioBuffer<float>& src,
+                 juce::AudioBuffer<float>&       dst,
+                 double sampleRate,
+                 double timeRatio,
+                 double pitchScale);
 
     /** Does this build contain a real backend? False = the default build
         where stretch() copies without adjusting anything. */
