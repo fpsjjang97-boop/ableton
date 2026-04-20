@@ -111,6 +111,15 @@ private:
     int      trimTrackIdx { -1 };
     int      trimClipIdx  { -1 };
 
+    // PPP1 — audio clip fade drag state (top-of-clip handles; distinct from
+    // edge trim which spans the full clip height). Activated only when the
+    // hit falls within the top fadeHandleHeight px of the clip row.
+    enum class FadeMode { None, In, Out };
+    FadeMode fadeMode     { FadeMode::None };
+    int      fadeTrackIdx { -1 };
+    int      fadeClipIdx  { -1 };
+    static constexpr int fadeHandleHeight = 8;
+
     float beatToX(double beat) const;
     double xToBeat(float x) const;
 

@@ -323,6 +323,63 @@ void ArrangementView::paint(juce::Graphics& g)
                 g.drawText(aclip.sourceName, (int)(drawX + 4), y + 2, (int)(drawW - 8), 12,
                            juce::Justification::topLeft);
             }
+
+            // PPP1 — fade region overlays + drag handles. The fade triangle
+            // is drawn in clip-local coords (not clipped by drawX) so the
+            // ramp geometry stays correct even when the clip extends past
+            // the viewport. Draw order: dim fill → bright edge line → handle.
+            {
+                const float clipTopF = (float) clipTop;
+                const float clipBotF = (float) clipBot;
+                const float clipLeftX  = beatToX (aclip.startBeat);
+                const float clipRightX = beatToX (aclip.startBeat + aclip.lengthBeats);
+
+                auto drawHandle = [&] (float hx)
+                {
+                    const float s = 6.0f;
+                    const float hy = clipTopF;
+                    g.setColour (juce::Colours::yellow.withAlpha (0.9f));
+                    g.fillRect (hx - s * 0.5f, hy, s, s);
+                    g.setColour (juce::Colours::black.withAlpha (0.7f));
+                    g.drawRect (hx - s * 0.5f, hy, s, s, 1.0f);
+                };
+
+                if (aclip.fadeInBeats > 0.0)
+                {
+                    const float fadeEndX = beatToX (aclip.startBeat + aclip.fadeInBeats);
+                    juce::Path p;
+                    p.startNewSubPath (clipLeftX, clipBotF);
+                    p.lineTo          (fadeEndX, clipTopF);
+                    p.lineTo          (clipLeftX, clipTopF);
+                    p.closeSubPath();
+                    g.setColour (juce::Colours::black.withAlpha (0.45f));
+                    g.fillPath (p);
+                    g.setColour (juce::Colours::white.withAlpha (0.75f));
+                    g.drawLine (clipLeftX, clipBotF, fadeEndX, clipTopF, 1.2f);
+                }
+                if (aclip.fadeOutBeats > 0.0)
+                {
+                    const float fadeStartX = beatToX (aclip.startBeat + aclip.lengthBeats - aclip.fadeOutBeats);
+                    juce::Path p;
+                    p.startNewSubPath (clipRightX, clipBotF);
+                    p.lineTo          (fadeStartX, clipTopF);
+                    p.lineTo          (clipRightX, clipTopF);
+                    p.closeSubPath();
+                    g.setColour (juce::Colours::black.withAlpha (0.45f));
+                    g.fillPath (p);
+                    g.setColour (juce::Colours::white.withAlpha (0.75f));
+                    g.drawLine (fadeStartX, clipTopF, clipRightX, clipBotF, 1.2f);
+                }
+
+                // Always show handles at the current fade boundary so the
+                // user can grab them even when fadeInBeats == 0 (handle sits
+                // flush against the clip edge). Skip when the handle would
+                // fall outside the viewport.
+                const float hIn  = beatToX (aclip.startBeat + aclip.fadeInBeats);
+                const float hOut = beatToX (aclip.startBeat + aclip.lengthBeats - aclip.fadeOutBeats);
+                if (hIn  >= drawX - 4 && hIn  <= drawX + drawW + 4) drawHandle (hIn);
+                if (hOut >= drawX - 4 && hOut <= drawX + drawW + 4) drawHandle (hOut);
+            }
         }
 
         // T5 + CC6 — Inline automation lane (volume) overlay at row bottom (12px)
@@ -972,6 +1029,37 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
         return;
     }
 
+    // PPP1 — audio clip fade handle hit test. Top fadeHandleHeight px of
+    // the clip row; ±5 px X tolerance. Must run BEFORE the trim hit test
+    // because a fresh fade handle at fadeInBeats==0 sits on the clip edge,
+    // and we want drags in the top strip to adjust fade, not trim.
+    {
+        const int clipTopY = rowTop + 2;                          // matches paint()
+        if (e.y >= clipTopY && e.y <= clipTopY + fadeHandleHeight)
+        {
+            for (int ci = 0; ci < (int)track.audioClips.size(); ++ci)
+            {
+                auto& ac = track.audioClips[(size_t)ci];
+                const float hIn  = beatToX(ac.startBeat + ac.fadeInBeats);
+                const float hOut = beatToX(ac.startBeat + ac.lengthBeats - ac.fadeOutBeats);
+                if (std::abs((float)e.x - hIn) <= 5.0f)
+                {
+                    fadeMode     = FadeMode::In;
+                    fadeTrackIdx = trackIdx;
+                    fadeClipIdx  = ci;
+                    return;
+                }
+                if (std::abs((float)e.x - hOut) <= 5.0f)
+                {
+                    fadeMode     = FadeMode::Out;
+                    fadeTrackIdx = trackIdx;
+                    fadeClipIdx  = ci;
+                    return;
+                }
+            }
+        }
+    }
+
     // X3 — audio clip trim handle hit test (±6px from either edge)
     for (int ci = 0; ci < (int)track.audioClips.size(); ++ci)
     {
@@ -1122,6 +1210,40 @@ void ArrangementView::mouseDrag(const juce::MouseEvent& e)
         return;
     }
 
+    // PPP1 — audio clip fade drag. Updates fadeInBeats / fadeOutBeats
+    // based on the mouse beat; clamped against the opposing fade and a
+    // minimum sliver (1/16 beat) to avoid zero-length gaps between fades.
+    if (fadeMode != FadeMode::None && fadeTrackIdx >= 0 && fadeClipIdx >= 0)
+    {
+        auto& tracks = audioEngine.getTrackModel().getTracks();
+        if (fadeTrackIdx >= (int)tracks.size()) { fadeMode = FadeMode::None; return; }
+        auto& track = tracks[(size_t)fadeTrackIdx];
+        if (fadeClipIdx >= (int)track.audioClips.size()) { fadeMode = FadeMode::None; return; }
+        auto& ac = track.audioClips[(size_t)fadeClipIdx];
+
+        const double mouseBeat   = xToBeat((float)e.x);
+        const double minSliver   = 0.0625;   // 1/16 beat minimum between fades
+        const double maxAllowed  = juce::jmax(0.0, ac.lengthBeats - minSliver);
+
+        if (fadeMode == FadeMode::In)
+        {
+            const double raw = snapBeat(mouseBeat - ac.startBeat);
+            ac.fadeInBeats = juce::jlimit(0.0,
+                                           juce::jmax(0.0, maxAllowed - ac.fadeOutBeats),
+                                           raw);
+        }
+        else // FadeMode::Out
+        {
+            const double clipEnd = ac.startBeat + ac.lengthBeats;
+            const double raw     = snapBeat(clipEnd - mouseBeat);
+            ac.fadeOutBeats = juce::jlimit(0.0,
+                                            juce::jmax(0.0, maxAllowed - ac.fadeInBeats),
+                                            raw);
+        }
+        repaint();
+        return;
+    }
+
     // X3 — audio clip trim drag
     if (trimMode != TrimMode::None && trimTrackIdx >= 0 && trimClipIdx >= 0)
     {
@@ -1248,6 +1370,10 @@ void ArrangementView::mouseUp(const juce::MouseEvent&)
     trimMode = TrimMode::None;     // X3
     trimTrackIdx = -1;
     trimClipIdx = -1;
+
+    fadeMode     = FadeMode::None;  // PPP1
+    fadeTrackIdx = -1;
+    fadeClipIdx  = -1;
 }
 
 void ArrangementView::mouseDoubleClick(const juce::MouseEvent& e)
