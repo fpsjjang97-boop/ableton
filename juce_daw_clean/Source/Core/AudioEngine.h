@@ -13,6 +13,7 @@
 #include "SynthEngine.h"
 #include "TrackModel.h"
 #include "Bus.h"
+#include "../Audio/ResamplerWrapper.h"
 #include "../Plugin/TrackPluginChain.h"
 #include <map>
 #include <memory>
@@ -124,6 +125,14 @@ private:
     juce::AudioBuffer<float> trackBuf;
     juce::AudioBuffer<float> busAccum;
     std::map<int, juce::AudioBuffer<float>> busBuffers; // S4 — per-bus accumulators
+
+    // NNN6 — shared AudioClip resampler + scratch. Sized in
+    // audioDeviceAboutToStart so the audio thread never allocates. Each
+    // clip prepare()s with its own effective source SR per block; the
+    // underlying Lagrange state is reset per prepare() so clips don't
+    // cross-contaminate.
+    midigpt_daw::ResamplerWrapper clipResampler;
+    juce::AudioBuffer<float>      clipScratch;
 
     double currentSampleRate { 44100.0 };
     float masterVolume { 1.0f };

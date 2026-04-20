@@ -5,6 +5,8 @@
 #include "AudioEngine.h"
 #include <set>
 #include <algorithm>
+#include <array>
+#include <cmath>
 
 AudioEngine::AudioEngine()
 {
@@ -472,42 +474,70 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
                     + (juce::int64)(secsIntoClip * clip.sourceSampleRate);
                 if (srcStart >= clip.buffer.getNumSamples()) continue;
 
-                const double srRatio = clip.effectiveSrRatio(currentSampleRate); // PP1
-                const int dstChannels = juce::jmin(trackBuf.getNumChannels(), clip.buffer.getNumChannels());
-                const juce::int64 srcLen = clip.buffer.getNumSamples();
-                for (int ch = 0; ch < dstChannels; ++ch)
+                // NNN6 — replace the inline U4 Catmull-Rom loop with a call
+                // through ResamplerWrapper (JUCE Lagrange by default;
+                // r8brain when MIDIGPTDAW_WITH_R8BRAIN). Keeps the fade
+                // envelope (DD2) and accumulation into trackBuf identical.
+                const int dstChannels = juce::jmin(trackBuf.getNumChannels(),
+                                                   clip.buffer.getNumChannels());
+                if (dstChannels <= 0) continue;
+
+                // Bake clip playbackRate + pitch into an effective source SR.
+                // ResamplerWrapper uses srRatio = sourceSr / destSr; prepare()
+                // per clip per block, RT-safe after reserveChannels().
+                const double rateMul = clip.playbackRate
+                    * (std::abs(clip.pitchSemitones) > 0.01f
+                        ? std::pow(2.0, clip.pitchSemitones / 12.0) : 1.0);
+                const double effSourceSr = clip.sourceSampleRate
+                    * juce::jlimit(0.25, 4.0, rateMul);
+                const double srRatio     = effSourceSr / currentSampleRate;
+
+                // Bound the source slice to what the clip buffer actually
+                // contains; derive the max producible output from that.
+                const juce::int64 srcAvail
+                    = (juce::int64)clip.buffer.getNumSamples() - srcStart;
+                const int srcWanted
+                    = (int)std::ceil((double)numSamples * srRatio) + 8;
+                const int srcLen = (int)juce::jmin((juce::int64)srcWanted, srcAvail);
+                if (srcLen < 4) continue;
+                const int numOut = juce::jmin(numSamples,
+                    (int)((double)(srcLen - 4) / juce::jmax(srRatio, 1.0e-6)));
+                if (numOut <= 0) continue;
+
+                // Non-owning AudioBuffer view of the source slice (avoids
+                // copying the region into a scratch before resampling).
+                const int viewCh = juce::jmin(dstChannels,
+                                              clipScratch.getNumChannels());
+                if (viewCh <= 0) continue;
+                std::array<float*, 16> srcPtrs{};
+                const int vCh = juce::jmin(viewCh, (int)srcPtrs.size());
+                for (int ch = 0; ch < vCh; ++ch)
+                    srcPtrs[(size_t)ch]
+                        = const_cast<float*>(clip.buffer.getReadPointer(ch)) + srcStart;
+                juce::AudioBuffer<float> srcView(srcPtrs.data(), vCh, srcLen);
+
+                // Scratch must be wide enough; otherwise skip this clip
+                // (guards against a shrinking device without re-prepare).
+                if (clipScratch.getNumSamples() < numOut) continue;
+
+                clipResampler.prepare(effSourceSr, currentSampleRate, vCh, numOut);
+                // Temporarily restrict scratch to numOut so process() fills
+                // exactly that many samples per channel without touching
+                // beyond the valid region.
+                juce::AudioBuffer<float> scratchView(
+                    clipScratch.getArrayOfWritePointers(), vCh, numOut);
+                clipResampler.process(srcView, scratchView);
+
+                // DD2 — apply fade envelope and accumulate into trackBuf.
+                for (int ch = 0; ch < vCh; ++ch)
                 {
-                    auto* src = clip.buffer.getReadPointer(ch);
-                    auto* dst = trackBuf.getWritePointer(ch);
-                    // U4 — 4-tap Catmull-Rom (Hermite) cubic interpolation
-                    for (int s = 0; s < numSamples; ++s)
+                    const float* scratchPtr = scratchView.getReadPointer(ch);
+                    float* dst              = trackBuf.getWritePointer(ch);
+                    for (int s = 0; s < numOut; ++s)
                     {
-                        const double srcPos = (double)srcStart + (double)s * srRatio;
-                        const juce::int64 i1 = (juce::int64)std::floor(srcPos);
-                        const juce::int64 i0 = i1 - 1;
-                        const juce::int64 i2 = i1 + 1;
-                        const juce::int64 i3 = i1 + 2;
-                        if (i0 < 0 || i3 >= srcLen) continue;
-
-                        const float t  = (float)(srcPos - (double)i1);
-                        const float y0 = src[(int)i0];
-                        const float y1 = src[(int)i1];
-                        const float y2 = src[(int)i2];
-                        const float y3 = src[(int)i3];
-
-                        // Catmull-Rom polynomial
-                        const float a = -0.5f*y0 + 1.5f*y1 - 1.5f*y2 + 0.5f*y3;
-                        const float b =  y0 - 2.5f*y1 + 2.0f*y2 - 0.5f*y3;
-                        const float c = -0.5f*y0 + 0.5f*y2;
-                        const float d =  y1;
-                        float sample = ((a*t + b)*t + c)*t + d;
-
-                        // DD2 — apply fade envelope
                         const double beatInClip = (curBeat - clip.startBeat)
                             + (double)s * beatsPerSample;
-                        sample *= clip.fadeGainAt(beatInClip);
-
-                        dst[s] += sample;
+                        dst[s] += scratchPtr[s] * clip.fadeGainAt(beatInClip);
                     }
                 }
             }
@@ -864,6 +894,14 @@ void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device)
     busAccum.setSize(outCh, blockSize, false, false, true);
     for (auto& [id, buf] : busBuffers)
         buf.setSize(outCh, blockSize, false, false, true);
+
+    // NNN6 — pre-size clip resample scratch and per-channel interpolator
+    // state so the audio thread never allocates during playback. Reserve a
+    // few extra channels in case a future multichannel audio clip (e.g.
+    // 5.1 stem) needs them — cheap memory, avoids RT surprises.
+    const int resampleCh = juce::jmax(outCh, 8);
+    clipScratch.setSize(resampleCh, blockSize, false, false, true);
+    clipResampler.reserveChannels(resampleCh);
 }
 
 void AudioEngine::audioDeviceStopped()
