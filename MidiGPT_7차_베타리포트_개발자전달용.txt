@@ -1,0 +1,2412 @@
+================================================================
+  MidiGPT 7차 베타 리포트 — 테스터(유환) → 개발자(지수)
+  날짜: 2026-04-20
+  테스트 환경: Windows 10, RTX 4080, Python 3.11.9, PyTorch 2.5.1+cu121
+================================================================
+
+
+================================================================
+[이번 테스트 진행 순서]
+================================================================
+
+1. git pull (지수 최신 업데이트 포함) ✅
+2. 기존 midigpt_pipeline 삭제 후 재토크나이징 ✅
+3. 학습 데이터: midi_data (POP909 제외, 순수 오케스트라/밴드 65개)
+4. 파이프라인 전체 실행 (pre-training + SFT 포함) ✅
+5. test_generate.py 생성 테스트 ✅
+
+
+================================================================
+[파이프라인 결과 — SFT 처음으로 정상 완료!]
+================================================================
+
+■ Pre-training
+  - 데이터: midi_data 65개 (증강 포함 ~1,000개)
+  - Epochs: 10
+  - 총 소요시간: 약 0.4시간 (1563초)
+  - 체크포인트: checkpoints\midigpt_best.pt ✅
+
+■ SFT LoRA 학습 — 이번에 처음으로 정상 완료!!
+  - Epochs: 20
+  - Best loss: 0.2692
+  - NaN: 0  ← 6차까지 매번 NaN 범벅이었는데 이번엔 완전히 해결됨
+  - Valid: 43/43
+  - 소요시간: 2.1분
+  - LoRA 저장: checkpoints\lora\lora_sft_best.bin ✅
+
+  지수가 수정한 NaN 버그(gradient clipping / FP16 스케일링)가
+  정상적으로 적용된 것으로 확인됨. 버그 수정 완료 확인.
+
+
+================================================================
+[생성 결과 청취 — 품질 개선 없음, 원인은 데이터 부족]
+================================================================
+
+SFT까지 정상 완료됐음에도 생성 결과가 이전과 크게 다르지 않았음.
+
+■ 원인 분석
+  이번 학습 데이터:  midi_data 65개 원본 → 증강 후 ~1,000개
+  이전 학습 데이터:  midi_data_combined → 증강 후 5,852개
+
+  데이터가 약 1/6 수준으로 줄어든 상태에서
+  SFT가 시퀀스 패턴을 충분히 학습하기에는 부족했던 것으로 추정.
+  POP909를 제외하라는 요청에 따라 midi_data만 사용했지만,
+  이 데이터량으로는 한계가 있음.
+
+■ 데이터 방향 관련 질문
+  POP909를 완전히 제외한 상태에서 품질을 높이려면
+  학습 데이터를 더 확보해야 할 것 같음.
+  어떤 방향으로 데이터를 늘릴지 가이드 부탁드림.
+
+
+================================================================
+[지속 미해결 — 생성 MIDI 중간 공백 문제]
+================================================================
+
+■ 증상
+  생성된 MIDI를 Cubase에서 열면 중간중간 노트가 없는
+  빈 구간이 반복적으로 발생. 1차 테스트부터 현재까지
+  모든 테스트에서 동일하게 관찰됨.
+
+■ 5차 회신에서 지수가 분석한 원인
+  "모델이 Bar_3 다음 Bar_5로 점프하면 중간 두 마디 공백 발생.
+   SFT가 시퀀스 컨벤션을 강화학습하는 단계라
+   SFT 완료 후 재평가 권장" 이라고 했음.
+
+■ 이번 테스트 결과
+  SFT가 이번에 처음으로 정상 완료됐음에도 공백이 여전함.
+  즉 SFT 완료만으로는 해결되지 않았음.
+
+  데이터가 너무 적어서 SFT가 시퀀스 컨벤션을
+  충분히 학습하지 못한 것인지,
+  아니면 inference/engine.py 의 EOS suppression 또는
+  디코더 로직에 별도 문제가 있는 것인지 판단이 필요함.
+
+■ 확인 요청
+  (1) 데이터를 늘려서 SFT를 다시 돌리면 해결될 가능성이 있는가?
+  (2) 아니면 inference 경로에서 별도 수정이 필요한가?
+
+
+================================================================
+[기타 — 이전 리포트에서 이어지는 미해결 사항]
+================================================================
+
+■ 노트 중복 찍힘 (6차에서 보고)
+  여러 트랙에서 동일 위치에 MIDI 노트가 2개씩 겹쳐 생성됨.
+  이번 테스트에서도 동일하게 관찰됨. 미해결.
+
+■ C.BASS 분류 (6차에서 요청)
+  C.BASS = 콘트라베이스(오케스트라) → strings 로 변경 요청.
+  반영 여부 확인 부탁드림.
+
+
+================================================================
+[환경 정보]
+================================================================
+
+OS        : Windows 10 (19045.6691)
+Python    : 3.11.9 (venv)
+GPU       : NVIDIA GeForce RTX 4080 (17.2 GB)
+PyTorch   : 2.5.1+cu121
+CUDA      : 12.1
+작업 경로  : C:\Users\USER\ableton
+
+================================================================
+학습 로그
+================================================================
+
+(venv) C:\Users\USER\ableton>git pull origin main
+remote: Enumerating objects: 436, done.
+remote: Counting objects: 100% (436/436), done.
+remote: Compressing objects: 100% (168/168), done.
+remote: Total 368 (delta 236), reused 328 (delta 198), pack-reused 0 (from 0)
+Receiving objects: 100% (368/368), 321.83 KiB | 20.11 MiB/s, done.
+Resolving deltas: 100% (236/236), completed with 54 local objects.
+From https://github.com/fpsjjang97-boop/ableton
+ * branch            main       -> FETCH_HEAD
+   b646c95..45e23e4  main       -> origin/main
+Updating b646c95..45e23e4
+Fast-forward
+ .github/ISSUE_TEMPLATE/bug_report.yml              |   80 ++
+ .github/ISSUE_TEMPLATE/config.yml                  |    8 +
+ .github/ISSUE_TEMPLATE/feature_request.yml         |   50 +
+ .gitignore                                         |   18 +
+ CHANGELOG.md                                       |  160 +++
+ CREDITS.md                                         |  145 +++
+ ...36\220\354\240\204\353\213\254\354\232\251.txt" |  147 +++
+ QUICKSTART.md                                      |  125 ++
+ README.md                                          |    2 +
+ docs/business/10_audio2midi_roadmap.md             |  197 +++
+ docs/business/11_demo_storyboard.md                |  108 ++
+ docs/business/12_release_checklist.md              |   91 ++
+ docs/business/13_post_release_ops.md               |  106 ++
+ docs/business/14_sft_audit_report.md               |  133 ++
+ docs/business/15_sprint_37_42_summary.md           |  103 ++
+ docs/business/16_sprint_43_design.md               |  188 +++
+ docs/business/17_sprint_43_44_report.md            |  130 ++
+ docs/business/18_sprint_45_46_report.md            |   84 ++
+ docs/business/19_sprint_47_report.md               |   97 ++
+ docs/business/INDEX.md                             |  114 ++
+ docs/keyboard_shortcuts.md                         |  144 +++
+ docs/samples/README.md                             |   38 +
+ docs/ui_style_guide.md                             |  148 +++
+ examples/lora_hotswap.sh                           |   56 +
+ examples/lora_hotswap_client.py                    |  112 ++
+ juce_daw_clean/CMakeLists.txt                      |   74 ++
+ juce_daw_clean/Source/AI/AIBridge.cpp              |  150 +++
+ juce_daw_clean/Source/AI/AIBridge.h                |   29 +
+ juce_daw_clean/Source/AI/AIPanel.cpp               |   65 +-
+ juce_daw_clean/Source/AI/AIPanel.h                 |   10 +
+ juce_daw_clean/Source/Audio/AudioClip.h            |   33 +
+ juce_daw_clean/Source/Automation/AutomationLane.h  |   13 +-
+ juce_daw_clean/Source/Command/EditCommands.cpp     |   51 +
+ juce_daw_clean/Source/Command/EditCommands.h       |   36 +
+ juce_daw_clean/Source/Core/AudioEngine.cpp         |  310 ++++-
+ juce_daw_clean/Source/Core/AudioEngine.h           |   28 +-
+ juce_daw_clean/Source/Core/MidiEngine.h            |   29 +
+ juce_daw_clean/Source/Core/TrackModel.h            |   73 +-
+ juce_daw_clean/Source/MainWindow.cpp               |  837 ++++++++++++-
+ juce_daw_clean/Source/MainWindow.h                 |   14 +
+ juce_daw_clean/Source/Plugin/PluginHost.cpp        |   12 +-
+ juce_daw_clean/Source/Plugin/PluginHost.h          |    7 +
+ juce_daw_clean/Source/Plugin/TrackPluginChain.h    |   12 +
+ juce_daw_clean/Source/PluginEditor.cpp             | 1173 +++++++++++++++++-
+ juce_daw_clean/Source/PluginEditor.h               |  125 +-
+ juce_daw_clean/Source/PluginProcessor.cpp          |  577 ++++++++-
+ juce_daw_clean/Source/PluginProcessor.h            |  155 ++-
+ juce_daw_clean/Source/PluginUI/I18n.h              |  182 +++
+ juce_daw_clean/Source/PluginUI/MiniPianoRoll.cpp   |  141 +++
+ juce_daw_clean/Source/PluginUI/MiniPianoRoll.h     |   64 +
+ juce_daw_clean/Source/PluginUI/PerformanceHUD.h    |   67 +
+ juce_daw_clean/Source/PluginUI/PluginLogger.h      |   73 ++
+ juce_daw_clean/Source/PluginUI/PresetManager.h     |  110 ++
+ juce_daw_clean/Source/PluginUI/SampleGallery.h     |  100 ++
+ juce_daw_clean/Source/PluginUI/TutorialOverlay.h   |  160 +++
+ juce_daw_clean/Source/UI/ArrangementView.cpp       | 1305 ++++++++++++++++++--
+ juce_daw_clean/Source/UI/ArrangementView.h         |   62 +
+ juce_daw_clean/Source/UI/CCLane.cpp                |   35 +-
+ juce_daw_clean/Source/UI/CCLane.h                  |    7 +-
+ juce_daw_clean/Source/UI/LookAndFeel.cpp           |   60 +
+ juce_daw_clean/Source/UI/LookAndFeel.h             |   42 +
+ juce_daw_clean/Source/UI/MixerPanel.cpp            |  151 ++-
+ juce_daw_clean/Source/UI/MixerPanel.h              |   10 +
+ juce_daw_clean/Source/UI/StepSeqView.cpp           |   57 +-
+ juce_daw_clean/Source/UI/StepSeqView.h             |    8 +-
+ juce_daw_clean/Source/UI/TransportBar.cpp          |  145 ++-
+ juce_daw_clean/Source/UI/TransportBar.h            |   11 +
+ juce_daw_clean/build.bat                           |   38 +
+ juce_daw_clean/smoke.bat                           |   54 +
+ midigpt/data/dataset.py                            |   75 +-
+ midigpt/inference/constrained.py                   |  263 ++++
+ midigpt/inference/engine.py                        |  214 +++-
+ midigpt/inference_server.py                        |  331 ++++-
+ midigpt/tokenizer/decoder.py                       |   12 +-
+ midigpt/tokenizer/encoder.py                       |   17 +-
+ midigpt/training/lora.py                           |   67 +
+ midigpt/training/train_sft_lora.py                 |   28 +-
+ requirements-audio2midi.txt                        |   39 +
+ scripts/audio2midi_edge_cases.py                   |  266 ++++
+ scripts/audit_lora_dtype.py                        |  226 ++++
+ scripts/audit_sft_tokens.py                        |  268 ++++
+ scripts/clean_sft_pairs.py                         |  220 ++++
+ scripts/demo_preflight.py                          |  132 ++
+ scripts/doctor.py                                  |  300 +++++
+ scripts/download_checkpoints.py                    |  257 ++++
+ scripts/download_datasets.py                       |    7 +
+ scripts/e2e_pipeline.py                            |  192 +++
+ scripts/e2e_test.py                                |  235 ++++
+ scripts/list_vst_presets.py                        |   87 ++
+ scripts/make_release.bat                           |  112 ++
+ scripts/make_release_manifest.py                   |  171 +++
+ scripts/make_test_midi.py                          |  177 +++
+ scripts/measure_generation_quality.py              |  284 +++++
+ scripts/midi_stats.py                              |  185 +++
+ scripts/regress_audio2midi_refine.py               |  149 +++
+ scripts/regress_fsm_dedup.py                       |  161 +++
+ scripts/regress_lora_swap.py                       |  208 ++++
+ scripts/run_self_improvement_loop.py               |    7 +
+ scripts/setup_audio2midi.bat                       |   61 +
+ scripts/setup_audio2midi.sh                        |   27 +
+ scripts/setup_build_env.bat                        |   69 ++
+ scripts/setup_check.py                             |   12 +
+ scripts/smoke_all_scripts.py                       |  108 ++
+ scripts/tag_release.bat                            |   97 ++
+ scripts/validate_mgp_project.py                    |  157 +++
+ scripts/verify_checkpoint_vocab.py                 |  165 +++
+ tools/audio_to_midi/convert.py                     |  476 ++++++-
+ tools/audio_to_midi/refine.py                      |  341 +++++
+ tools/audio_to_midi/tone_classify.py               |  146 +++
+ tools/dump_generated_tokens.py                     |  205 +++
+ tools/scoring/__init__.py                          |    1 +
+ tools/scoring/dtw_score.py                         |  222 ++++
+ 112 files changed, 15702 insertions(+), 354 deletions(-)
+ create mode 100644 .github/ISSUE_TEMPLATE/bug_report.yml
+ create mode 100644 .github/ISSUE_TEMPLATE/config.yml
+ create mode 100644 .github/ISSUE_TEMPLATE/feature_request.yml
+ create mode 100644 CHANGELOG.md
+ create mode 100644 CREDITS.md
+ create mode 100644 "MidiGPT_6\354\260\250_\353\262\240\355\203\200\353\246\254\355\217\254\355\212\270_\352\260\234\353\260\234\354\236\220\354\240\204\353\213\254\354\232\251.txt"
+ create mode 100644 QUICKSTART.md
+ create mode 100644 docs/business/10_audio2midi_roadmap.md
+ create mode 100644 docs/business/11_demo_storyboard.md
+ create mode 100644 docs/business/12_release_checklist.md
+ create mode 100644 docs/business/13_post_release_ops.md
+ create mode 100644 docs/business/14_sft_audit_report.md
+ create mode 100644 docs/business/15_sprint_37_42_summary.md
+ create mode 100644 docs/business/16_sprint_43_design.md
+ create mode 100644 docs/business/17_sprint_43_44_report.md
+ create mode 100644 docs/business/18_sprint_45_46_report.md
+ create mode 100644 docs/business/19_sprint_47_report.md
+ create mode 100644 docs/business/INDEX.md
+ create mode 100644 docs/keyboard_shortcuts.md
+ create mode 100644 docs/samples/README.md
+ create mode 100644 docs/ui_style_guide.md
+ create mode 100644 examples/lora_hotswap.sh
+ create mode 100644 examples/lora_hotswap_client.py
+ create mode 100644 juce_daw_clean/Source/PluginUI/I18n.h
+ create mode 100644 juce_daw_clean/Source/PluginUI/MiniPianoRoll.cpp
+ create mode 100644 juce_daw_clean/Source/PluginUI/MiniPianoRoll.h
+ create mode 100644 juce_daw_clean/Source/PluginUI/PerformanceHUD.h
+ create mode 100644 juce_daw_clean/Source/PluginUI/PluginLogger.h
+ create mode 100644 juce_daw_clean/Source/PluginUI/PresetManager.h
+ create mode 100644 juce_daw_clean/Source/PluginUI/SampleGallery.h
+ create mode 100644 juce_daw_clean/Source/PluginUI/TutorialOverlay.h
+ create mode 100644 juce_daw_clean/smoke.bat
+ create mode 100644 midigpt/inference/constrained.py
+ create mode 100644 requirements-audio2midi.txt
+ create mode 100644 scripts/audio2midi_edge_cases.py
+ create mode 100644 scripts/audit_lora_dtype.py
+ create mode 100644 scripts/audit_sft_tokens.py
+ create mode 100644 scripts/clean_sft_pairs.py
+ create mode 100644 scripts/demo_preflight.py
+ create mode 100644 scripts/doctor.py
+ create mode 100644 scripts/download_checkpoints.py
+ create mode 100644 scripts/e2e_pipeline.py
+ create mode 100644 scripts/e2e_test.py
+ create mode 100644 scripts/list_vst_presets.py
+ create mode 100644 scripts/make_release.bat
+ create mode 100644 scripts/make_release_manifest.py
+ create mode 100644 scripts/make_test_midi.py
+ create mode 100644 scripts/measure_generation_quality.py
+ create mode 100644 scripts/midi_stats.py
+ create mode 100644 scripts/regress_audio2midi_refine.py
+ create mode 100644 scripts/regress_fsm_dedup.py
+ create mode 100644 scripts/regress_lora_swap.py
+ create mode 100644 scripts/setup_audio2midi.bat
+ create mode 100644 scripts/setup_audio2midi.sh
+ create mode 100644 scripts/setup_build_env.bat
+ create mode 100644 scripts/smoke_all_scripts.py
+ create mode 100644 scripts/tag_release.bat
+ create mode 100644 scripts/validate_mgp_project.py
+ create mode 100644 scripts/verify_checkpoint_vocab.py
+ create mode 100644 tools/audio_to_midi/refine.py
+ create mode 100644 tools/audio_to_midi/tone_classify.py
+ create mode 100644 tools/dump_generated_tokens.py
+ create mode 100644 tools/scoring/__init__.py
+ create mode 100644 tools/scoring/dtw_score.py
+
+(venv) C:\Users\USER\ableton>dir midi_data /b
+.gitkeep
+CITY POP 105 4-4 ALL.mid
+CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid
+CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid
+CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid
+CITY POP 105 4-4 DRUM E.PIANO.mid
+COLOR 190 4-4 BASS DRUM MELODY.mid
+COLOR 190 4-4 PIANO BASS.mid
+COLOR 190 4-4.mid
+HIPHOP 63 4-4 ALL.mid
+HIPHOP 63 4-4 BASS E.GUITAR VOCAL.mid
+HIPHOP 63 4-4 DRUM BASS E.GUITAR.mid
+HIPHOP 63 4-4 DRUM BASS VOCAL.mid
+HOUSE 123 4-4 ALL.mid
+HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK.mid
+HOUSE 123 4-4 DRUM SYNTHBASS VOCAL.mid
+HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL.mid
+HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL.mid
+J POP BASS DRUM 130 4-4.mid
+J POP DRUM PIANO 140 4-4.mid
+J POP MELODY+PIANO.mid
+J POP PIANO BASS DRUM 130 4-4.mid
+J POP PIANO+BASS+DRUM.mid
+J POP.mid
+KPOP GARAGE 165 4-4 ALL.mid
+KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL.mid
+KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD.mid
+KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL.mid
+LATIN ALL 105 4-4.mid
+METAL 110 4-4 ALL GUITAR BASS.mid
+METAL 110 4-4 ALL.mid
+METAL 110 4-4 BASS DRUM.mid
+METAL 110 4-4 GUITAR DRUM.mid
+ORCHESTRA 150 4-4 ALL.mid
+ORCHESTRA 150 4-4 PIANO STRING.mid
+ORCHESTRA 150 4-4 STRING BRASS WOODWIND.mid
+ORCHESTRA 150 4-4 STRING BRASS.mid
+ORCHESTRA 150 4-4 STRING PERC HARP CHOIR.mid
+ORCHESTRA 150 4-4 STRING WOODWIND.mid
+ORCHESTRA 4-4 115 ALL.mid
+ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND.mid
+ORCHESTRA 4-4 115 PIANO STRING BRASS.mid
+ORCHESTRA 4-4 115 PIANO STRING WOODWIND.mid
+ORCHESTRA 4-4 115 STRING PERC.mid
+ORCHESTRA 80 4-4 ALL.mid
+ORCHESTRA 80 4-4 PIANO STRING.mid
+ORCHESTRA 80 4-4 PIANO WOODWIND.mid
+ORCHESTRA 80 4-4 STRING WOODWIND.mid
+ORCHESTRA WALTZ 78 6-8 ALL.mid
+ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid.mid
+ORCHESTRA_67_6-8 ALL.mid
+ORCHESTRA_67_6-8 STRING,BRASS.mid
+ORCHESTRA_67_6-8 STRING,WOODWIND.mid
+ORCHESTRA_67_6-8 STRING.mid
+ROCK 200 4-4 ALL.mid
+ROCK 200 4-4 BASS DRUM.mid
+ROCK 200 4-4 GUITAR BASS.mid
+ROCK 200 4-4 GUITAR DRUM.mid
+STRING_60_4-4 ALL.mid
+STRING_60_4-4 PIANO MELODY STRING.mid
+STRING_60_4-4 PIANO MELODY.mid
+STRING_60_4-4 PIANO STRING GUITAR PAD.mid
+WALTZ 6-8 85 BPM FULL.mid
+WALTZ 6-8 85 BPM PIANO STRING.mid
+WALTZ 6-8 85 BPM STRING.mid
+WALTZ 90 -6-8 REALL.mid
+
+(venv) C:\Users\USER\ableton>rmdir /s /q midigpt_pipeline
+
+(venv) C:\Users\USER\ableton>python -m midigpt.pipeline --midi_dir ./midi_data --epochs 10
+
+============================================================
+  STEP: Augmentation (Key Transposition + Track Dropout)
+============================================================
+
+Found 65 MIDI files
+Transpose: all
+Track dropout: 3 variations/file
+Velocity jitter: +-10%
+Time stretch: +-5%
+Track shuffle: 2 variations/file
+Output: midigpt_pipeline\augmented
+============================================================
+  [1/65] + CITY POP 105 4-4 ALL.mid → 15 augmented
+  [2/65] + CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid → 15 augmented
+  [3/65] + CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid → 15 augmented
+  [4/65] + CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid  → 15 augmented
+  [5/65] + CITY POP 105 4-4 DRUM E.PIANO.mid → 15 augmented
+  [6/65] + COLOR 190 4-4 BASS DRUM MELODY.mid → 15 augmented
+  [7/65] + COLOR 190 4-4 PIANO BASS.mid → 15 augmented
+  [8/65] + COLOR 190 4-4.mid → 15 augmented
+  [9/65] + HIPHOP 63 4-4 ALL.mid → 18 augmented
+  [10/65] + HIPHOP 63 4-4 BASS E.GUITAR VOCAL.mid → 15 augmented
+  [11/65] + HIPHOP 63 4-4 DRUM BASS E.GUITAR.mid → 18 augmented
+  [12/65] + HIPHOP 63 4-4 DRUM BASS VOCAL.mid → 18 augmented
+  [13/65] + HOUSE 123 4-4 ALL.mid → 15 augmented
+  [14/65] + HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK.mid → 15 augmented
+  [15/65] + HOUSE 123 4-4 DRUM SYNTHBASS VOCAL.mid → 15 augmented
+  [16/65] + HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL.mid → 15 augmented
+  [17/65] + HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL.mid → 15 augmented
+  [18/65] + J POP BASS DRUM 130 4-4.mid → 15 augmented
+  [19/65] + J POP DRUM PIANO 140 4-4.mid → 15 augmented
+  [20/65] + J POP MELODY+PIANO.mid → 15 augmented
+  [21/65] + J POP PIANO BASS DRUM 130 4-4.mid → 15 augmented
+  [22/65] + J POP PIANO+BASS+DRUM.mid → 15 augmented
+  [23/65] + J POP.mid → 15 augmented
+  [24/65] + KPOP GARAGE 165 4-4 ALL.mid → 15 augmented
+  [25/65] + KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL.mid → 15 augmented
+  [26/65] + KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD.mid → 15 augmented
+  [27/65] + KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL.mid → 15 augmented
+  [28/65] + LATIN ALL 105 4-4.mid → 15 augmented
+  [29/65] + METAL 110 4-4 ALL GUITAR BASS.mid → 15 augmented
+  [30/65] + METAL 110 4-4 ALL.mid → 15 augmented
+  [31/65] + METAL 110 4-4 BASS DRUM.mid → 15 augmented
+  [32/65] + METAL 110 4-4 GUITAR DRUM.mid → 15 augmented
+  [33/65] + ORCHESTRA 150 4-4 ALL.mid → 15 augmented
+  [34/65] + ORCHESTRA 150 4-4 PIANO STRING.mid → 15 augmented
+  [35/65] + ORCHESTRA 150 4-4 STRING BRASS WOODWIND.mid → 15 augmented
+  [36/65] + ORCHESTRA 150 4-4 STRING BRASS.mid → 15 augmented
+  [37/65] + ORCHESTRA 150 4-4 STRING PERC HARP CHOIR.mid → 15 augmented
+  [38/65] + ORCHESTRA 150 4-4 STRING WOODWIND.mid → 15 augmented
+  [39/65] + ORCHESTRA 4-4 115 ALL.mid → 15 augmented
+  [40/65] + ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND.mid → 15 augmented
+  [41/65] + ORCHESTRA 4-4 115 PIANO STRING BRASS.mid → 15 augmented
+  [42/65] + ORCHESTRA 4-4 115 PIANO STRING WOODWIND.mid → 15 augmented
+  [43/65] + ORCHESTRA 4-4 115 STRING PERC.mid → 15 augmented
+  [44/65] + ORCHESTRA 80 4-4 ALL.mid → 15 augmented
+  [45/65] + ORCHESTRA 80 4-4 PIANO STRING.mid → 15 augmented
+  [46/65] + ORCHESTRA 80 4-4 PIANO WOODWIND.mid → 15 augmented
+  [47/65] + ORCHESTRA 80 4-4 STRING WOODWIND.mid → 15 augmented
+  [48/65] + ORCHESTRA WALTZ 78 6-8 ALL.mid → 15 augmented
+  [49/65] + ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid.mid → 15 augmented
+  [50/65] + ORCHESTRA_67_6-8 ALL.mid → 15 augmented
+  [51/65] + ORCHESTRA_67_6-8 STRING,BRASS.mid → 15 augmented
+  [52/65] + ORCHESTRA_67_6-8 STRING,WOODWIND.mid → 15 augmented
+  [53/65] + ORCHESTRA_67_6-8 STRING.mid → 15 augmented
+  [54/65] + ROCK 200 4-4 ALL.mid → 15 augmented
+  [55/65] + ROCK 200 4-4 BASS DRUM.mid → 15 augmented
+  [56/65] + ROCK 200 4-4 GUITAR BASS.mid → 15 augmented
+  [57/65] + ROCK 200 4-4 GUITAR DRUM.mid → 15 augmented
+  [58/65] + STRING_60_4-4 ALL.mid → 15 augmented
+  [59/65] + STRING_60_4-4 PIANO MELODY STRING.mid → 15 augmented
+  [60/65] + STRING_60_4-4 PIANO MELODY.mid → 15 augmented
+  [61/65] + STRING_60_4-4 PIANO STRING GUITAR PAD.mid → 15 augmented
+  [62/65] + WALTZ 6-8 85 BPM FULL.mid → 15 augmented
+  [63/65] + WALTZ 6-8 85 BPM PIANO STRING.mid → 15 augmented
+  [64/65] + WALTZ 6-8 85 BPM STRING.mid → 15 augmented
+  [65/65] + WALTZ 90 -6-8 REALL.mid → 15 augmented
+
+Copying 65 original files...
+============================================================
+Done! Generated 984 augmented files
+Total dataset: 1049 files (65 originals + 984 augmented)
+Errors: 0
+Time: 158.9s
+Data multiplier: x16.1
+
+[OK] Augmentation (Key Transposition + Track Dropout) complete
+
+============================================================
+  STEP: Tokenization (MIDI → Token Arrays)
+============================================================
+
+Found 1049 MIDI files in midigpt_pipeline\augmented
+Output: midigpt_pipeline\tokenized\tokens
+Workers: 4
+============================================================
+  [1/1049] CITY POP 105 4-4 ALL_trans+11.mid → ok (16124 tokens)
+  [2/1049] CITY POP 105 4-4 ALL_original.mid → ok (16124 tokens)
+  [3/1049] CITY POP 105 4-4 ALL_trans+10.mid → ok (16124 tokens)
+  [4/1049] CITY POP 105 4-4 ALL_trans+1.mid → ok (16124 tokens)
+  [5/1049] CITY POP 105 4-4 ALL_trans+2.mid → ok (16124 tokens)
+  [6/1049] CITY POP 105 4-4 ALL_trans+4.mid → ok (16124 tokens)
+  [7/1049] CITY POP 105 4-4 ALL_trans+5.mid → ok (16124 tokens)
+  [8/1049] CITY POP 105 4-4 ALL_trans+3.mid → ok (16124 tokens)
+  [9/1049] CITY POP 105 4-4 ALL_trans+6.mid → ok (16124 tokens)
+  [10/1049] CITY POP 105 4-4 ALL_trans+8.mid → ok (16124 tokens)
+  [11/1049] CITY POP 105 4-4 ALL_trans+7.mid → ok (16124 tokens)
+  [12/1049] CITY POP 105 4-4 ALL_trans+9.mid → ok (16124 tokens)
+  [13/1049] CITY POP 105 4-4 ALL_tshuffle0.mid → ok (16141 tokens)
+  [14/1049] CITY POP 105 4-4 ALL_tshuffle1.mid → ok (16132 tokens)
+  [15/1049] CITY POP 105 4-4 ALL_tstretch.mid → ok (16678 tokens)
+  [16/1049] CITY POP 105 4-4 ALL_veljit.mid → ok (16124 tokens)
+  [17/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_original.mid → ok (8208 tokens)
+  [18/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+1.mid → ok (8208 tokens)
+  [19/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+10.mid → ok (8208 tokens)
+  [20/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+11.mid → ok (8208 tokens)
+  [21/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+2.mid → ok (8208 tokens)
+  [22/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+3.mid → ok (8208 tokens)
+  [23/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+5.mid → ok (8208 tokens)
+  [24/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+4.mid → ok (8208 tokens)
+  [25/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+6.mid → ok (8208 tokens)
+  [26/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+7.mid → ok (8208 tokens)
+  [27/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+8.mid → ok (8208 tokens)
+  [28/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+9.mid → ok (8208 tokens)
+  [29/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_tshuffle0.mid → ok (8218 tokens)
+  [30/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_tshuffle1.mid → ok (8197 tokens)
+  [31/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_veljit.mid → ok (8208 tokens)
+  [32/1049] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO_tstretch.mid → ok (8262 tokens)
+  [33/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_original.mid → ok (12402 tokens)
+  [34/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+1.mid → ok (12402 tokens)
+  [35/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+11.mid → ok (12402 tokens)
+  [36/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+10.mid → ok (12402 tokens)
+  [37/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+2.mid → ok (12402 tokens)
+  [38/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+3.mid → ok (12402 tokens)
+  [39/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+5.mid → ok (12402 tokens)
+  [40/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+4.mid → ok (12402 tokens)
+  [41/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+6.mid → ok (12402 tokens)
+  [42/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+7.mid → ok (12402 tokens)
+  [43/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+8.mid → ok (12402 tokens)
+  [44/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+9.mid → ok (12402 tokens)
+  [45/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_tshuffle0.mid → ok (12395 tokens)
+  [46/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_tshuffle1.mid → ok (12402 tokens)
+  [47/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_tstretch.mid → ok (12459 tokens)
+  [48/1049] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_veljit.mid → ok (12402 tokens)
+  [49/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_original.mid → ok (14835 tokens)
+  [50/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+1.mid → ok (14835 tokens)
+  [51/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+10.mid → ok (14835 tokens)
+  [52/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+11.mid → ok (14835 tokens)
+  [53/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+3.mid → ok (14835 tokens)
+  [54/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+2.mid → ok (14835 tokens)
+  [55/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+5.mid → ok (14835 tokens)
+  [56/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+4.mid → ok (14835 tokens)
+  [57/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+6.mid → ok (14835 tokens)
+  [58/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+7.mid → ok (14835 tokens)
+  [59/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+8.mid → ok (14835 tokens)
+  [60/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_trans+9.mid → ok (14835 tokens)
+  [61/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_tshuffle0.mid → ok (14841 tokens)
+  [62/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_tshuffle1.mid → ok (14851 tokens)
+  [63/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_tstretch.mid → ok (15457 tokens)
+  [64/1049] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO_veljit.mid → ok (14835 tokens)
+  [65/1049] CITY POP 105 4-4 DRUM E.PIANO_original.mid → ok (5776 tokens)
+  [66/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+1.mid → ok (5776 tokens)
+  [67/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+10.mid → ok (5776 tokens)
+  [68/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+11.mid → ok (5776 tokens)
+  [69/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+2.mid → ok (5776 tokens)
+  [70/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+3.mid → ok (5776 tokens)
+  [71/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+4.mid → ok (5776 tokens)
+  [72/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+5.mid → ok (5776 tokens)
+  [73/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+6.mid → ok (5776 tokens)
+  [74/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+7.mid → ok (5776 tokens)
+  [75/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+8.mid → ok (5776 tokens)
+  [76/1049] CITY POP 105 4-4 DRUM E.PIANO_trans+9.mid → ok (5776 tokens)
+  [77/1049] CITY POP 105 4-4 DRUM E.PIANO_tshuffle0.mid → ok (5778 tokens)
+  [78/1049] CITY POP 105 4-4 DRUM E.PIANO_tshuffle1.mid → ok (5776 tokens)
+  [79/1049] CITY POP 105 4-4 DRUM E.PIANO_tstretch.mid → ok (6127 tokens)
+  [80/1049] CITY POP 105 4-4 DRUM E.PIANO_veljit.mid → ok (5776 tokens)
+  [81/1049] COLOR 190 4-4 BASS DRUM MELODY_original.mid → ok (5658 tokens)
+  [82/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+1.mid → ok (5658 tokens)
+  [83/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+10.mid → ok (5658 tokens)
+  [84/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+11.mid → ok (5658 tokens)
+  [85/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+2.mid → ok (5658 tokens)
+  [86/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+3.mid → ok (5658 tokens)
+  [87/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+4.mid → ok (5658 tokens)
+  [88/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+5.mid → ok (5658 tokens)
+  [89/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+6.mid → ok (5658 tokens)
+  [90/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+7.mid → ok (5658 tokens)
+  [91/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+8.mid → ok (5658 tokens)
+  [92/1049] COLOR 190 4-4 BASS DRUM MELODY_trans+9.mid → ok (5658 tokens)
+  [93/1049] COLOR 190 4-4 BASS DRUM MELODY_tshuffle0.mid → ok (5658 tokens)
+  [94/1049] COLOR 190 4-4 BASS DRUM MELODY_tstretch.mid → ok (5687 tokens)
+  [95/1049] COLOR 190 4-4 BASS DRUM MELODY_tshuffle1.mid → ok (5658 tokens)
+  [96/1049] COLOR 190 4-4 BASS DRUM MELODY_veljit.mid → ok (5658 tokens)
+  [97/1049] COLOR 190 4-4 PIANO BASS_original.mid → ok (4817 tokens)
+  [98/1049] COLOR 190 4-4 PIANO BASS_trans+1.mid → ok (4817 tokens)
+  [99/1049] COLOR 190 4-4 PIANO BASS_trans+10.mid → ok (4817 tokens)
+  [100/1049] COLOR 190 4-4 PIANO BASS_trans+11.mid → ok (4817 tokens)
+  [101/1049] COLOR 190 4-4 PIANO BASS_trans+2.mid → ok (4817 tokens)
+  [102/1049] COLOR 190 4-4 PIANO BASS_trans+3.mid → ok (4817 tokens)
+  [103/1049] COLOR 190 4-4 PIANO BASS_trans+4.mid → ok (4817 tokens)
+  [104/1049] COLOR 190 4-4 PIANO BASS_trans+5.mid → ok (4817 tokens)
+  [105/1049] COLOR 190 4-4 PIANO BASS_trans+6.mid → ok (4817 tokens)
+  [106/1049] COLOR 190 4-4 PIANO BASS_trans+7.mid → ok (4817 tokens)
+  [107/1049] COLOR 190 4-4 PIANO BASS_trans+8.mid → ok (4817 tokens)
+  [108/1049] COLOR 190 4-4 PIANO BASS_trans+9.mid → ok (4817 tokens)
+  [109/1049] COLOR 190 4-4 PIANO BASS_tshuffle0.mid → ok (4817 tokens)
+  [110/1049] COLOR 190 4-4 PIANO BASS_tshuffle1.mid → ok (4814 tokens)
+  [111/1049] COLOR 190 4-4 PIANO BASS_tstretch.mid → ok (4769 tokens)
+  [112/1049] COLOR 190 4-4 PIANO BASS_veljit.mid → ok (4817 tokens)
+  [113/1049] COLOR 190 4-4_original.mid → ok (14165 tokens)
+  [114/1049] COLOR 190 4-4_trans+1.mid → ok (14165 tokens)
+  [115/1049] COLOR 190 4-4_trans+10.mid → ok (14165 tokens)
+  [116/1049] COLOR 190 4-4_trans+11.mid → ok (14165 tokens)
+  [117/1049] COLOR 190 4-4_trans+2.mid → ok (14165 tokens)
+  [118/1049] COLOR 190 4-4_trans+3.mid → ok (14165 tokens)
+  [119/1049] COLOR 190 4-4_trans+4.mid → ok (14165 tokens)
+  [120/1049] COLOR 190 4-4_trans+5.mid → ok (14165 tokens)
+  [121/1049] COLOR 190 4-4_trans+6.mid → ok (14165 tokens)
+  [122/1049] COLOR 190 4-4_trans+7.mid → ok (14165 tokens)
+  [123/1049] COLOR 190 4-4_trans+8.mid → ok (14165 tokens)
+  [124/1049] COLOR 190 4-4_trans+9.mid → ok (14165 tokens)
+  [125/1049] COLOR 190 4-4_tshuffle0.mid → ok (14206 tokens)
+  [126/1049] COLOR 190 4-4_tshuffle1.mid → ok (14268 tokens)
+  [127/1049] COLOR 190 4-4_tstretch.mid → ok (14595 tokens)
+  [128/1049] HIPHOP 63 4-4 ALL_drop_accomp+bass.mid → ok (4496 tokens)
+  [129/1049] COLOR 190 4-4_veljit.mid → ok (14165 tokens)
+  [130/1049] HIPHOP 63 4-4 ALL_drop_accomp+drums.mid → ok (8056 tokens)
+  [131/1049] HIPHOP 63 4-4 ALL_drop_bass+drums.mid → ok (4601 tokens)
+  [132/1049] HIPHOP 63 4-4 ALL_trans+1.mid → ok (8815 tokens)
+  [133/1049] HIPHOP 63 4-4 ALL_original.mid → ok (8815 tokens)
+  [134/1049] HIPHOP 63 4-4 ALL_trans+10.mid → ok (8815 tokens)
+  [135/1049] HIPHOP 63 4-4 ALL_trans+11.mid → ok (8815 tokens)
+  [136/1049] HIPHOP 63 4-4 ALL_trans+3.mid → ok (8815 tokens)
+  [137/1049] HIPHOP 63 4-4 ALL_trans+2.mid → ok (8815 tokens)
+  [138/1049] HIPHOP 63 4-4 ALL_trans+4.mid → ok (8815 tokens)
+  [139/1049] HIPHOP 63 4-4 ALL_trans+5.mid → ok (8815 tokens)
+  [140/1049] HIPHOP 63 4-4 ALL_trans+6.mid → ok (8815 tokens)
+  [141/1049] HIPHOP 63 4-4 ALL_trans+7.mid → ok (8815 tokens)
+  [142/1049] HIPHOP 63 4-4 ALL_trans+8.mid → ok (8815 tokens)
+  [143/1049] HIPHOP 63 4-4 ALL_trans+9.mid → ok (8815 tokens)
+  [144/1049] HIPHOP 63 4-4 ALL_tshuffle0.mid → ok (8821 tokens)
+  [145/1049] HIPHOP 63 4-4 ALL_tshuffle1.mid → ok (8815 tokens)
+  [146/1049] HIPHOP 63 4-4 ALL_veljit.mid → ok (8815 tokens)
+  [147/1049] HIPHOP 63 4-4 ALL_tstretch.mid → ok (9332 tokens)
+  [148/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_original.mid → ok (4496 tokens)
+  [149/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+1.mid → ok (4496 tokens)
+  [150/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+10.mid → ok (4496 tokens)
+  [151/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+11.mid → ok (4496 tokens)
+  [152/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+2.mid → ok (4496 tokens)
+  [153/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+3.mid → ok (4496 tokens)
+  [154/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+4.mid → ok (4496 tokens)
+  [155/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+5.mid → ok (4496 tokens)
+  [156/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+6.mid → ok (4496 tokens)
+  [157/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+7.mid → ok (4496 tokens)
+  [158/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+8.mid → ok (4496 tokens)
+  [159/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_trans+9.mid → ok (4496 tokens)
+  [160/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_tshuffle0.mid → ok (4492 tokens)
+  [161/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_tshuffle1.mid → ok (4492 tokens)
+  [162/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_drop_accomp+bass.mid → ok (2772 tokens)
+  [163/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_tstretch.mid → ok (4844 tokens)
+  [164/1049] HIPHOP 63 4-4 BASS E.GUITAR VOCAL_veljit.mid → ok (4496 tokens)
+  [165/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_drop_accomp+drums.mid → ok (6388 tokens)
+  [166/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_drop_bass+drums.mid → ok (4601 tokens)
+  [167/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_original.mid → ok (7169 tokens)
+  [168/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+1.mid → ok (7169 tokens)
+  [169/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+10.mid → ok (7169 tokens)
+  [170/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+11.mid → ok (7169 tokens)
+  [171/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+2.mid → ok (7169 tokens)
+  [172/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+3.mid → ok (7169 tokens)
+  [173/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+4.mid → ok (7169 tokens)
+  [174/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+5.mid → ok (7169 tokens)
+  [175/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+6.mid → ok (7169 tokens)
+  [176/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+7.mid → ok (7169 tokens)
+  [177/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+8.mid → ok (7169 tokens)
+  [178/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_trans+9.mid → ok (7169 tokens)
+  [179/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_tshuffle0.mid → ok (7169 tokens)
+  [180/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_tshuffle1.mid → ok (7169 tokens)
+  [181/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_drop_accomp+bass.mid → ok (2095 tokens)
+  [182/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_tstretch.mid → ok (7502 tokens)
+  [183/1049] HIPHOP 63 4-4 DRUM BASS E.GUITAR_veljit.mid → ok (7169 tokens)
+  [184/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_drop_accomp+drums.mid → ok (5599 tokens)
+  [185/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_drop_bass+drums.mid → ok (4601 tokens)
+  [186/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_original.mid → ok (6368 tokens)
+  [187/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+1.mid → ok (6368 tokens)
+  [188/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+10.mid → ok (6368 tokens)
+  [189/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+11.mid → ok (6368 tokens)
+  [190/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+2.mid → ok (6368 tokens)
+  [191/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+3.mid → ok (6368 tokens)
+  [192/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+4.mid → ok (6368 tokens)
+  [193/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+5.mid → ok (6368 tokens)
+  [194/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+6.mid → ok (6368 tokens)
+  [195/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+7.mid → ok (6368 tokens)
+  [196/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+8.mid → ok (6368 tokens)
+  [197/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_trans+9.mid → ok (6368 tokens)
+  [198/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_tshuffle0.mid → ok (6368 tokens)
+  [199/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_tshuffle1.mid → ok (6368 tokens)
+  [200/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_tstretch.mid → ok (6756 tokens)
+  [201/1049] HIPHOP 63 4-4 DRUM BASS VOCAL_veljit.mid → ok (6368 tokens)
+  [202/1049] HOUSE 123 4-4 ALL_original.mid → ok (7155 tokens)
+  [203/1049] HOUSE 123 4-4 ALL_trans+1.mid → ok (7155 tokens)
+  [204/1049] HOUSE 123 4-4 ALL_trans+10.mid → ok (7155 tokens)
+  [205/1049] HOUSE 123 4-4 ALL_trans+11.mid → ok (7155 tokens)
+  [206/1049] HOUSE 123 4-4 ALL_trans+2.mid → ok (7155 tokens)
+  [207/1049] HOUSE 123 4-4 ALL_trans+3.mid → ok (7155 tokens)
+  [208/1049] HOUSE 123 4-4 ALL_trans+4.mid → ok (7155 tokens)
+  [209/1049] HOUSE 123 4-4 ALL_trans+5.mid → ok (7155 tokens)
+  [210/1049] HOUSE 123 4-4 ALL_trans+6.mid → ok (7155 tokens)
+  [211/1049] HOUSE 123 4-4 ALL_trans+7.mid → ok (7155 tokens)
+  [212/1049] HOUSE 123 4-4 ALL_trans+8.mid → ok (7155 tokens)
+  [213/1049] HOUSE 123 4-4 ALL_trans+9.mid → ok (7155 tokens)
+  [214/1049] HOUSE 123 4-4 ALL_tshuffle0.mid → ok (7157 tokens)
+  [215/1049] HOUSE 123 4-4 ALL_tshuffle1.mid → ok (7165 tokens)
+  [216/1049] HOUSE 123 4-4 ALL_tstretch.mid → ok (7823 tokens)
+  [217/1049] HOUSE 123 4-4 ALL_veljit.mid → ok (7155 tokens)
+  [218/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_original.mid → ok (6384 tokens)
+  [219/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+1.mid → ok (6384 tokens)
+  [220/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+10.mid → ok (6384 tokens)
+  [221/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+11.mid → ok (6384 tokens)
+  [222/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+2.mid → ok (6384 tokens)
+  [223/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+3.mid → ok (6384 tokens)
+  [224/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+4.mid → ok (6384 tokens)
+  [225/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+5.mid → ok (6384 tokens)
+  [226/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+6.mid → ok (6384 tokens)
+  [227/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+7.mid → ok (6384 tokens)
+  [228/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+8.mid → ok (6384 tokens)
+  [229/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_trans+9.mid → ok (6384 tokens)
+  [230/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_tshuffle0.mid → ok (6393 tokens)
+  [231/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_tshuffle1.mid → ok (6389 tokens)
+  [232/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_tstretch.mid → ok (6957 tokens)
+  [233/1049] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK_veljit.mid → ok (6384 tokens)
+  [234/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_original.mid → ok (4592 tokens)
+  [235/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+1.mid → ok (4592 tokens)
+  [236/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+10.mid → ok (4592 tokens)
+  [237/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+11.mid → ok (4592 tokens)
+  [238/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+2.mid → ok (4592 tokens)
+  [239/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+3.mid → ok (4592 tokens)
+  [240/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+4.mid → ok (4592 tokens)
+  [241/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+5.mid → ok (4592 tokens)
+  [242/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+6.mid → ok (4592 tokens)
+  [243/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+7.mid → ok (4592 tokens)
+  [244/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+8.mid → ok (4592 tokens)
+  [245/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_trans+9.mid → ok (4592 tokens)
+  [246/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_tshuffle0.mid → ok (4592 tokens)
+  [247/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_tshuffle1.mid → ok (4592 tokens)
+  [248/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_tstretch.mid → ok (5122 tokens)
+  [249/1049] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL_veljit.mid → ok (4592 tokens)
+  [250/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_original.mid → ok (6467 tokens)
+  [251/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+1.mid → ok (6467 tokens)
+  [252/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+10.mid → ok (6467 tokens)
+  [253/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+11.mid → ok (6467 tokens)
+  [254/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+2.mid → ok (6467 tokens)
+  [255/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+3.mid → ok (6467 tokens)
+  [256/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+5.mid → ok (6467 tokens)
+  [257/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+4.mid → ok (6467 tokens)
+  [258/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+6.mid → ok (6467 tokens)
+  [259/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+7.mid → ok (6467 tokens)
+  [260/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+8.mid → ok (6467 tokens)
+  [261/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_trans+9.mid → ok (6467 tokens)
+  [262/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_tshuffle0.mid → ok (6482 tokens)
+  [263/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_tshuffle1.mid → ok (6471 tokens)
+  [264/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_tstretch.mid → ok (7093 tokens)
+  [265/1049] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL_veljit.mid → ok (6467 tokens)
+  [266/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_original.mid → ok (3839 tokens)
+  [267/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+1.mid → ok (3839 tokens)
+  [268/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+10.mid → ok (3839 tokens)
+  [269/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+11.mid → ok (3839 tokens)
+  [270/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+2.mid → ok (3839 tokens)
+  [271/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+3.mid → ok (3839 tokens)
+  [272/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+4.mid → ok (3839 tokens)
+  [273/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+5.mid → ok (3839 tokens)
+  [274/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+6.mid → ok (3839 tokens)
+  [275/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+7.mid → ok (3839 tokens)
+  [276/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+8.mid → ok (3839 tokens)
+  [277/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_trans+9.mid → ok (3839 tokens)
+  [278/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_tshuffle0.mid → ok (3844 tokens)
+  [279/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_tshuffle1.mid → ok (3834 tokens)
+  [280/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_tstretch.mid → ok (4043 tokens)
+  [281/1049] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL_veljit.mid → ok (3839 tokens)
+  [282/1049] J POP BASS DRUM 130 4-4_original.mid → ok (5527 tokens)
+  [283/1049] J POP BASS DRUM 130 4-4_trans+1.mid → ok (5527 tokens)
+  [284/1049] J POP BASS DRUM 130 4-4_trans+10.mid → ok (5527 tokens)
+  [285/1049] J POP BASS DRUM 130 4-4_trans+11.mid → ok (5527 tokens)
+  [286/1049] J POP BASS DRUM 130 4-4_trans+2.mid → ok (5527 tokens)
+  [287/1049] J POP BASS DRUM 130 4-4_trans+3.mid → ok (5527 tokens)
+  [288/1049] J POP BASS DRUM 130 4-4_trans+4.mid → ok (5527 tokens)
+  [289/1049] J POP BASS DRUM 130 4-4_trans+5.mid → ok (5527 tokens)
+  [290/1049] J POP BASS DRUM 130 4-4_trans+6.mid → ok (5527 tokens)
+  [291/1049] J POP BASS DRUM 130 4-4_trans+7.mid → ok (5527 tokens)
+  [292/1049] J POP BASS DRUM 130 4-4_trans+8.mid → ok (5527 tokens)
+  [293/1049] J POP BASS DRUM 130 4-4_trans+9.mid → ok (5527 tokens)
+  [294/1049] J POP BASS DRUM 130 4-4_tshuffle0.mid → ok (5527 tokens)
+  [295/1049] J POP BASS DRUM 130 4-4_tshuffle1.mid → ok (5525 tokens)
+  [296/1049] J POP BASS DRUM 130 4-4_tstretch.mid → ok (5569 tokens)
+  [297/1049] J POP BASS DRUM 130 4-4_veljit.mid → ok (5527 tokens)
+  [298/1049] J POP DRUM PIANO 140 4-4_original.mid → ok (8992 tokens)
+  [299/1049] J POP DRUM PIANO 140 4-4_trans+10.mid → ok (8992 tokens)
+  [300/1049] J POP DRUM PIANO 140 4-4_trans+1.mid → ok (8992 tokens)
+  [301/1049] J POP DRUM PIANO 140 4-4_trans+11.mid → ok (8992 tokens)
+  [302/1049] J POP DRUM PIANO 140 4-4_trans+2.mid → ok (8992 tokens)
+  [303/1049] J POP DRUM PIANO 140 4-4_trans+3.mid → ok (8992 tokens)
+  [304/1049] J POP DRUM PIANO 140 4-4_trans+4.mid → ok (8992 tokens)
+  [305/1049] J POP DRUM PIANO 140 4-4_trans+5.mid → ok (8992 tokens)
+  [306/1049] J POP DRUM PIANO 140 4-4_trans+6.mid → ok (8992 tokens)
+  [307/1049] J POP DRUM PIANO 140 4-4_trans+7.mid → ok (8992 tokens)
+  [308/1049] J POP DRUM PIANO 140 4-4_trans+8.mid → ok (8992 tokens)
+  [309/1049] J POP DRUM PIANO 140 4-4_trans+9.mid → ok (8992 tokens)
+  [310/1049] J POP DRUM PIANO 140 4-4_tshuffle0.mid → ok (8992 tokens)
+  [311/1049] J POP DRUM PIANO 140 4-4_tshuffle1.mid → ok (8992 tokens)
+  [312/1049] J POP DRUM PIANO 140 4-4_tstretch.mid → ok (9477 tokens)
+  [313/1049] J POP DRUM PIANO 140 4-4_veljit.mid → ok (8992 tokens)
+  [314/1049] J POP MELODY+PIANO_original.mid → ok (4174 tokens)
+  [315/1049] J POP MELODY+PIANO_trans+1.mid → ok (4174 tokens)
+  [316/1049] J POP MELODY+PIANO_trans+10.mid → ok (4174 tokens)
+  [317/1049] J POP MELODY+PIANO_trans+11.mid → ok (4174 tokens)
+  [318/1049] J POP MELODY+PIANO_trans+2.mid → ok (4174 tokens)
+  [319/1049] J POP MELODY+PIANO_trans+3.mid → ok (4174 tokens)
+  [320/1049] J POP MELODY+PIANO_trans+4.mid → ok (4174 tokens)
+  [321/1049] J POP MELODY+PIANO_trans+5.mid → ok (4174 tokens)
+  [322/1049] J POP MELODY+PIANO_trans+6.mid → ok (4174 tokens)
+  [323/1049] J POP MELODY+PIANO_trans+7.mid → ok (4174 tokens)
+  [324/1049] J POP MELODY+PIANO_trans+8.mid → ok (4174 tokens)
+  [325/1049] J POP MELODY+PIANO_trans+9.mid → ok (4174 tokens)
+  [326/1049] J POP MELODY+PIANO_tshuffle0.mid → ok (4174 tokens)
+  [327/1049] J POP MELODY+PIANO_tshuffle1.mid → ok (4168 tokens)
+  [328/1049] J POP MELODY+PIANO_tstretch.mid → ok (4479 tokens)
+  [329/1049] J POP MELODY+PIANO_veljit.mid → ok (4174 tokens)
+  [330/1049] J POP PIANO BASS DRUM 130 4-4_original.mid → ok (10933 tokens)
+  [331/1049] J POP PIANO BASS DRUM 130 4-4_trans+10.mid → ok (10933 tokens)
+  [332/1049] J POP PIANO BASS DRUM 130 4-4_trans+1.mid → ok (10933 tokens)
+  [333/1049] J POP PIANO BASS DRUM 130 4-4_trans+11.mid → ok (10933 tokens)
+  [334/1049] J POP PIANO BASS DRUM 130 4-4_trans+2.mid → ok (10933 tokens)
+  [335/1049] J POP PIANO BASS DRUM 130 4-4_trans+4.mid → ok (10933 tokens)
+  [336/1049] J POP PIANO BASS DRUM 130 4-4_trans+3.mid → ok (10933 tokens)
+  [337/1049] J POP PIANO BASS DRUM 130 4-4_trans+5.mid → ok (10933 tokens)
+  [338/1049] J POP PIANO BASS DRUM 130 4-4_trans+6.mid → ok (10933 tokens)
+  [339/1049] J POP PIANO BASS DRUM 130 4-4_trans+8.mid → ok (10933 tokens)
+  [340/1049] J POP PIANO BASS DRUM 130 4-4_trans+7.mid → ok (10933 tokens)
+  [341/1049] J POP PIANO BASS DRUM 130 4-4_trans+9.mid → ok (10933 tokens)
+  [342/1049] J POP PIANO BASS DRUM 130 4-4_tshuffle0.mid → ok (10913 tokens)
+  [343/1049] J POP PIANO BASS DRUM 130 4-4_tstretch.mid → ok (10945 tokens)
+  [344/1049] J POP PIANO BASS DRUM 130 4-4_tshuffle1.mid → ok (10933 tokens)
+  [345/1049] J POP PIANO BASS DRUM 130 4-4_veljit.mid → ok (10933 tokens)
+  [346/1049] J POP PIANO+BASS+DRUM_original.mid → ok (8663 tokens)
+  [347/1049] J POP PIANO+BASS+DRUM_trans+10.mid → ok (8663 tokens)
+  [348/1049] J POP PIANO+BASS+DRUM_trans+1.mid → ok (8663 tokens)
+  [349/1049] J POP PIANO+BASS+DRUM_trans+11.mid → ok (8663 tokens)
+  [350/1049] J POP PIANO+BASS+DRUM_trans+2.mid → ok (8663 tokens)
+  [351/1049] J POP PIANO+BASS+DRUM_trans+4.mid → ok (8663 tokens)
+  [352/1049] J POP PIANO+BASS+DRUM_trans+5.mid → ok (8663 tokens)
+  [353/1049] J POP PIANO+BASS+DRUM_trans+3.mid → ok (8663 tokens)
+  [354/1049] J POP PIANO+BASS+DRUM_trans+6.mid → ok (8663 tokens)
+  [355/1049] J POP PIANO+BASS+DRUM_trans+7.mid → ok (8663 tokens)
+  [356/1049] J POP PIANO+BASS+DRUM_trans+9.mid → ok (8663 tokens)
+  [357/1049] J POP PIANO+BASS+DRUM_trans+8.mid → ok (8663 tokens)
+  [358/1049] J POP PIANO+BASS+DRUM_tshuffle0.mid → ok (8664 tokens)
+  [359/1049] J POP PIANO+BASS+DRUM_tshuffle1.mid → ok (8664 tokens)
+  [360/1049] J POP PIANO+BASS+DRUM_veljit.mid → ok (8663 tokens)
+  [361/1049] J POP PIANO+BASS+DRUM_tstretch.mid → ok (9118 tokens)
+  [362/1049] J POP_original.mid → ok (11057 tokens)
+  [363/1049] J POP_trans+1.mid → ok (11057 tokens)
+  [364/1049] J POP_trans+10.mid → ok (11057 tokens)
+  [365/1049] J POP_trans+11.mid → ok (11057 tokens)
+  [366/1049] J POP_trans+2.mid → ok (11057 tokens)
+  [367/1049] J POP_trans+3.mid → ok (11057 tokens)
+  [368/1049] J POP_trans+4.mid → ok (11057 tokens)
+  [369/1049] J POP_trans+5.mid → ok (11057 tokens)
+  [370/1049] J POP_trans+6.mid → ok (11057 tokens)
+  [371/1049] J POP_trans+7.mid → ok (11057 tokens)
+  [372/1049] J POP_trans+8.mid → ok (11057 tokens)
+  [373/1049] J POP_trans+9.mid → ok (11057 tokens)
+  [374/1049] J POP_tshuffle0.mid → ok (11040 tokens)
+  [375/1049] J POP_tshuffle1.mid → ok (11016 tokens)
+  [376/1049] J POP_tstretch.mid → ok (11845 tokens)
+  [377/1049] J POP_veljit.mid → ok (11057 tokens)
+  [378/1049] KPOP GARAGE 165 4-4 ALL_original.mid → ok (5598 tokens)
+  [379/1049] KPOP GARAGE 165 4-4 ALL_trans+1.mid → ok (5598 tokens)
+  [380/1049] KPOP GARAGE 165 4-4 ALL_trans+10.mid → ok (5598 tokens)
+  [381/1049] KPOP GARAGE 165 4-4 ALL_trans+11.mid → ok (5598 tokens)
+  [382/1049] KPOP GARAGE 165 4-4 ALL_trans+2.mid → ok (5598 tokens)
+  [383/1049] KPOP GARAGE 165 4-4 ALL_trans+3.mid → ok (5598 tokens)
+  [384/1049] KPOP GARAGE 165 4-4 ALL_trans+4.mid → ok (5598 tokens)
+  [385/1049] KPOP GARAGE 165 4-4 ALL_trans+5.mid → ok (5598 tokens)
+  [386/1049] KPOP GARAGE 165 4-4 ALL_trans+6.mid → ok (5598 tokens)
+  [387/1049] KPOP GARAGE 165 4-4 ALL_trans+7.mid → ok (5598 tokens)
+  [388/1049] KPOP GARAGE 165 4-4 ALL_trans+8.mid → ok (5598 tokens)
+  [389/1049] KPOP GARAGE 165 4-4 ALL_trans+9.mid → ok (5598 tokens)
+  [390/1049] KPOP GARAGE 165 4-4 ALL_tshuffle0.mid → ok (5612 tokens)
+  [391/1049] KPOP GARAGE 165 4-4 ALL_tshuffle1.mid → ok (5598 tokens)
+  [392/1049] KPOP GARAGE 165 4-4 ALL_tstretch.mid → ok (5589 tokens)
+  [393/1049] KPOP GARAGE 165 4-4 ALL_veljit.mid → ok (5598 tokens)
+  [394/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_original.mid → ok (4587 tokens)
+  [395/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+1.mid → ok (4587 tokens)
+  [396/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+10.mid → ok (4587 tokens)
+  [397/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+11.mid → ok (4587 tokens)
+  [398/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+2.mid → ok (4587 tokens)
+  [399/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+3.mid → ok (4587 tokens)
+  [400/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+4.mid → ok (4587 tokens)
+  [401/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+5.mid → ok (4587 tokens)
+  [402/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+6.mid → ok (4587 tokens)
+  [403/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+7.mid → ok (4587 tokens)
+  [404/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+8.mid → ok (4587 tokens)
+  [405/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_trans+9.mid → ok (4587 tokens)
+  [406/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_tshuffle0.mid → ok (4600 tokens)
+  [407/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_tshuffle1.mid → ok (4600 tokens)
+  [408/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_tstretch.mid → ok (4770 tokens)
+  [409/1049] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL_veljit.mid → ok (4587 tokens)
+  [410/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_original.mid → ok (4653 tokens)
+  [411/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+1.mid → ok (4653 tokens)
+  [412/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+10.mid → ok (4653 tokens)
+  [413/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+11.mid → ok (4653 tokens)
+  [414/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+2.mid → ok (4653 tokens)
+  [415/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+4.mid → ok (4653 tokens)
+  [416/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+3.mid → ok (4653 tokens)
+  [417/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+5.mid → ok (4653 tokens)
+  [418/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+6.mid → ok (4653 tokens)
+  [419/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+7.mid → ok (4653 tokens)
+  [420/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+8.mid → ok (4653 tokens)
+  [421/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_trans+9.mid → ok (4653 tokens)
+  [422/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_tshuffle0.mid → ok (4672 tokens)
+  [423/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_tshuffle1.mid → ok (4672 tokens)
+  [424/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_tstretch.mid → ok (4777 tokens)
+  [425/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_original.mid → ok (3747 tokens)
+  [426/1049] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD_veljit.mid → ok (4653 tokens)
+  [427/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+1.mid → ok (3747 tokens)
+  [428/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+10.mid → ok (3747 tokens)
+  [429/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+11.mid → ok (3747 tokens)
+  [430/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+2.mid → ok (3747 tokens)
+  [431/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+3.mid → ok (3747 tokens)
+  [432/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+4.mid → ok (3747 tokens)
+  [433/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+5.mid → ok (3747 tokens)
+  [434/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+6.mid → ok (3747 tokens)
+  [435/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+7.mid → ok (3747 tokens)
+  [436/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+8.mid → ok (3747 tokens)
+  [437/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_trans+9.mid → ok (3747 tokens)
+  [438/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_tshuffle0.mid → ok (3774 tokens)
+  [439/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_tshuffle1.mid → ok (3759 tokens)
+  [440/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_tstretch.mid → ok (3807 tokens)
+  [441/1049] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL_veljit.mid → ok (3747 tokens)
+  [442/1049] LATIN ALL 105 4-4_original.mid → ok (5833 tokens)
+  [443/1049] LATIN ALL 105 4-4_trans+1.mid → ok (5833 tokens)
+  [444/1049] LATIN ALL 105 4-4_trans+10.mid → ok (5833 tokens)
+  [445/1049] LATIN ALL 105 4-4_trans+11.mid → ok (5833 tokens)
+  [446/1049] LATIN ALL 105 4-4_trans+2.mid → ok (5833 tokens)
+  [447/1049] LATIN ALL 105 4-4_trans+4.mid → ok (5833 tokens)
+  [448/1049] LATIN ALL 105 4-4_trans+3.mid → ok (5833 tokens)
+  [449/1049] LATIN ALL 105 4-4_trans+5.mid → ok (5833 tokens)
+  [450/1049] LATIN ALL 105 4-4_trans+6.mid → ok (5833 tokens)
+  [451/1049] LATIN ALL 105 4-4_trans+7.mid → ok (5833 tokens)
+  [452/1049] LATIN ALL 105 4-4_trans+8.mid → ok (5833 tokens)
+  [453/1049] LATIN ALL 105 4-4_trans+9.mid → ok (5833 tokens)
+  [454/1049] LATIN ALL 105 4-4_tshuffle0.mid → ok (5833 tokens)
+  [455/1049] LATIN ALL 105 4-4_tshuffle1.mid → ok (5832 tokens)
+  [456/1049] LATIN ALL 105 4-4_tstretch.mid → ok (6235 tokens)
+  [457/1049] LATIN ALL 105 4-4_veljit.mid → ok (5833 tokens)
+  [458/1049] METAL 110 4-4 ALL GUITAR BASS_original.mid → ok (10836 tokens)
+  [459/1049] METAL 110 4-4 ALL GUITAR BASS_trans+1.mid → ok (10836 tokens)
+  [460/1049] METAL 110 4-4 ALL GUITAR BASS_trans+10.mid → ok (10836 tokens)
+  [461/1049] METAL 110 4-4 ALL GUITAR BASS_trans+11.mid → ok (10836 tokens)
+  [462/1049] METAL 110 4-4 ALL GUITAR BASS_trans+2.mid → ok (10836 tokens)
+  [463/1049] METAL 110 4-4 ALL GUITAR BASS_trans+3.mid → ok (10836 tokens)
+  [464/1049] METAL 110 4-4 ALL GUITAR BASS_trans+4.mid → ok (10836 tokens)
+  [465/1049] METAL 110 4-4 ALL GUITAR BASS_trans+5.mid → ok (10836 tokens)
+  [466/1049] METAL 110 4-4 ALL GUITAR BASS_trans+6.mid → ok (10836 tokens)
+  [467/1049] METAL 110 4-4 ALL GUITAR BASS_trans+7.mid → ok (10836 tokens)
+  [468/1049] METAL 110 4-4 ALL GUITAR BASS_trans+8.mid → ok (10836 tokens)
+  [469/1049] METAL 110 4-4 ALL GUITAR BASS_trans+9.mid → ok (10836 tokens)
+  [470/1049] METAL 110 4-4 ALL GUITAR BASS_tshuffle0.mid → ok (10836 tokens)
+  [471/1049] METAL 110 4-4 ALL GUITAR BASS_tshuffle1.mid → ok (10836 tokens)
+  [472/1049] METAL 110 4-4 ALL GUITAR BASS_tstretch.mid → ok (11268 tokens)
+  [473/1049] METAL 110 4-4 ALL GUITAR BASS_veljit.mid → ok (10836 tokens)
+  [474/1049] METAL 110 4-4 ALL_original.mid → ok (15824 tokens)
+  [475/1049] METAL 110 4-4 ALL_trans+1.mid → ok (15824 tokens)
+  [476/1049] METAL 110 4-4 ALL_trans+10.mid → ok (15824 tokens)
+  [477/1049] METAL 110 4-4 ALL_trans+11.mid → ok (15824 tokens)
+  [478/1049] METAL 110 4-4 ALL_trans+2.mid → ok (15824 tokens)
+  [479/1049] METAL 110 4-4 ALL_trans+3.mid → ok (15824 tokens)
+  [480/1049] METAL 110 4-4 ALL_trans+4.mid → ok (15824 tokens)
+  [481/1049] METAL 110 4-4 ALL_trans+5.mid → ok (15824 tokens)
+  [482/1049] METAL 110 4-4 ALL_trans+7.mid → ok (15824 tokens)
+  [483/1049] METAL 110 4-4 ALL_trans+6.mid → ok (15824 tokens)
+  [484/1049] METAL 110 4-4 ALL_trans+8.mid → ok (15824 tokens)
+  [485/1049] METAL 110 4-4 ALL_trans+9.mid → ok (15824 tokens)
+  [486/1049] METAL 110 4-4 ALL_tshuffle1.mid → ok (15923 tokens)
+  [487/1049] METAL 110 4-4 ALL_tshuffle0.mid → ok (15923 tokens)
+  [488/1049] METAL 110 4-4 ALL_tstretch.mid → ok (16319 tokens)
+  [489/1049] METAL 110 4-4 ALL_veljit.mid → ok (15824 tokens)
+  [490/1049] METAL 110 4-4 BASS DRUM_original.mid → ok (8004 tokens)
+  [491/1049] METAL 110 4-4 BASS DRUM_trans+1.mid → ok (8004 tokens)
+  [492/1049] METAL 110 4-4 BASS DRUM_trans+10.mid → ok (8004 tokens)
+  [493/1049] METAL 110 4-4 BASS DRUM_trans+11.mid → ok (8004 tokens)
+  [494/1049] METAL 110 4-4 BASS DRUM_trans+2.mid → ok (8004 tokens)
+  [495/1049] METAL 110 4-4 BASS DRUM_trans+4.mid → ok (8004 tokens)
+  [496/1049] METAL 110 4-4 BASS DRUM_trans+3.mid → ok (8004 tokens)
+  [497/1049] METAL 110 4-4 BASS DRUM_trans+5.mid → ok (8004 tokens)
+  [498/1049] METAL 110 4-4 BASS DRUM_trans+6.mid → ok (8004 tokens)
+  [499/1049] METAL 110 4-4 BASS DRUM_trans+7.mid → ok (8004 tokens)
+  [500/1049] METAL 110 4-4 BASS DRUM_trans+8.mid → ok (8004 tokens)
+  [501/1049] METAL 110 4-4 BASS DRUM_trans+9.mid → ok (8004 tokens)
+  [502/1049] METAL 110 4-4 BASS DRUM_tshuffle0.mid → ok (8072 tokens)
+  [503/1049] METAL 110 4-4 BASS DRUM_tshuffle1.mid → ok (8072 tokens)
+  [504/1049] METAL 110 4-4 BASS DRUM_tstretch.mid → ok (8314 tokens)
+  [505/1049] METAL 110 4-4 BASS DRUM_veljit.mid → ok (8004 tokens)
+  [506/1049] METAL 110 4-4 GUITAR DRUM_original.mid → ok (12237 tokens)
+  [507/1049] METAL 110 4-4 GUITAR DRUM_trans+1.mid → ok (12237 tokens)
+  [508/1049] METAL 110 4-4 GUITAR DRUM_trans+10.mid → ok (12237 tokens)
+  [509/1049] METAL 110 4-4 GUITAR DRUM_trans+11.mid → ok (12237 tokens)
+  [510/1049] METAL 110 4-4 GUITAR DRUM_trans+2.mid → ok (12237 tokens)
+  [511/1049] METAL 110 4-4 GUITAR DRUM_trans+3.mid → ok (12237 tokens)
+  [512/1049] METAL 110 4-4 GUITAR DRUM_trans+4.mid → ok (12237 tokens)
+  [513/1049] METAL 110 4-4 GUITAR DRUM_trans+5.mid → ok (12237 tokens)
+  [514/1049] METAL 110 4-4 GUITAR DRUM_trans+7.mid → ok (12237 tokens)
+  [515/1049] METAL 110 4-4 GUITAR DRUM_trans+6.mid → ok (12237 tokens)
+  [516/1049] METAL 110 4-4 GUITAR DRUM_trans+8.mid → ok (12237 tokens)
+  [517/1049] METAL 110 4-4 GUITAR DRUM_trans+9.mid → ok (12237 tokens)
+  [518/1049] METAL 110 4-4 GUITAR DRUM_tshuffle0.mid → ok (12237 tokens)
+  [519/1049] METAL 110 4-4 GUITAR DRUM_tshuffle1.mid → ok (12237 tokens)
+  [520/1049] METAL 110 4-4 GUITAR DRUM_tstretch.mid → ok (12727 tokens)
+  [521/1049] METAL 110 4-4 GUITAR DRUM_veljit.mid → ok (12237 tokens)
+  [522/1049] ORCHESTRA 150 4-4 ALL_trans+1.mid → ok (11059 tokens)
+  [523/1049] ORCHESTRA 150 4-4 ALL_trans+10.mid → ok (11051 tokens)
+  [524/1049] ORCHESTRA 150 4-4 ALL_original.mid → ok (11059 tokens)
+  [525/1049] ORCHESTRA 150 4-4 ALL_trans+11.mid → ok (11051 tokens)
+  [526/1049] ORCHESTRA 150 4-4 ALL_trans+2.mid → ok (11059 tokens)
+  [527/1049] ORCHESTRA 150 4-4 ALL_trans+4.mid → ok (11059 tokens)
+  [528/1049] ORCHESTRA 150 4-4 ALL_trans+5.mid → ok (11059 tokens)
+  [529/1049] ORCHESTRA 150 4-4 ALL_trans+3.mid → ok (11059 tokens)
+  [530/1049] ORCHESTRA 150 4-4 ALL_trans+7.mid → ok (11059 tokens)
+  [531/1049] ORCHESTRA 150 4-4 ALL_trans+6.mid → ok (11059 tokens)
+  [532/1049] ORCHESTRA 150 4-4 ALL_trans+8.mid → ok (11051 tokens)
+  [533/1049] ORCHESTRA 150 4-4 ALL_trans+9.mid → ok (11051 tokens)
+  [534/1049] ORCHESTRA 150 4-4 ALL_tshuffle0.mid → ok (11150 tokens)
+  [535/1049] ORCHESTRA 150 4-4 ALL_tstretch.mid → ok (11312 tokens)
+  [536/1049] ORCHESTRA 150 4-4 ALL_tshuffle1.mid → ok (11110 tokens)
+  [537/1049] ORCHESTRA 150 4-4 ALL_veljit.mid → ok (11059 tokens)
+  [538/1049] ORCHESTRA 150 4-4 PIANO STRING_original.mid → ok (3318 tokens)
+  [539/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+1.mid → ok (3318 tokens)
+  [540/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+10.mid → ok (3318 tokens)
+  [541/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+11.mid → ok (3318 tokens)
+  [542/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+2.mid → ok (3318 tokens)
+  [543/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+3.mid → ok (3318 tokens)
+  [544/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+4.mid → ok (3318 tokens)
+  [545/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+5.mid → ok (3318 tokens)
+  [546/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+6.mid → ok (3318 tokens)
+  [547/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+7.mid → ok (3318 tokens)
+  [548/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+8.mid → ok (3318 tokens)
+  [549/1049] ORCHESTRA 150 4-4 PIANO STRING_trans+9.mid → ok (3318 tokens)
+  [550/1049] ORCHESTRA 150 4-4 PIANO STRING_tshuffle0.mid → ok (3314 tokens)
+  [551/1049] ORCHESTRA 150 4-4 PIANO STRING_tshuffle1.mid → ok (3318 tokens)
+  [552/1049] ORCHESTRA 150 4-4 PIANO STRING_tstretch.mid → ok (3762 tokens)
+  [553/1049] ORCHESTRA 150 4-4 PIANO STRING_veljit.mid → ok (3318 tokens)
+  [554/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_original.mid → ok (6498 tokens)
+  [555/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+1.mid → ok (6498 tokens)
+  [556/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+10.mid → ok (6498 tokens)
+  [557/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+11.mid → ok (6498 tokens)
+  [558/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+2.mid → ok (6498 tokens)
+  [559/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+3.mid → ok (6498 tokens)
+  [560/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+4.mid → ok (6498 tokens)
+  [561/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+5.mid → ok (6498 tokens)
+  [562/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+7.mid → ok (6498 tokens)
+  [563/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+6.mid → ok (6498 tokens)
+  [564/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+9.mid → ok (6498 tokens)
+  [565/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_trans+8.mid → ok (6498 tokens)
+  [566/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_tshuffle0.mid → ok (6501 tokens)
+  [567/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_tshuffle1.mid → ok (6444 tokens)
+  [568/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_tstretch.mid → ok (6969 tokens)
+  [569/1049] ORCHESTRA 150 4-4 STRING BRASS WOODWIND_veljit.mid → ok (6498 tokens)
+  [570/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+1.mid → ok (5641 tokens)
+  [571/1049] ORCHESTRA 150 4-4 STRING BRASS_original.mid → ok (5641 tokens)
+  [572/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+10.mid → ok (5641 tokens)
+  [573/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+11.mid → ok (5641 tokens)
+  [574/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+3.mid → ok (5641 tokens)
+  [575/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+2.mid → ok (5641 tokens)
+  [576/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+4.mid → ok (5641 tokens)
+  [577/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+5.mid → ok (5641 tokens)
+  [578/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+7.mid → ok (5641 tokens)
+  [579/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+6.mid → ok (5641 tokens)
+  [580/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+8.mid → ok (5641 tokens)
+  [581/1049] ORCHESTRA 150 4-4 STRING BRASS_trans+9.mid → ok (5641 tokens)
+  [582/1049] ORCHESTRA 150 4-4 STRING BRASS_tshuffle0.mid → ok (5650 tokens)
+  [583/1049] ORCHESTRA 150 4-4 STRING BRASS_tshuffle1.mid → ok (5633 tokens)
+  [584/1049] ORCHESTRA 150 4-4 STRING BRASS_tstretch.mid → ok (6092 tokens)
+  [585/1049] ORCHESTRA 150 4-4 STRING BRASS_veljit.mid → ok (5641 tokens)
+  [586/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+1.mid → ok (6215 tokens)
+  [587/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_original.mid → ok (6215 tokens)
+  [588/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+10.mid → ok (6215 tokens)
+  [589/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+11.mid → ok (6215 tokens)
+  [590/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+2.mid → ok (6215 tokens)
+  [591/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+3.mid → ok (6215 tokens)
+  [592/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+4.mid → ok (6215 tokens)
+  [593/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+5.mid → ok (6215 tokens)
+  [594/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+6.mid → ok (6215 tokens)
+  [595/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+7.mid → ok (6215 tokens)
+  [596/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+8.mid → ok (6215 tokens)
+  [597/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_trans+9.mid → ok (6215 tokens)
+  [598/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_tshuffle0.mid → ok (6212 tokens)
+  [599/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_tshuffle1.mid → ok (6210 tokens)
+  [600/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_tstretch.mid → ok (6812 tokens)
+  [601/1049] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR_veljit.mid → ok (6215 tokens)
+  [602/1049] ORCHESTRA 150 4-4 STRING WOODWIND_original.mid → ok (3679 tokens)
+  [603/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+1.mid → ok (3679 tokens)
+  [604/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+10.mid → ok (3679 tokens)
+  [605/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+11.mid → ok (3679 tokens)
+  [606/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+2.mid → ok (3679 tokens)
+  [607/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+3.mid → ok (3679 tokens)
+  [608/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+4.mid → ok (3679 tokens)
+  [609/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+5.mid → ok (3679 tokens)
+  [610/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+6.mid → ok (3679 tokens)
+  [611/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+7.mid → ok (3679 tokens)
+  [612/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+8.mid → ok (3679 tokens)
+  [613/1049] ORCHESTRA 150 4-4 STRING WOODWIND_trans+9.mid → ok (3679 tokens)
+  [614/1049] ORCHESTRA 150 4-4 STRING WOODWIND_tshuffle0.mid → ok (3679 tokens)
+  [615/1049] ORCHESTRA 150 4-4 STRING WOODWIND_tshuffle1.mid → ok (3697 tokens)
+  [616/1049] ORCHESTRA 150 4-4 STRING WOODWIND_tstretch.mid → ok (3985 tokens)
+  [617/1049] ORCHESTRA 150 4-4 STRING WOODWIND_veljit.mid → ok (3679 tokens)
+  [618/1049] ORCHESTRA 4-4 115 ALL_original.mid → ok (16326 tokens)
+  [619/1049] ORCHESTRA 4-4 115 ALL_trans+1.mid → ok (16305 tokens)
+  [620/1049] ORCHESTRA 4-4 115 ALL_trans+10.mid → ok (16325 tokens)
+  [621/1049] ORCHESTRA 4-4 115 ALL_trans+11.mid → ok (16332 tokens)
+  [622/1049] ORCHESTRA 4-4 115 ALL_trans+2.mid → ok (16303 tokens)
+  [623/1049] ORCHESTRA 4-4 115 ALL_trans+3.mid → ok (16303 tokens)
+  [624/1049] ORCHESTRA 4-4 115 ALL_trans+4.mid → ok (16298 tokens)
+  [625/1049] ORCHESTRA 4-4 115 ALL_trans+5.mid → ok (16341 tokens)
+  [626/1049] ORCHESTRA 4-4 115 ALL_trans+7.mid → ok (16340 tokens)
+  [627/1049] ORCHESTRA 4-4 115 ALL_trans+6.mid → ok (16341 tokens)
+  [628/1049] ORCHESTRA 4-4 115 ALL_trans+8.mid → ok (16305 tokens)
+  [629/1049] ORCHESTRA 4-4 115 ALL_trans+9.mid → ok (16303 tokens)
+  [630/1049] ORCHESTRA 4-4 115 ALL_tstretch.mid → ok (16575 tokens)
+  [631/1049] ORCHESTRA 4-4 115 ALL_tshuffle0.mid → ok (16351 tokens)
+  [632/1049] ORCHESTRA 4-4 115 ALL_tshuffle1.mid → ok (16331 tokens)
+  [633/1049] ORCHESTRA 4-4 115 ALL_veljit.mid → ok (16326 tokens)
+  [634/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+10.mid → ok (10813 tokens)
+  [635/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+1.mid → ok (10813 tokens)
+  [636/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_original.mid → ok (10828 tokens)
+  [637/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+11.mid → ok (10813 tokens)
+  [638/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+4.mid → ok (10813 tokens)
+  [639/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+3.mid → ok (10813 tokens)
+  [640/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+2.mid → ok (10813 tokens)
+  [641/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+5.mid → ok (10813 tokens)
+  [642/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+8.mid → ok (10817 tokens)
+  [643/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+7.mid → ok (10813 tokens)
+  [644/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+6.mid → ok (10813 tokens)
+  [645/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_trans+9.mid → ok (10817 tokens)
+  [646/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_tshuffle0.mid → ok (10821 tokens)
+  [647/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_tshuffle1.mid → ok (10861 tokens)
+  [648/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_tstretch.mid → ok (11588 tokens)
+  [649/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND_veljit.mid → ok (10828 tokens)
+  [650/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+1.mid → ok (9085 tokens)
+  [651/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+10.mid → ok (9085 tokens)
+  [652/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_original.mid → ok (9100 tokens)
+  [653/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+11.mid → ok (9085 tokens)
+  [654/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+3.mid → ok (9085 tokens)
+  [655/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+4.mid → ok (9085 tokens)
+  [656/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+2.mid → ok (9085 tokens)
+  [657/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+5.mid → ok (9085 tokens)
+  [658/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+6.mid → ok (9085 tokens)
+  [659/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+8.mid → ok (9089 tokens)
+  [660/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+7.mid → ok (9085 tokens)
+  [661/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_trans+9.mid → ok (9089 tokens)
+  [662/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_tshuffle1.mid → ok (9080 tokens)
+  [663/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_tshuffle0.mid → ok (9100 tokens)
+  [664/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_tstretch.mid → ok (10072 tokens)
+  [665/1049] ORCHESTRA 4-4 115 PIANO STRING BRASS_veljit.mid → ok (9100 tokens)
+  [666/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+1.mid → ok (6952 tokens)
+  [667/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_original.mid → ok (6967 tokens)
+  [668/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+10.mid → ok (6952 tokens)
+  [669/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+11.mid → ok (6952 tokens)
+  [670/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+3.mid → ok (6952 tokens)
+  [671/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+2.mid → ok (6952 tokens)
+  [672/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+4.mid → ok (6952 tokens)
+  [673/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+5.mid → ok (6952 tokens)
+  [674/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+6.mid → ok (6952 tokens)
+  [675/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+7.mid → ok (6952 tokens)
+  [676/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+8.mid → ok (6952 tokens)
+  [677/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_trans+9.mid → ok (6952 tokens)
+  [678/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_tshuffle0.mid → ok (6987 tokens)
+  [679/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_tshuffle1.mid → ok (6947 tokens)
+  [680/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_tstretch.mid → ok (7972 tokens)
+  [681/1049] ORCHESTRA 4-4 115 PIANO STRING WOODWIND_veljit.mid → ok (6967 tokens)
+  [682/1049] ORCHESTRA 4-4 115 STRING PERC_original.mid → ok (7494 tokens)
+  [683/1049] ORCHESTRA 4-4 115 STRING PERC_trans+1.mid → ok (7496 tokens)
+  [684/1049] ORCHESTRA 4-4 115 STRING PERC_trans+10.mid → ok (7487 tokens)
+  [685/1049] ORCHESTRA 4-4 115 STRING PERC_trans+11.mid → ok (7487 tokens)
+  [686/1049] ORCHESTRA 4-4 115 STRING PERC_trans+2.mid → ok (7496 tokens)
+  [687/1049] ORCHESTRA 4-4 115 STRING PERC_trans+3.mid → ok (7496 tokens)
+  [688/1049] ORCHESTRA 4-4 115 STRING PERC_trans+4.mid → ok (7496 tokens)
+  [689/1049] ORCHESTRA 4-4 115 STRING PERC_trans+5.mid → ok (7489 tokens)
+  [690/1049] ORCHESTRA 4-4 115 STRING PERC_trans+6.mid → ok (7489 tokens)
+  [691/1049] ORCHESTRA 4-4 115 STRING PERC_trans+7.mid → ok (7489 tokens)
+  [692/1049] ORCHESTRA 4-4 115 STRING PERC_trans+8.mid → ok (7487 tokens)
+  [693/1049] ORCHESTRA 4-4 115 STRING PERC_trans+9.mid → ok (7487 tokens)
+  [694/1049] ORCHESTRA 4-4 115 STRING PERC_tshuffle0.mid → ok (7488 tokens)
+  [695/1049] ORCHESTRA 4-4 115 STRING PERC_tshuffle1.mid → ok (7472 tokens)
+  [696/1049] ORCHESTRA 4-4 115 STRING PERC_tstretch.mid → ok (8801 tokens)
+  [697/1049] ORCHESTRA 4-4 115 STRING PERC_veljit.mid → ok (7494 tokens)
+  [698/1049] ORCHESTRA 80 4-4 ALL_original.mid → ok (3479 tokens)
+  [699/1049] ORCHESTRA 80 4-4 ALL_trans+1.mid → ok (3479 tokens)
+  [700/1049] ORCHESTRA 80 4-4 ALL_trans+10.mid → ok (3479 tokens)
+  [701/1049] ORCHESTRA 80 4-4 ALL_trans+11.mid → ok (3479 tokens)
+  [702/1049] ORCHESTRA 80 4-4 ALL_trans+2.mid → ok (3479 tokens)
+  [703/1049] ORCHESTRA 80 4-4 ALL_trans+3.mid → ok (3479 tokens)
+  [704/1049] ORCHESTRA 80 4-4 ALL_trans+4.mid → ok (3479 tokens)
+  [705/1049] ORCHESTRA 80 4-4 ALL_trans+5.mid → ok (3479 tokens)
+  [706/1049] ORCHESTRA 80 4-4 ALL_trans+6.mid → ok (3479 tokens)
+  [707/1049] ORCHESTRA 80 4-4 ALL_trans+7.mid → ok (3479 tokens)
+  [708/1049] ORCHESTRA 80 4-4 ALL_trans+8.mid → ok (3479 tokens)
+  [709/1049] ORCHESTRA 80 4-4 ALL_trans+9.mid → ok (3479 tokens)
+  [710/1049] ORCHESTRA 80 4-4 ALL_tshuffle0.mid → ok (3488 tokens)
+  [711/1049] ORCHESTRA 80 4-4 ALL_tshuffle1.mid → ok (3479 tokens)
+  [712/1049] ORCHESTRA 80 4-4 ALL_tstretch.mid → ok (4569 tokens)
+  [713/1049] ORCHESTRA 80 4-4 ALL_veljit.mid → ok (3479 tokens)
+  [714/1049] ORCHESTRA 80 4-4 PIANO STRING_original.mid → ok (2766 tokens)
+  [715/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+1.mid → ok (2766 tokens)
+  [716/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+10.mid → ok (2766 tokens)
+  [717/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+11.mid → ok (2766 tokens)
+  [718/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+2.mid → ok (2766 tokens)
+  [719/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+3.mid → ok (2766 tokens)
+  [720/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+4.mid → ok (2766 tokens)
+  [721/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+5.mid → ok (2766 tokens)
+  [722/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+6.mid → ok (2766 tokens)
+  [723/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+7.mid → ok (2766 tokens)
+  [724/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+8.mid → ok (2766 tokens)
+  [725/1049] ORCHESTRA 80 4-4 PIANO STRING_trans+9.mid → ok (2766 tokens)
+  [726/1049] ORCHESTRA 80 4-4 PIANO STRING_tshuffle0.mid → ok (2736 tokens)
+  [727/1049] ORCHESTRA 80 4-4 PIANO STRING_tshuffle1.mid → ok (2736 tokens)
+  [728/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_original.mid → ok (2472 tokens)
+  [729/1049] ORCHESTRA 80 4-4 PIANO STRING_tstretch.mid → ok (3527 tokens)
+  [730/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+1.mid → ok (2472 tokens)
+  [731/1049] ORCHESTRA 80 4-4 PIANO STRING_veljit.mid → ok (2766 tokens)
+  [732/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+10.mid → ok (2472 tokens)
+  [733/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+11.mid → ok (2472 tokens)
+  [734/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+2.mid → ok (2472 tokens)
+  [735/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+3.mid → ok (2472 tokens)
+  [736/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+4.mid → ok (2472 tokens)
+  [737/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+5.mid → ok (2472 tokens)
+  [738/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+6.mid → ok (2472 tokens)
+  [739/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+7.mid → ok (2472 tokens)
+  [740/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+8.mid → ok (2472 tokens)
+  [741/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_trans+9.mid → ok (2472 tokens)
+  [742/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_tshuffle0.mid → ok (2480 tokens)
+  [743/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_tshuffle1.mid → ok (2480 tokens)
+  [744/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_tstretch.mid → ok (3206 tokens)
+  [745/1049] ORCHESTRA 80 4-4 PIANO WOODWIND_veljit.mid → ok (2472 tokens)
+  [746/1049] ORCHESTRA 80 4-4 STRING WOODWIND_original.mid → ok (1498 tokens)
+  [747/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+1.mid → ok (1498 tokens)
+  [748/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+10.mid → ok (1498 tokens)
+  [749/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+11.mid → ok (1498 tokens)
+  [750/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+2.mid → ok (1498 tokens)
+  [751/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+3.mid → ok (1498 tokens)
+  [752/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+4.mid → ok (1498 tokens)
+  [753/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+5.mid → ok (1498 tokens)
+  [754/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+6.mid → ok (1498 tokens)
+  [755/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+7.mid → ok (1498 tokens)
+  [756/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+8.mid → ok (1498 tokens)
+  [757/1049] ORCHESTRA 80 4-4 STRING WOODWIND_trans+9.mid → ok (1498 tokens)
+  [758/1049] ORCHESTRA 80 4-4 STRING WOODWIND_tshuffle0.mid → ok (1498 tokens)
+  [759/1049] ORCHESTRA 80 4-4 STRING WOODWIND_tstretch.mid → ok (1947 tokens)
+  [760/1049] ORCHESTRA 80 4-4 STRING WOODWIND_tshuffle1.mid → ok (1498 tokens)
+  [761/1049] ORCHESTRA 80 4-4 STRING WOODWIND_veljit.mid → ok (1498 tokens)
+  [762/1049] ORCHESTRA WALTZ 78 6-8 ALL_original.mid → ok (5411 tokens)
+  [763/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+1.mid → ok (5411 tokens)
+  [764/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+10.mid → ok (5377 tokens)
+  [765/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+11.mid → ok (5377 tokens)
+  [766/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+2.mid → ok (5411 tokens)
+  [767/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+3.mid → ok (5411 tokens)
+  [768/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+4.mid → ok (5411 tokens)
+  [769/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+5.mid → ok (5411 tokens)
+  [770/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+6.mid → ok (5411 tokens)
+  [771/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+7.mid → ok (5377 tokens)
+  [772/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+8.mid → ok (5377 tokens)
+  [773/1049] ORCHESTRA WALTZ 78 6-8 ALL_trans+9.mid → ok (5377 tokens)
+  [774/1049] ORCHESTRA WALTZ 78 6-8 ALL_tshuffle0.mid → ok (5400 tokens)
+  [775/1049] ORCHESTRA WALTZ 78 6-8 ALL_tshuffle1.mid → ok (5403 tokens)
+  [776/1049] ORCHESTRA WALTZ 78 6-8 ALL_tstretch.mid → ok (5873 tokens)
+  [777/1049] ORCHESTRA WALTZ 78 6-8 ALL_veljit.mid → ok (5411 tokens)
+  [778/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_original.mid → ok (4452 tokens)
+  [779/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+1.mid → ok (4452 tokens)
+  [780/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+10.mid → ok (4452 tokens)
+  [781/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+11.mid → ok (4452 tokens)
+  [782/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+2.mid → ok (4452 tokens)
+  [783/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+3.mid → ok (4452 tokens)
+  [784/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+4.mid → ok (4452 tokens)
+  [785/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+5.mid → ok (4452 tokens)
+  [786/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+6.mid → ok (4452 tokens)
+  [787/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+7.mid → ok (4452 tokens)
+  [788/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+8.mid → ok (4452 tokens)
+  [789/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_trans+9.mid → ok (4452 tokens)
+  [790/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_tshuffle0.mid → ok (4452 tokens)
+  [791/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_tshuffle1.mid → ok (4466 tokens)
+  [792/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_tstretch.mid → ok (4825 tokens)
+  [793/1049] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid_veljit.mid → ok (4452 tokens)
+  [794/1049] ORCHESTRA_67_6-8 ALL_original.mid → ok (10557 tokens)
+  [795/1049] ORCHESTRA_67_6-8 ALL_trans+1.mid → ok (10557 tokens)
+  [796/1049] ORCHESTRA_67_6-8 ALL_trans+10.mid → ok (10557 tokens)
+  [797/1049] ORCHESTRA_67_6-8 ALL_trans+11.mid → ok (10557 tokens)
+  [798/1049] ORCHESTRA_67_6-8 ALL_trans+2.mid → ok (10557 tokens)
+  [799/1049] ORCHESTRA_67_6-8 ALL_trans+3.mid → ok (10557 tokens)
+  [800/1049] ORCHESTRA_67_6-8 ALL_trans+4.mid → ok (10557 tokens)
+  [801/1049] ORCHESTRA_67_6-8 ALL_trans+5.mid → ok (10557 tokens)
+  [802/1049] ORCHESTRA_67_6-8 ALL_trans+6.mid → ok (10557 tokens)
+  [803/1049] ORCHESTRA_67_6-8 ALL_trans+7.mid → ok (10557 tokens)
+  [804/1049] ORCHESTRA_67_6-8 ALL_trans+8.mid → ok (10557 tokens)
+  [805/1049] ORCHESTRA_67_6-8 ALL_trans+9.mid → ok (10557 tokens)
+  [806/1049] ORCHESTRA_67_6-8 ALL_tshuffle0.mid → ok (10573 tokens)
+  [807/1049] ORCHESTRA_67_6-8 ALL_tshuffle1.mid → ok (10562 tokens)
+  [808/1049] ORCHESTRA_67_6-8 ALL_tstretch.mid → ok (10991 tokens)
+  [809/1049] ORCHESTRA_67_6-8 ALL_veljit.mid → ok (10557 tokens)
+  [810/1049] ORCHESTRA_67_6-8 STRING,BRASS_original.mid → ok (7448 tokens)
+  [811/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+1.mid → ok (7448 tokens)
+  [812/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+10.mid → ok (7448 tokens)
+  [813/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+11.mid → ok (7448 tokens)
+  [814/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+2.mid → ok (7448 tokens)
+  [815/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+3.mid → ok (7448 tokens)
+  [816/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+4.mid → ok (7448 tokens)
+  [817/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+5.mid → ok (7448 tokens)
+  [818/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+6.mid → ok (7448 tokens)
+  [819/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+7.mid → ok (7448 tokens)
+  [820/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+8.mid → ok (7448 tokens)
+  [821/1049] ORCHESTRA_67_6-8 STRING,BRASS_trans+9.mid → ok (7448 tokens)
+  [822/1049] ORCHESTRA_67_6-8 STRING,BRASS_tshuffle0.mid → ok (7436 tokens)
+  [823/1049] ORCHESTRA_67_6-8 STRING,BRASS_tshuffle1.mid → ok (7445 tokens)
+  [824/1049] ORCHESTRA_67_6-8 STRING,BRASS_tstretch.mid → ok (7815 tokens)
+  [825/1049] ORCHESTRA_67_6-8 STRING,BRASS_veljit.mid → ok (7448 tokens)
+  [826/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_original.mid → ok (7884 tokens)
+  [827/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+1.mid → ok (7884 tokens)
+  [828/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+10.mid → ok (7884 tokens)
+  [829/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+11.mid → ok (7884 tokens)
+  [830/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+2.mid → ok (7884 tokens)
+  [831/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+3.mid → ok (7884 tokens)
+  [832/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+4.mid → ok (7884 tokens)
+  [833/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+5.mid → ok (7884 tokens)
+  [834/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+6.mid → ok (7884 tokens)
+  [835/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+7.mid → ok (7884 tokens)
+  [836/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+8.mid → ok (7884 tokens)
+  [837/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_trans+9.mid → ok (7884 tokens)
+  [838/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_tshuffle0.mid → ok (7897 tokens)
+  [839/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_tshuffle1.mid → ok (7897 tokens)
+  [840/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_tstretch.mid → ok (8340 tokens)
+  [841/1049] ORCHESTRA_67_6-8 STRING,WOODWIND_veljit.mid → ok (7884 tokens)
+  [842/1049] ORCHESTRA_67_6-8 STRING_original.mid → ok (3404 tokens)
+  [843/1049] ORCHESTRA_67_6-8 STRING_trans+1.mid → ok (3404 tokens)
+  [844/1049] ORCHESTRA_67_6-8 STRING_trans+10.mid → ok (3404 tokens)
+  [845/1049] ORCHESTRA_67_6-8 STRING_trans+11.mid → ok (3404 tokens)
+  [846/1049] ORCHESTRA_67_6-8 STRING_trans+2.mid → ok (3404 tokens)
+  [847/1049] ORCHESTRA_67_6-8 STRING_trans+3.mid → ok (3404 tokens)
+  [848/1049] ORCHESTRA_67_6-8 STRING_trans+4.mid → ok (3404 tokens)
+  [849/1049] ORCHESTRA_67_6-8 STRING_trans+5.mid → ok (3404 tokens)
+  [850/1049] ORCHESTRA_67_6-8 STRING_trans+6.mid → ok (3404 tokens)
+  [851/1049] ORCHESTRA_67_6-8 STRING_trans+7.mid → ok (3404 tokens)
+  [852/1049] ORCHESTRA_67_6-8 STRING_trans+8.mid → ok (3404 tokens)
+  [853/1049] ORCHESTRA_67_6-8 STRING_trans+9.mid → ok (3404 tokens)
+  [854/1049] ORCHESTRA_67_6-8 STRING_tshuffle0.mid → ok (3404 tokens)
+  [855/1049] ORCHESTRA_67_6-8 STRING_tshuffle1.mid → ok (3404 tokens)
+  [856/1049] ROCK 200 4-4 ALL_original.mid → ok (3529 tokens)
+  [857/1049] ROCK 200 4-4 ALL_trans+10.mid → ok (3529 tokens)
+  [858/1049] ROCK 200 4-4 ALL_trans+1.mid → ok (3529 tokens)
+  [859/1049] ROCK 200 4-4 ALL_trans+11.mid → ok (3529 tokens)
+  [860/1049] ROCK 200 4-4 ALL_trans+2.mid → ok (3529 tokens)
+  [861/1049] ORCHESTRA_67_6-8 STRING_tstretch.mid → ok (3624 tokens)
+  [862/1049] ORCHESTRA_67_6-8 STRING_veljit.mid → ok (3404 tokens)
+  [863/1049] ROCK 200 4-4 ALL_trans+3.mid → ok (3529 tokens)
+  [864/1049] ROCK 200 4-4 ALL_trans+4.mid → ok (3529 tokens)
+  [865/1049] ROCK 200 4-4 ALL_trans+5.mid → ok (3529 tokens)
+  [866/1049] ROCK 200 4-4 ALL_trans+7.mid → ok (3529 tokens)
+  [867/1049] ROCK 200 4-4 ALL_trans+6.mid → ok (3529 tokens)
+  [868/1049] ROCK 200 4-4 ALL_trans+8.mid → ok (3529 tokens)
+  [869/1049] ROCK 200 4-4 ALL_trans+9.mid → ok (3529 tokens)
+  [870/1049] ROCK 200 4-4 ALL_tshuffle0.mid → ok (3536 tokens)
+  [871/1049] ROCK 200 4-4 ALL_tshuffle1.mid → ok (3536 tokens)
+  [872/1049] ROCK 200 4-4 ALL_tstretch.mid → ok (3851 tokens)
+  [873/1049] ROCK 200 4-4 BASS DRUM_original.mid → ok (1144 tokens)
+  [874/1049] ROCK 200 4-4 BASS DRUM_trans+1.mid → ok (1144 tokens)
+  [875/1049] ROCK 200 4-4 BASS DRUM_trans+10.mid → ok (1144 tokens)
+  [876/1049] ROCK 200 4-4 BASS DRUM_trans+11.mid → ok (1144 tokens)
+  [877/1049] ROCK 200 4-4 ALL_veljit.mid → ok (3529 tokens)
+  [878/1049] ROCK 200 4-4 BASS DRUM_trans+2.mid → ok (1144 tokens)
+  [879/1049] ROCK 200 4-4 BASS DRUM_trans+4.mid → ok (1144 tokens)
+  [880/1049] ROCK 200 4-4 BASS DRUM_trans+5.mid → ok (1144 tokens)
+  [881/1049] ROCK 200 4-4 BASS DRUM_trans+3.mid → ok (1144 tokens)
+  [882/1049] ROCK 200 4-4 BASS DRUM_trans+6.mid → ok (1144 tokens)
+  [883/1049] ROCK 200 4-4 BASS DRUM_trans+7.mid → ok (1144 tokens)
+  [884/1049] ROCK 200 4-4 BASS DRUM_trans+9.mid → ok (1144 tokens)
+  [885/1049] ROCK 200 4-4 BASS DRUM_trans+8.mid → ok (1144 tokens)
+  [886/1049] ROCK 200 4-4 BASS DRUM_tshuffle0.mid → ok (1144 tokens)
+  [887/1049] ROCK 200 4-4 BASS DRUM_tshuffle1.mid → ok (1144 tokens)
+  [888/1049] ROCK 200 4-4 BASS DRUM_tstretch.mid → ok (1252 tokens)
+  [889/1049] ROCK 200 4-4 BASS DRUM_veljit.mid → ok (1144 tokens)
+  [890/1049] ROCK 200 4-4 GUITAR BASS_original.mid → ok (2819 tokens)
+  [891/1049] ROCK 200 4-4 GUITAR BASS_trans+1.mid → ok (2819 tokens)
+  [892/1049] ROCK 200 4-4 GUITAR BASS_trans+10.mid → ok (2819 tokens)
+  [893/1049] ROCK 200 4-4 GUITAR BASS_trans+11.mid → ok (2819 tokens)
+  [894/1049] ROCK 200 4-4 GUITAR BASS_trans+2.mid → ok (2819 tokens)
+  [895/1049] ROCK 200 4-4 GUITAR BASS_trans+3.mid → ok (2819 tokens)
+  [896/1049] ROCK 200 4-4 GUITAR BASS_trans+4.mid → ok (2819 tokens)
+  [897/1049] ROCK 200 4-4 GUITAR BASS_trans+5.mid → ok (2819 tokens)
+  [898/1049] ROCK 200 4-4 GUITAR BASS_trans+6.mid → ok (2819 tokens)
+  [899/1049] ROCK 200 4-4 GUITAR BASS_trans+7.mid → ok (2819 tokens)
+  [900/1049] ROCK 200 4-4 GUITAR BASS_trans+8.mid → ok (2819 tokens)
+  [901/1049] ROCK 200 4-4 GUITAR BASS_trans+9.mid → ok (2819 tokens)
+  [902/1049] ROCK 200 4-4 GUITAR BASS_tshuffle0.mid → ok (2822 tokens)
+  [903/1049] ROCK 200 4-4 GUITAR BASS_tstretch.mid → ok (3101 tokens)
+  [904/1049] ROCK 200 4-4 GUITAR BASS_tshuffle1.mid → ok (2822 tokens)
+  [905/1049] ROCK 200 4-4 GUITAR BASS_veljit.mid → ok (2819 tokens)
+  [906/1049] ROCK 200 4-4 GUITAR DRUM_original.mid → ok (3009 tokens)
+  [907/1049] ROCK 200 4-4 GUITAR DRUM_trans+1.mid → ok (3009 tokens)
+  [908/1049] ROCK 200 4-4 GUITAR DRUM_trans+10.mid → ok (3009 tokens)
+  [909/1049] ROCK 200 4-4 GUITAR DRUM_trans+11.mid → ok (3009 tokens)
+  [910/1049] ROCK 200 4-4 GUITAR DRUM_trans+2.mid → ok (3009 tokens)
+  [911/1049] ROCK 200 4-4 GUITAR DRUM_trans+3.mid → ok (3009 tokens)
+  [912/1049] ROCK 200 4-4 GUITAR DRUM_trans+4.mid → ok (3009 tokens)
+  [913/1049] ROCK 200 4-4 GUITAR DRUM_trans+5.mid → ok (3009 tokens)
+  [914/1049] ROCK 200 4-4 GUITAR DRUM_trans+6.mid → ok (3009 tokens)
+  [915/1049] ROCK 200 4-4 GUITAR DRUM_trans+7.mid → ok (3009 tokens)
+  [916/1049] ROCK 200 4-4 GUITAR DRUM_trans+8.mid → ok (3009 tokens)
+  [917/1049] ROCK 200 4-4 GUITAR DRUM_trans+9.mid → ok (3009 tokens)
+  [918/1049] ROCK 200 4-4 GUITAR DRUM_tshuffle0.mid → ok (3009 tokens)
+  [919/1049] ROCK 200 4-4 GUITAR DRUM_tshuffle1.mid → ok (3009 tokens)
+  [920/1049] ROCK 200 4-4 GUITAR DRUM_tstretch.mid → ok (3355 tokens)
+  [921/1049] ROCK 200 4-4 GUITAR DRUM_veljit.mid → ok (3009 tokens)
+  [922/1049] STRING_60_4-4 ALL_original.mid → ok (3723 tokens)
+  [923/1049] STRING_60_4-4 ALL_trans+1.mid → ok (3723 tokens)
+  [924/1049] STRING_60_4-4 ALL_trans+10.mid → ok (3723 tokens)
+  [925/1049] STRING_60_4-4 ALL_trans+11.mid → ok (3723 tokens)
+  [926/1049] STRING_60_4-4 ALL_trans+2.mid → ok (3723 tokens)
+  [927/1049] STRING_60_4-4 ALL_trans+4.mid → ok (3723 tokens)
+  [928/1049] STRING_60_4-4 ALL_trans+3.mid → ok (3723 tokens)
+  [929/1049] STRING_60_4-4 ALL_trans+5.mid → ok (3723 tokens)
+  [930/1049] STRING_60_4-4 ALL_trans+6.mid → ok (3723 tokens)
+  [931/1049] STRING_60_4-4 ALL_trans+7.mid → ok (3723 tokens)
+  [932/1049] STRING_60_4-4 ALL_trans+9.mid → ok (3723 tokens)
+  [933/1049] STRING_60_4-4 ALL_trans+8.mid → ok (3723 tokens)
+  [934/1049] STRING_60_4-4 ALL_tshuffle0.mid → ok (3716 tokens)
+  [935/1049] STRING_60_4-4 ALL_tshuffle1.mid → ok (3715 tokens)
+  [936/1049] STRING_60_4-4 ALL_tstretch.mid → ok (4446 tokens)
+  [937/1049] STRING_60_4-4 ALL_veljit.mid → ok (3723 tokens)
+  [938/1049] STRING_60_4-4 PIANO MELODY STRING_trans+1.mid → ok (3226 tokens)
+  [939/1049] STRING_60_4-4 PIANO MELODY STRING_original.mid → ok (3226 tokens)
+  [940/1049] STRING_60_4-4 PIANO MELODY STRING_trans+10.mid → ok (3226 tokens)
+  [941/1049] STRING_60_4-4 PIANO MELODY STRING_trans+11.mid → ok (3226 tokens)
+  [942/1049] STRING_60_4-4 PIANO MELODY STRING_trans+2.mid → ok (3226 tokens)
+  [943/1049] STRING_60_4-4 PIANO MELODY STRING_trans+3.mid → ok (3226 tokens)
+  [944/1049] STRING_60_4-4 PIANO MELODY STRING_trans+4.mid → ok (3226 tokens)
+  [945/1049] STRING_60_4-4 PIANO MELODY STRING_trans+5.mid → ok (3226 tokens)
+  [946/1049] STRING_60_4-4 PIANO MELODY STRING_trans+7.mid → ok (3226 tokens)
+  [947/1049] STRING_60_4-4 PIANO MELODY STRING_trans+6.mid → ok (3226 tokens)
+  [948/1049] STRING_60_4-4 PIANO MELODY STRING_trans+8.mid → ok (3226 tokens)
+  [949/1049] STRING_60_4-4 PIANO MELODY STRING_trans+9.mid → ok (3226 tokens)
+  [950/1049] STRING_60_4-4 PIANO MELODY STRING_tshuffle0.mid → ok (3222 tokens)
+  [951/1049] STRING_60_4-4 PIANO MELODY STRING_veljit.mid → ok (3226 tokens)
+  [952/1049] STRING_60_4-4 PIANO MELODY STRING_tshuffle1.mid → ok (3225 tokens)
+  [953/1049] STRING_60_4-4 PIANO MELODY STRING_tstretch.mid → ok (3786 tokens)
+  [954/1049] STRING_60_4-4 PIANO MELODY_original.mid → ok (2362 tokens)
+  [955/1049] STRING_60_4-4 PIANO MELODY_trans+10.mid → ok (2362 tokens)
+  [956/1049] STRING_60_4-4 PIANO MELODY_trans+1.mid → ok (2362 tokens)
+  [957/1049] STRING_60_4-4 PIANO MELODY_trans+11.mid → ok (2362 tokens)
+  [958/1049] STRING_60_4-4 PIANO MELODY_trans+2.mid → ok (2362 tokens)
+  [959/1049] STRING_60_4-4 PIANO MELODY_trans+3.mid → ok (2362 tokens)
+  [960/1049] STRING_60_4-4 PIANO MELODY_trans+5.mid → ok (2362 tokens)
+  [961/1049] STRING_60_4-4 PIANO MELODY_trans+4.mid → ok (2362 tokens)
+  [962/1049] STRING_60_4-4 PIANO MELODY_trans+6.mid → ok (2362 tokens)
+  [963/1049] STRING_60_4-4 PIANO MELODY_trans+7.mid → ok (2362 tokens)
+  [964/1049] STRING_60_4-4 PIANO MELODY_trans+9.mid → ok (2362 tokens)
+  [965/1049] STRING_60_4-4 PIANO MELODY_trans+8.mid → ok (2362 tokens)
+  [966/1049] STRING_60_4-4 PIANO MELODY_tshuffle0.mid → ok (2362 tokens)
+  [967/1049] STRING_60_4-4 PIANO MELODY_tshuffle1.mid → ok (2362 tokens)
+  [968/1049] STRING_60_4-4 PIANO MELODY_tstretch.mid → ok (2765 tokens)
+  [969/1049] STRING_60_4-4 PIANO MELODY_veljit.mid → ok (2362 tokens)
+  [970/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_original.mid → ok (3175 tokens)
+  [971/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+1.mid → ok (3175 tokens)
+  [972/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+10.mid → ok (3175 tokens)
+  [973/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+11.mid → ok (3175 tokens)
+  [974/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+2.mid → ok (3175 tokens)
+  [975/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+3.mid → ok (3175 tokens)
+  [976/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+4.mid → ok (3175 tokens)
+  [977/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+5.mid → ok (3175 tokens)
+  [978/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+6.mid → ok (3175 tokens)
+  [979/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+7.mid → ok (3175 tokens)
+  [980/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+8.mid → ok (3175 tokens)
+  [981/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_trans+9.mid → ok (3175 tokens)
+  [982/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_tshuffle0.mid → ok (3175 tokens)
+  [983/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_tshuffle1.mid → ok (3173 tokens)
+  [984/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_tstretch.mid → ok (3804 tokens)
+  [985/1049] STRING_60_4-4 PIANO STRING GUITAR PAD_veljit.mid → ok (3175 tokens)
+  [986/1049] WALTZ 6-8 85 BPM FULL_trans+1.mid → ok (6422 tokens)
+  [987/1049] WALTZ 6-8 85 BPM FULL_original.mid → ok (6422 tokens)
+  [988/1049] WALTZ 6-8 85 BPM FULL_trans+10.mid → ok (6422 tokens)
+  [989/1049] WALTZ 6-8 85 BPM FULL_trans+11.mid → ok (6422 tokens)
+  [990/1049] WALTZ 6-8 85 BPM FULL_trans+2.mid → ok (6422 tokens)
+  [991/1049] WALTZ 6-8 85 BPM FULL_trans+3.mid → ok (6422 tokens)
+  [992/1049] WALTZ 6-8 85 BPM FULL_trans+4.mid → ok (6422 tokens)
+  [993/1049] WALTZ 6-8 85 BPM FULL_trans+5.mid → ok (6422 tokens)
+  [994/1049] WALTZ 6-8 85 BPM FULL_trans+6.mid → ok (6422 tokens)
+  [995/1049] WALTZ 6-8 85 BPM FULL_trans+8.mid → ok (6422 tokens)
+  [996/1049] WALTZ 6-8 85 BPM FULL_trans+7.mid → ok (6422 tokens)
+  [997/1049] WALTZ 6-8 85 BPM FULL_trans+9.mid → ok (6422 tokens)
+  [998/1049] WALTZ 6-8 85 BPM FULL_tshuffle0.mid → ok (6522 tokens)
+  [999/1049] WALTZ 6-8 85 BPM FULL_tstretch.mid → ok (6697 tokens)
+  [1000/1049] WALTZ 6-8 85 BPM FULL_tshuffle1.mid → ok (6424 tokens)
+  [1001/1049] WALTZ 6-8 85 BPM FULL_veljit.mid → ok (6422 tokens)
+  [1002/1049] WALTZ 6-8 85 BPM PIANO STRING_original.mid → ok (4759 tokens)
+  [1003/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+1.mid → ok (4759 tokens)
+  [1004/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+11.mid → ok (4759 tokens)
+  [1005/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+10.mid → ok (4759 tokens)
+  [1006/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+2.mid → ok (4759 tokens)
+  [1007/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+3.mid → ok (4759 tokens)
+  [1008/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+4.mid → ok (4759 tokens)
+  [1009/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+5.mid → ok (4759 tokens)
+  [1010/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+6.mid → ok (4759 tokens)
+  [1011/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+8.mid → ok (4759 tokens)
+  [1012/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+9.mid → ok (4759 tokens)
+  [1013/1049] WALTZ 6-8 85 BPM PIANO STRING_trans+7.mid → ok (4759 tokens)
+  [1014/1049] WALTZ 6-8 85 BPM PIANO STRING_tshuffle0.mid → ok (4796 tokens)
+  [1015/1049] WALTZ 6-8 85 BPM PIANO STRING_tshuffle1.mid → ok (4781 tokens)
+  [1016/1049] WALTZ 6-8 85 BPM PIANO STRING_tstretch.mid → ok (4998 tokens)
+  [1017/1049] WALTZ 6-8 85 BPM PIANO STRING_veljit.mid → ok (4759 tokens)
+  [1018/1049] WALTZ 6-8 85 BPM STRING_original.mid → ok (1941 tokens)
+  [1019/1049] WALTZ 6-8 85 BPM STRING_trans+10.mid → ok (1941 tokens)
+  [1020/1049] WALTZ 6-8 85 BPM STRING_trans+1.mid → ok (1941 tokens)
+  [1021/1049] WALTZ 6-8 85 BPM STRING_trans+11.mid → ok (1941 tokens)
+  [1022/1049] WALTZ 6-8 85 BPM STRING_trans+2.mid → ok (1941 tokens)
+  [1023/1049] WALTZ 6-8 85 BPM STRING_trans+4.mid → ok (1941 tokens)
+  [1024/1049] WALTZ 6-8 85 BPM STRING_trans+3.mid → ok (1941 tokens)
+  [1025/1049] WALTZ 6-8 85 BPM STRING_trans+5.mid → ok (1941 tokens)
+  [1026/1049] WALTZ 6-8 85 BPM STRING_trans+6.mid → ok (1941 tokens)
+  [1027/1049] WALTZ 6-8 85 BPM STRING_trans+7.mid → ok (1941 tokens)
+  [1028/1049] WALTZ 6-8 85 BPM STRING_trans+8.mid → ok (1941 tokens)
+  [1029/1049] WALTZ 6-8 85 BPM STRING_trans+9.mid → ok (1941 tokens)
+  [1030/1049] WALTZ 6-8 85 BPM STRING_tshuffle0.mid → ok (1941 tokens)
+  [1031/1049] WALTZ 6-8 85 BPM STRING_tstretch.mid → ok (2058 tokens)
+  [1032/1049] WALTZ 6-8 85 BPM STRING_tshuffle1.mid → ok (1941 tokens)
+  [1033/1049] WALTZ 6-8 85 BPM STRING_veljit.mid → ok (1941 tokens)
+  [1034/1049] WALTZ 90 -6-8 REALL_original.mid → ok (5504 tokens)
+  [1035/1049] WALTZ 90 -6-8 REALL_trans+1.mid → ok (5504 tokens)
+  [1036/1049] WALTZ 90 -6-8 REALL_trans+10.mid → ok (5504 tokens)
+  [1037/1049] WALTZ 90 -6-8 REALL_trans+11.mid → ok (5504 tokens)
+  [1038/1049] WALTZ 90 -6-8 REALL_trans+2.mid → ok (5504 tokens)
+  [1039/1049] WALTZ 90 -6-8 REALL_trans+3.mid → ok (5504 tokens)
+  [1040/1049] WALTZ 90 -6-8 REALL_trans+4.mid → ok (5504 tokens)
+  [1041/1049] WALTZ 90 -6-8 REALL_trans+5.mid → ok (5504 tokens)
+  [1042/1049] WALTZ 90 -6-8 REALL_trans+6.mid → ok (5504 tokens)
+  [1043/1049] WALTZ 90 -6-8 REALL_trans+7.mid → ok (5504 tokens)
+  [1044/1049] WALTZ 90 -6-8 REALL_trans+8.mid → ok (5504 tokens)
+  [1045/1049] WALTZ 90 -6-8 REALL_trans+9.mid → ok (5504 tokens)
+  [1046/1049] WALTZ 90 -6-8 REALL_tshuffle0.mid → ok (5519 tokens)
+  [1047/1049] WALTZ 90 -6-8 REALL_tstretch.mid → ok (5690 tokens)
+  [1048/1049] WALTZ 90 -6-8 REALL_tshuffle1.mid → ok (5490 tokens)
+  [1049/1049] WALTZ 90 -6-8 REALL_veljit.mid → ok (5504 tokens)
+============================================================
+Done! 1049/1049 files tokenized
+Total tokens: 7,047,117
+Average tokens/file: 6,717
+Time: 19.4s
+Metadata: midigpt_pipeline\tokenized\metadata.json
+
+[OK] Tokenization (MIDI → Token Arrays) complete
+
+============================================================
+  STEP: Pre-training (MidiGPT 50M)
+============================================================
+
+Device: cuda
+GPU: NVIDIA GeForce RTX 4080
+VRAM: 17.2 GB
+
+MidiGPTConfig(
+  params=48.1M,
+  n_layer=12, n_head=12, n_embd=576,
+  n_inner=2304, block_size=2048,
+  vocab_size=527
+)
+Trainable parameters: 48,093,696 (48.1M)
+Dataset: 3974 chunks - 3577 train, 397 val
+Batches/epoch: 223 train, 25 val
+
+Training: 10 epochs, 2230 total steps
+Warmup: 200 steps
+Gradient accumulation: 4 steps
+Effective batch size: 64
+Checkpoints: checkpoints
+============================================================
+Step     10 | Epoch 1/10 | Loss 5.9316 | LR 1.50e-05 | Tok/s 45839 | 0.1min
+Step     20 | Epoch 1/10 | Loss 5.4286 | LR 3.00e-05 | Tok/s 54890 | 0.2min
+Step     30 | Epoch 1/10 | Loss 5.1030 | LR 4.50e-05 | Tok/s 58808 | 0.3min
+Step     40 | Epoch 1/10 | Loss 4.9579 | LR 6.00e-05 | Tok/s 60969 | 0.4min
+Step     50 | Epoch 1/10 | Loss 4.7132 | LR 7.50e-05 | Tok/s 62379 | 0.4min
+Step     60 | Epoch 1/10 | Loss 4.7051 | LR 9.00e-05 | Tok/s 63343 | 0.5min
+Step     70 | Epoch 1/10 | Loss 4.1607 | LR 1.05e-04 | Tok/s 64038 | 0.6min
+Step     80 | Epoch 1/10 | Loss 3.8422 | LR 1.20e-04 | Tok/s 64564 | 0.7min
+Step     90 | Epoch 1/10 | Loss 3.5616 | LR 1.35e-04 | Tok/s 64986 | 0.8min
+Step    100 | Epoch 1/10 | Loss 3.4531 | LR 1.50e-04 | Tok/s 65320 | 0.8min
+Step    110 | Epoch 1/10 | Loss 3.2716 | LR 1.65e-04 | Tok/s 65503 | 0.9min
+Step    120 | Epoch 1/10 | Loss 3.1452 | LR 1.80e-04 | Tok/s 65655 | 1.0min
+Step    130 | Epoch 1/10 | Loss 3.0034 | LR 1.95e-04 | Tok/s 65870 | 1.1min
+Step    140 | Epoch 1/10 | Loss 2.9835 | LR 2.10e-04 | Tok/s 66052 | 1.2min
+Step    150 | Epoch 1/10 | Loss 2.9288 | LR 2.25e-04 | Tok/s 66214 | 1.2min
+Step    160 | Epoch 1/10 | Loss 2.8218 | LR 2.40e-04 | Tok/s 66353 | 1.3min
+Step    170 | Epoch 1/10 | Loss 2.7851 | LR 2.55e-04 | Tok/s 66480 | 1.4min
+Step    180 | Epoch 1/10 | Loss 2.7557 | LR 2.70e-04 | Tok/s 66588 | 1.5min
+Step    190 | Epoch 1/10 | Loss 2.6615 | LR 2.85e-04 | Tok/s 66689 | 1.6min
+Step    200 | Epoch 1/10 | Loss 2.7177 | LR 3.00e-04 | Tok/s 66775 | 1.6min
+Step    210 | Epoch 1/10 | Loss 2.5864 | LR 3.00e-04 | Tok/s 66855 | 1.7min
+Step    220 | Epoch 1/10 | Loss 2.5818 | LR 3.00e-04 | Tok/s 66927 | 1.8min
+
+--- Epoch 1 complete | Train Loss: 3.6985 | Val Loss: 2.5339 ---
+
+  New best model saved (val_loss: 2.5339)
+Step    230 | Epoch 2/10 | Loss 2.4573 | LR 3.00e-04 | Tok/s 1902 | 2.0min
+Step    240 | Epoch 2/10 | Loss 2.4136 | LR 3.00e-04 | Tok/s 4442 | 2.1min
+Step    250 | Epoch 2/10 | Loss 2.4412 | LR 3.00e-04 | Tok/s 6792 | 2.2min
+Step    260 | Epoch 2/10 | Loss 2.2044 | LR 2.99e-04 | Tok/s 8975 | 2.3min
+Step    270 | Epoch 2/10 | Loss 2.2065 | LR 2.99e-04 | Tok/s 11007 | 2.3min
+Step    280 | Epoch 2/10 | Loss 2.1222 | LR 2.99e-04 | Tok/s 12903 | 2.4min
+Step    290 | Epoch 2/10 | Loss 2.0144 | LR 2.99e-04 | Tok/s 14677 | 2.5min
+Step    300 | Epoch 2/10 | Loss 1.8054 | LR 2.98e-04 | Tok/s 16340 | 2.6min
+Step    310 | Epoch 2/10 | Loss 1.9564 | LR 2.98e-04 | Tok/s 17903 | 2.7min
+Step    320 | Epoch 2/10 | Loss 1.8137 | LR 2.98e-04 | Tok/s 19373 | 2.7min
+Step    330 | Epoch 2/10 | Loss 1.6807 | LR 2.97e-04 | Tok/s 20758 | 2.8min
+Step    340 | Epoch 2/10 | Loss 1.6892 | LR 2.97e-04 | Tok/s 22067 | 2.9min
+Step    350 | Epoch 2/10 | Loss 1.6410 | LR 2.96e-04 | Tok/s 23305 | 3.0min
+Step    360 | Epoch 2/10 | Loss 1.6677 | LR 2.96e-04 | Tok/s 24477 | 3.1min
+Step    370 | Epoch 2/10 | Loss 1.5842 | LR 2.95e-04 | Tok/s 25590 | 3.1min
+Step    380 | Epoch 2/10 | Loss 1.7158 | LR 2.95e-04 | Tok/s 26647 | 3.2min
+Step    390 | Epoch 2/10 | Loss 1.7397 | LR 2.94e-04 | Tok/s 27652 | 3.3min
+Step    400 | Epoch 2/10 | Loss 1.7516 | LR 2.94e-04 | Tok/s 28609 | 3.4min
+Step    410 | Epoch 2/10 | Loss 1.4756 | LR 2.93e-04 | Tok/s 29522 | 3.5min
+Step    420 | Epoch 2/10 | Loss 1.5328 | LR 2.92e-04 | Tok/s 30392 | 3.5min
+Step    430 | Epoch 2/10 | Loss 1.6528 | LR 2.92e-04 | Tok/s 31225 | 3.6min
+Step    440 | Epoch 2/10 | Loss 1.5698 | LR 2.91e-04 | Tok/s 32021 | 3.7min
+
+--- Epoch 2 complete | Train Loss: 1.8770 | Val Loss: 1.4771 ---
+
+  New best model saved (val_loss: 1.4771)
+Step    450 | Epoch 3/10 | Loss 1.4288 | LR 2.90e-04 | Tok/s 557 | 3.9min
+Step    460 | Epoch 3/10 | Loss 1.5660 | LR 2.89e-04 | Tok/s 1910 | 4.0min
+Step    470 | Epoch 3/10 | Loss 1.2183 | LR 2.88e-04 | Tok/s 3210 | 4.1min
+Step    480 | Epoch 3/10 | Loss 1.2610 | LR 2.88e-04 | Tok/s 4459 | 4.2min
+Step    490 | Epoch 3/10 | Loss 1.2862 | LR 2.87e-04 | Tok/s 5661 | 4.2min
+Step    500 | Epoch 3/10 | Loss 1.2059 | LR 2.86e-04 | Tok/s 6819 | 4.3min
+Step    510 | Epoch 3/10 | Loss 1.3792 | LR 2.85e-04 | Tok/s 7933 | 4.4min
+Step    520 | Epoch 3/10 | Loss 1.2448 | LR 2.84e-04 | Tok/s 9008 | 4.5min
+Step    530 | Epoch 3/10 | Loss 1.2815 | LR 2.83e-04 | Tok/s 10045 | 4.6min
+Step    540 | Epoch 3/10 | Loss 1.2384 | LR 2.82e-04 | Tok/s 11046 | 4.6min
+Step    550 | Epoch 3/10 | Loss 1.1695 | LR 2.81e-04 | Tok/s 12013 | 4.7min
+Step    560 | Epoch 3/10 | Loss 1.1962 | LR 2.80e-04 | Tok/s 12947 | 4.8min
+Step    570 | Epoch 3/10 | Loss 1.1311 | LR 2.79e-04 | Tok/s 13850 | 4.9min
+Step    580 | Epoch 3/10 | Loss 1.0752 | LR 2.77e-04 | Tok/s 14725 | 5.0min
+Step    590 | Epoch 3/10 | Loss 1.0908 | LR 2.76e-04 | Tok/s 15571 | 5.1min
+Step    600 | Epoch 3/10 | Loss 1.3285 | LR 2.75e-04 | Tok/s 16391 | 5.1min
+Step    610 | Epoch 3/10 | Loss 1.0618 | LR 2.74e-04 | Tok/s 17185 | 5.2min
+Step    620 | Epoch 3/10 | Loss 1.0165 | LR 2.73e-04 | Tok/s 17956 | 5.3min
+Step    630 | Epoch 3/10 | Loss 0.9329 | LR 2.71e-04 | Tok/s 18703 | 5.4min
+Step    640 | Epoch 3/10 | Loss 1.0548 | LR 2.70e-04 | Tok/s 19428 | 5.5min
+Step    650 | Epoch 3/10 | Loss 1.0129 | LR 2.69e-04 | Tok/s 20132 | 5.5min
+Step    660 | Epoch 3/10 | Loss 0.8910 | LR 2.67e-04 | Tok/s 20816 | 5.6min
+
+--- Epoch 3 complete | Train Loss: 1.2081 | Val Loss: 1.0173 ---
+
+  New best model saved (val_loss: 1.0173)
+Step    670 | Epoch 4/10 | Loss 0.8814 | LR 2.66e-04 | Tok/s 94 | 5.8min
+Step    680 | Epoch 4/10 | Loss 0.9703 | LR 2.65e-04 | Tok/s 1016 | 5.9min
+Step    690 | Epoch 4/10 | Loss 0.7995 | LR 2.63e-04 | Tok/s 1889 | 6.1min
+Step    700 | Epoch 4/10 | Loss 0.8348 | LR 2.62e-04 | Tok/s 2750 | 6.2min
+Step    710 | Epoch 4/10 | Loss 0.9014 | LR 2.60e-04 | Tok/s 3590 | 6.2min
+Step    720 | Epoch 4/10 | Loss 0.7795 | LR 2.59e-04 | Tok/s 4408 | 6.3min
+Step    730 | Epoch 4/10 | Loss 0.7329 | LR 2.57e-04 | Tok/s 5206 | 6.4min
+Step    740 | Epoch 4/10 | Loss 0.9991 | LR 2.56e-04 | Tok/s 5984 | 6.5min
+Step    750 | Epoch 4/10 | Loss 0.8308 | LR 2.54e-04 | Tok/s 6743 | 6.6min
+Step    760 | Epoch 4/10 | Loss 0.8400 | LR 2.53e-04 | Tok/s 7484 | 6.6min
+Step    770 | Epoch 4/10 | Loss 0.6981 | LR 2.51e-04 | Tok/s 8207 | 6.7min
+Step    780 | Epoch 4/10 | Loss 0.8929 | LR 2.49e-04 | Tok/s 8913 | 6.8min
+Step    790 | Epoch 4/10 | Loss 0.7590 | LR 2.48e-04 | Tok/s 9602 | 6.9min
+Step    800 | Epoch 4/10 | Loss 0.7985 | LR 2.46e-04 | Tok/s 10275 | 7.0min
+Step    810 | Epoch 4/10 | Loss 0.8235 | LR 2.44e-04 | Tok/s 10933 | 7.0min
+Step    820 | Epoch 4/10 | Loss 0.7218 | LR 2.43e-04 | Tok/s 11576 | 7.1min
+Step    830 | Epoch 4/10 | Loss 0.7689 | LR 2.41e-04 | Tok/s 12204 | 7.2min
+Step    840 | Epoch 4/10 | Loss 0.7618 | LR 2.39e-04 | Tok/s 12819 | 7.3min
+Step    850 | Epoch 4/10 | Loss 0.6061 | LR 2.37e-04 | Tok/s 13420 | 7.4min
+Step    860 | Epoch 4/10 | Loss 0.9013 | LR 2.36e-04 | Tok/s 14008 | 7.4min
+Step    870 | Epoch 4/10 | Loss 0.7034 | LR 2.34e-04 | Tok/s 14584 | 7.5min
+Step    880 | Epoch 4/10 | Loss 0.7197 | LR 2.32e-04 | Tok/s 15149 | 7.6min
+Step    890 | Epoch 4/10 | Loss 0.7950 | LR 2.30e-04 | Tok/s 15701 | 7.7min
+
+--- Epoch 4 complete | Train Loss: 0.8333 | Val Loss: 0.7012 ---
+
+  New best model saved (val_loss: 0.7012)
+Step    900 | Epoch 5/10 | Loss 0.8479 | LR 2.28e-04 | Tok/s 552 | 7.9min
+Step    910 | Epoch 5/10 | Loss 0.5832 | LR 2.27e-04 | Tok/s 1230 | 8.0min
+Step    920 | Epoch 5/10 | Loss 0.6841 | LR 2.25e-04 | Tok/s 1895 | 8.1min
+Step    930 | Epoch 5/10 | Loss 0.6027 | LR 2.23e-04 | Tok/s 2546 | 8.2min
+Step    940 | Epoch 5/10 | Loss 0.6567 | LR 2.21e-04 | Tok/s 3185 | 8.2min
+Step    950 | Epoch 5/10 | Loss 0.6785 | LR 2.19e-04 | Tok/s 3811 | 8.3min
+Step    960 | Epoch 5/10 | Loss 0.6362 | LR 2.17e-04 | Tok/s 4425 | 8.4min
+Step    970 | Epoch 5/10 | Loss 0.5468 | LR 2.15e-04 | Tok/s 5027 | 8.5min
+Step    980 | Epoch 5/10 | Loss 0.6193 | LR 2.13e-04 | Tok/s 5619 | 8.6min
+Step    990 | Epoch 5/10 | Loss 0.5656 | LR 2.11e-04 | Tok/s 6199 | 8.6min
+Step   1000 | Epoch 5/10 | Loss 0.5754 | LR 2.09e-04 | Tok/s 6768 | 8.7min
+Step   1010 | Epoch 5/10 | Loss 0.5673 | LR 2.07e-04 | Tok/s 7327 | 8.8min
+Step   1020 | Epoch 5/10 | Loss 0.4639 | LR 2.05e-04 | Tok/s 7876 | 8.9min
+Step   1030 | Epoch 5/10 | Loss 0.3895 | LR 2.03e-04 | Tok/s 8415 | 9.0min
+Step   1040 | Epoch 5/10 | Loss 0.5686 | LR 2.01e-04 | Tok/s 8944 | 9.0min
+Step   1050 | Epoch 5/10 | Loss 0.5876 | LR 1.99e-04 | Tok/s 9464 | 9.1min
+Step   1060 | Epoch 5/10 | Loss 0.6171 | LR 1.97e-04 | Tok/s 9975 | 9.2min
+Step   1070 | Epoch 5/10 | Loss 0.5857 | LR 1.95e-04 | Tok/s 10477 | 9.3min
+Step   1080 | Epoch 5/10 | Loss 0.4994 | LR 1.93e-04 | Tok/s 10969 | 9.4min
+Step   1090 | Epoch 5/10 | Loss 0.4932 | LR 1.91e-04 | Tok/s 11455 | 9.4min
+Step   1100 | Epoch 5/10 | Loss 0.4826 | LR 1.89e-04 | Tok/s 11931 | 9.5min
+Step   1110 | Epoch 5/10 | Loss 0.5746 | LR 1.87e-04 | Tok/s 12400 | 9.6min
+
+--- Epoch 5 complete | Train Loss: 0.5811 | Val Loss: 0.4846 ---
+
+  New best model saved (val_loss: 0.4846)
+Step   1120 | Epoch 6/10 | Loss 0.4862 | LR 1.85e-04 | Tok/s 278 | 9.8min
+Step   1130 | Epoch 6/10 | Loss 0.4341 | LR 1.83e-04 | Tok/s 828 | 9.9min
+Step   1140 | Epoch 6/10 | Loss 0.5381 | LR 1.81e-04 | Tok/s 1368 | 10.0min
+Step   1150 | Epoch 6/10 | Loss 0.3496 | LR 1.79e-04 | Tok/s 1900 | 10.1min
+Step   1160 | Epoch 6/10 | Loss 0.3613 | LR 1.77e-04 | Tok/s 2424 | 10.1min
+Step   1170 | Epoch 6/10 | Loss 0.3980 | LR 1.75e-04 | Tok/s 2939 | 10.2min
+Step   1180 | Epoch 6/10 | Loss 0.4505 | LR 1.73e-04 | Tok/s 3446 | 10.3min
+Step   1190 | Epoch 6/10 | Loss 0.4228 | LR 1.70e-04 | Tok/s 3945 | 10.4min
+Step   1200 | Epoch 6/10 | Loss 0.4101 | LR 1.68e-04 | Tok/s 4437 | 10.5min
+Step   1210 | Epoch 6/10 | Loss 0.4793 | LR 1.66e-04 | Tok/s 4921 | 10.5min
+Step   1220 | Epoch 6/10 | Loss 0.4418 | LR 1.64e-04 | Tok/s 5398 | 10.6min
+Step   1230 | Epoch 6/10 | Loss 0.4104 | LR 1.62e-04 | Tok/s 5867 | 10.7min
+Step   1240 | Epoch 6/10 | Loss 0.4552 | LR 1.60e-04 | Tok/s 6330 | 10.8min
+Step   1250 | Epoch 6/10 | Loss 0.3733 | LR 1.58e-04 | Tok/s 6785 | 10.9min
+Step   1260 | Epoch 6/10 | Loss 0.3326 | LR 1.56e-04 | Tok/s 7234 | 10.9min
+Step   1270 | Epoch 6/10 | Loss 0.4115 | LR 1.54e-04 | Tok/s 7677 | 11.0min
+Step   1280 | Epoch 6/10 | Loss 0.2919 | LR 1.52e-04 | Tok/s 8113 | 11.1min
+Step   1290 | Epoch 6/10 | Loss 0.4136 | LR 1.50e-04 | Tok/s 8543 | 11.2min
+Step   1300 | Epoch 6/10 | Loss 0.3115 | LR 1.47e-04 | Tok/s 8967 | 11.3min
+Step   1310 | Epoch 6/10 | Loss 0.4074 | LR 1.45e-04 | Tok/s 9384 | 11.3min
+Step   1320 | Epoch 6/10 | Loss 0.3832 | LR 1.43e-04 | Tok/s 9796 | 11.4min
+Step   1330 | Epoch 6/10 | Loss 0.3475 | LR 1.41e-04 | Tok/s 10202 | 11.5min
+
+--- Epoch 6 complete | Train Loss: 0.4131 | Val Loss: 0.3596 ---
+
+  New best model saved (val_loss: 0.3596)
+Step   1340 | Epoch 7/10 | Loss 0.3553 | LR 1.39e-04 | Tok/s 93 | 11.7min
+Step   1350 | Epoch 7/10 | Loss 0.3329 | LR 1.37e-04 | Tok/s 555 | 11.8min
+Step   1360 | Epoch 7/10 | Loss 0.4179 | LR 1.35e-04 | Tok/s 1010 | 11.9min
+Step   1370 | Epoch 7/10 | Loss 0.3212 | LR 1.33e-04 | Tok/s 1459 | 12.0min
+Step   1380 | Epoch 7/10 | Loss 0.3700 | LR 1.31e-04 | Tok/s 1903 | 12.1min
+Step   1390 | Epoch 7/10 | Loss 0.3485 | LR 1.29e-04 | Tok/s 2340 | 12.1min
+Step   1400 | Epoch 7/10 | Loss 0.4025 | LR 1.27e-04 | Tok/s 2761 | 12.3min
+Step   1410 | Epoch 7/10 | Loss 0.2950 | LR 1.25e-04 | Tok/s 3179 | 12.4min
+Step   1420 | Epoch 7/10 | Loss 0.2402 | LR 1.23e-04 | Tok/s 3593 | 12.5min
+Step   1430 | Epoch 7/10 | Loss 0.3137 | LR 1.21e-04 | Tok/s 4002 | 12.6min
+Step   1440 | Epoch 7/10 | Loss 0.2750 | LR 1.19e-04 | Tok/s 4408 | 12.6min
+Step   1450 | Epoch 7/10 | Loss 0.2794 | LR 1.17e-04 | Tok/s 4809 | 12.7min
+Step   1460 | Epoch 7/10 | Loss 0.3620 | LR 1.15e-04 | Tok/s 5205 | 12.8min
+Step   1470 | Epoch 7/10 | Loss 0.2943 | LR 1.13e-04 | Tok/s 5596 | 12.9min
+Step   1480 | Epoch 7/10 | Loss 0.2298 | LR 1.11e-04 | Tok/s 5982 | 13.0min
+Step   1490 | Epoch 7/10 | Loss 0.3408 | LR 1.09e-04 | Tok/s 6363 | 13.0min
+Step   1500 | Epoch 7/10 | Loss 0.2406 | LR 1.08e-04 | Tok/s 6739 | 13.1min
+Step   1510 | Epoch 7/10 | Loss 0.2938 | LR 1.06e-04 | Tok/s 7111 | 13.2min
+Step   1520 | Epoch 7/10 | Loss 0.3039 | LR 1.04e-04 | Tok/s 7478 | 13.3min
+Step   1530 | Epoch 7/10 | Loss 0.2438 | LR 1.02e-04 | Tok/s 7841 | 13.4min
+Step   1540 | Epoch 7/10 | Loss 0.2782 | LR 1.00e-04 | Tok/s 8199 | 13.5min
+Step   1550 | Epoch 7/10 | Loss 0.3485 | LR 9.83e-05 | Tok/s 8553 | 13.5min
+Step   1560 | Epoch 7/10 | Loss 0.3153 | LR 9.65e-05 | Tok/s 8903 | 13.6min
+
+--- Epoch 7 complete | Train Loss: 0.3078 | Val Loss: 0.2817 ---
+
+  New best model saved (val_loss: 0.2817)
+Step   1570 | Epoch 8/10 | Loss 0.1646 | LR 9.47e-05 | Tok/s 355 | 13.8min
+Step   1580 | Epoch 8/10 | Loss 0.3986 | LR 9.29e-05 | Tok/s 745 | 13.9min
+Step   1590 | Epoch 8/10 | Loss 0.2883 | LR 9.12e-05 | Tok/s 1131 | 14.0min
+Step   1600 | Epoch 8/10 | Loss 0.2718 | LR 8.94e-05 | Tok/s 1512 | 14.1min
+Step   1610 | Epoch 8/10 | Loss 0.2425 | LR 8.77e-05 | Tok/s 1889 | 14.2min
+Step   1620 | Epoch 8/10 | Loss 0.2823 | LR 8.60e-05 | Tok/s 2262 | 14.2min
+Step   1630 | Epoch 8/10 | Loss 0.2920 | LR 8.43e-05 | Tok/s 2630 | 14.3min
+Step   1640 | Epoch 8/10 | Loss 0.2353 | LR 8.26e-05 | Tok/s 2994 | 14.4min
+Step   1650 | Epoch 8/10 | Loss 0.3020 | LR 8.10e-05 | Tok/s 3354 | 14.5min
+Step   1660 | Epoch 8/10 | Loss 0.2522 | LR 7.94e-05 | Tok/s 3710 | 14.6min
+Step   1670 | Epoch 8/10 | Loss 0.2226 | LR 7.78e-05 | Tok/s 4062 | 14.7min
+Step   1680 | Epoch 8/10 | Loss 0.2737 | LR 7.62e-05 | Tok/s 4410 | 14.7min
+Step   1690 | Epoch 8/10 | Loss 0.2106 | LR 7.46e-05 | Tok/s 4754 | 14.8min
+Step   1700 | Epoch 8/10 | Loss 0.2422 | LR 7.31e-05 | Tok/s 5094 | 14.9min
+Step   1710 | Epoch 8/10 | Loss 0.1838 | LR 7.16e-05 | Tok/s 5431 | 15.0min
+Step   1720 | Epoch 8/10 | Loss 0.2152 | LR 7.01e-05 | Tok/s 5764 | 15.1min
+Step   1730 | Epoch 8/10 | Loss 0.2140 | LR 6.86e-05 | Tok/s 6094 | 15.1min
+Step   1740 | Epoch 8/10 | Loss 0.2128 | LR 6.71e-05 | Tok/s 6420 | 15.2min
+Step   1750 | Epoch 8/10 | Loss 0.1837 | LR 6.57e-05 | Tok/s 6742 | 15.3min
+Step   1760 | Epoch 8/10 | Loss 0.3221 | LR 6.43e-05 | Tok/s 7061 | 15.4min
+Step   1770 | Epoch 8/10 | Loss 0.2053 | LR 6.29e-05 | Tok/s 7377 | 15.5min
+Step   1780 | Epoch 8/10 | Loss 0.1872 | LR 6.16e-05 | Tok/s 7689 | 15.6min
+
+--- Epoch 8 complete | Train Loss: 0.2413 | Val Loss: 0.2407 ---
+
+  New best model saved (val_loss: 0.2407)
+Step   1790 | Epoch 9/10 | Loss 0.1762 | LR 6.02e-05 | Tok/s 208 | 15.8min
+Step   1800 | Epoch 9/10 | Loss 0.1712 | LR 5.89e-05 | Tok/s 551 | 15.9min
+Step   1810 | Epoch 9/10 | Loss 0.2441 | LR 5.77e-05 | Tok/s 891 | 15.9min
+Step   1820 | Epoch 9/10 | Loss 0.2275 | LR 5.64e-05 | Tok/s 1227 | 16.0min
+Step   1830 | Epoch 9/10 | Loss 0.2960 | LR 5.52e-05 | Tok/s 1560 | 16.1min
+Step   1840 | Epoch 9/10 | Loss 0.2286 | LR 5.40e-05 | Tok/s 1890 | 16.2min
+Step   1850 | Epoch 9/10 | Loss 0.1770 | LR 5.28e-05 | Tok/s 2216 | 16.3min
+Step   1860 | Epoch 9/10 | Loss 0.1687 | LR 5.16e-05 | Tok/s 2539 | 16.3min
+Step   1870 | Epoch 9/10 | Loss 0.2840 | LR 5.05e-05 | Tok/s 2858 | 16.4min
+Step   1880 | Epoch 9/10 | Loss 0.1821 | LR 4.94e-05 | Tok/s 3175 | 16.5min
+Step   1890 | Epoch 9/10 | Loss 0.2030 | LR 4.84e-05 | Tok/s 3489 | 16.6min
+Step   1900 | Epoch 9/10 | Loss 0.1909 | LR 4.73e-05 | Tok/s 3799 | 16.7min
+Step   1910 | Epoch 9/10 | Loss 0.1558 | LR 4.63e-05 | Tok/s 4106 | 16.8min
+Step   1920 | Epoch 9/10 | Loss 0.1973 | LR 4.53e-05 | Tok/s 4411 | 16.8min
+Step   1930 | Epoch 9/10 | Loss 0.1654 | LR 4.44e-05 | Tok/s 4712 | 16.9min
+Step   1940 | Epoch 9/10 | Loss 0.1956 | LR 4.35e-05 | Tok/s 5011 | 17.0min
+Step   1950 | Epoch 9/10 | Loss 0.1508 | LR 4.26e-05 | Tok/s 5307 | 17.1min
+Step   1960 | Epoch 9/10 | Loss 0.2060 | LR 4.17e-05 | Tok/s 5599 | 17.2min
+Step   1970 | Epoch 9/10 | Loss 0.1751 | LR 4.09e-05 | Tok/s 5890 | 17.2min
+Step   1980 | Epoch 9/10 | Loss 0.2478 | LR 4.01e-05 | Tok/s 6177 | 17.3min
+Step   1990 | Epoch 9/10 | Loss 0.1364 | LR 3.93e-05 | Tok/s 6462 | 17.4min
+Step   2000 | Epoch 9/10 | Loss 0.1261 | LR 3.85e-05 | Tok/s 6744 | 17.5min
+
+--- Epoch 9 complete | Train Loss: 0.2003 | Val Loss: 0.2164 ---
+
+  New best model saved (val_loss: 0.2164)
+Step   2010 | Epoch 10/10 | Loss 0.2535 | LR 3.78e-05 | Tok/s 92 | 17.7min
+Step   2020 | Epoch 10/10 | Loss 0.1503 | LR 3.71e-05 | Tok/s 399 | 17.8min
+Step   2030 | Epoch 10/10 | Loss 0.1715 | LR 3.65e-05 | Tok/s 703 | 17.9min
+Step   2040 | Epoch 10/10 | Loss 0.2144 | LR 3.59e-05 | Tok/s 1003 | 18.0min
+Step   2050 | Epoch 10/10 | Loss 0.1677 | LR 3.53e-05 | Tok/s 1302 | 18.0min
+Step   2060 | Epoch 10/10 | Loss 0.1488 | LR 3.47e-05 | Tok/s 1597 | 18.1min
+Step   2070 | Epoch 10/10 | Loss 0.2356 | LR 3.42e-05 | Tok/s 1890 | 18.2min
+Step   2080 | Epoch 10/10 | Loss 0.1440 | LR 3.37e-05 | Tok/s 2180 | 18.3min
+Step   2090 | Epoch 10/10 | Loss 0.1547 | LR 3.32e-05 | Tok/s 2468 | 18.4min
+Step   2100 | Epoch 10/10 | Loss 0.1485 | LR 3.28e-05 | Tok/s 2753 | 18.4min
+Step   2110 | Epoch 10/10 | Loss 0.1749 | LR 3.24e-05 | Tok/s 3036 | 18.5min
+Step   2120 | Epoch 10/10 | Loss 0.1584 | LR 3.20e-05 | Tok/s 3316 | 18.6min
+Step   2130 | Epoch 10/10 | Loss 0.1849 | LR 3.16e-05 | Tok/s 3593 | 18.7min
+Step   2140 | Epoch 10/10 | Loss 0.1506 | LR 3.13e-05 | Tok/s 3869 | 18.8min
+Step   2150 | Epoch 10/10 | Loss 0.1826 | LR 3.11e-05 | Tok/s 4142 | 18.9min
+Step   2160 | Epoch 10/10 | Loss 0.1778 | LR 3.08e-05 | Tok/s 4412 | 18.9min
+Step   2170 | Epoch 10/10 | Loss 0.1320 | LR 3.06e-05 | Tok/s 4680 | 19.0min
+Step   2180 | Epoch 10/10 | Loss 0.1575 | LR 3.04e-05 | Tok/s 4946 | 19.1min
+Step   2190 | Epoch 10/10 | Loss 0.2055 | LR 3.03e-05 | Tok/s 5210 | 19.2min
+Step   2200 | Epoch 10/10 | Loss 0.1709 | LR 3.02e-05 | Tok/s 5471 | 19.3min
+Step   2210 | Epoch 10/10 | Loss 0.1714 | LR 3.01e-05 | Tok/s 5730 | 19.3min
+Step   2220 | Epoch 10/10 | Loss 0.2335 | LR 3.00e-05 | Tok/s 5987 | 19.4min
+Step   2230 | Epoch 10/10 | Loss 0.2920 | LR 3.00e-05 | Tok/s 6242 | 19.5min
+
+--- Epoch 10 complete | Train Loss: 0.1753 | Val Loss: 0.2031 ---
+
+  New best model saved (val_loss: 0.2031)
+============================================================
+Training complete!
+Total time: 0.3 hours
+Best val loss: 0.2031
+Final model: checkpoints\midigpt_best.pt
+Weights-only: checkpoints\midigpt_base.pt
+
+[OK] Pre-training (MidiGPT 50M) complete
+
+============================================================
+  STEP: Build SFT Pairs (input→output)
+============================================================
+
+Found 65 original MIDI files
+Strategies: continuation, track_completion, variation
+Output: midigpt_pipeline\sft
+============================================================
+  [1/65] CITY POP 105 4-4 ALL.mid → 8 pairs
+  [2/65] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid → 8 pairs
+  [3/65] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid → 8 pairs
+  [4/65] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid → 8 pairs
+  [5/65] CITY POP 105 4-4 DRUM E.PIANO.mid → 6 pairs
+  [6/65] COLOR 190 4-4 BASS DRUM MELODY.mid → 8 pairs
+  [7/65] COLOR 190 4-4 PIANO BASS.mid → 6 pairs
+  [8/65] COLOR 190 4-4.mid → 8 pairs
+  [9/65] HIPHOP 63 4-4 ALL.mid → 8 pairs
+  [10/65] HIPHOP 63 4-4 BASS E.GUITAR VOCAL.mid → 8 pairs
+  [11/65] HIPHOP 63 4-4 DRUM BASS E.GUITAR.mid → 8 pairs
+  [12/65] HIPHOP 63 4-4 DRUM BASS VOCAL.mid → 8 pairs
+  [13/65] HOUSE 123 4-4 ALL.mid → 8 pairs
+  [14/65] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK.mid → 8 pairs
+  [15/65] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL.mid → 8 pairs
+  [16/65] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL.mid → 8 pairs
+  [17/65] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL.mid → 8 pairs
+  [18/65] J POP BASS DRUM 130 4-4.mid → 8 pairs
+  [19/65] J POP DRUM PIANO 140 4-4.mid → 8 pairs
+  [20/65] J POP MELODY+PIANO.mid → 6 pairs
+  [21/65] J POP PIANO BASS DRUM 130 4-4.mid → 8 pairs
+  [22/65] J POP PIANO+BASS+DRUM.mid → 8 pairs
+  [23/65] J POP.mid → 8 pairs
+  [24/65] KPOP GARAGE 165 4-4 ALL.mid → 8 pairs
+  [25/65] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL.mid → 8 pairs
+  [26/65] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD.mid → 8 pairs
+  [27/65] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL.mid → 8 pairs
+  [28/65] LATIN ALL 105 4-4.mid → 8 pairs
+  [29/65] METAL 110 4-4 ALL GUITAR BASS.mid → 8 pairs
+  [30/65] METAL 110 4-4 ALL.mid → 8 pairs
+  [31/65] METAL 110 4-4 BASS DRUM.mid → 6 pairs
+  [32/65] METAL 110 4-4 GUITAR DRUM.mid → 8 pairs
+  [33/65] ORCHESTRA 150 4-4 ALL.mid → 8 pairs
+  [34/65] ORCHESTRA 150 4-4 PIANO STRING.mid → 8 pairs
+  [35/65] ORCHESTRA 150 4-4 STRING BRASS WOODWIND.mid → 8 pairs
+  [36/65] ORCHESTRA 150 4-4 STRING BRASS.mid → 8 pairs
+  [37/65] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR.mid → 8 pairs
+  [38/65] ORCHESTRA 150 4-4 STRING WOODWIND.mid → 8 pairs
+  [39/65] ORCHESTRA 4-4 115 ALL.mid → 8 pairs
+  [40/65] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND.mid → 8 pairs
+  [41/65] ORCHESTRA 4-4 115 PIANO STRING BRASS.mid → 8 pairs
+  [42/65] ORCHESTRA 4-4 115 PIANO STRING WOODWIND.mid → 8 pairs
+  [43/65] ORCHESTRA 4-4 115 STRING PERC.mid → 8 pairs
+  [44/65] ORCHESTRA 80 4-4 ALL.mid → 8 pairs
+  [45/65] ORCHESTRA 80 4-4 PIANO STRING.mid → 8 pairs
+  [46/65] ORCHESTRA 80 4-4 PIANO WOODWIND.mid → 8 pairs
+  [47/65] ORCHESTRA 80 4-4 STRING WOODWIND.mid → 7 pairs
+  [48/65] ORCHESTRA WALTZ 78 6-8 ALL.mid → 8 pairs
+  [49/65] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid.mid → 8 pairs
+  [50/65] ORCHESTRA_67_6-8 ALL.mid → 8 pairs
+  [51/65] ORCHESTRA_67_6-8 STRING,BRASS.mid → 8 pairs
+  [52/65] ORCHESTRA_67_6-8 STRING,WOODWIND.mid → 8 pairs
+  [53/65] ORCHESTRA_67_6-8 STRING.mid → 8 pairs
+  [54/65] ROCK 200 4-4 ALL.mid → 8 pairs
+  [55/65] ROCK 200 4-4 BASS DRUM.mid → 6 pairs
+  [56/65] ROCK 200 4-4 GUITAR BASS.mid → 8 pairs
+  [57/65] ROCK 200 4-4 GUITAR DRUM.mid → 8 pairs
+  [58/65] STRING_60_4-4 ALL.mid → 8 pairs
+  [59/65] STRING_60_4-4 PIANO MELODY STRING.mid → 8 pairs
+  [60/65] STRING_60_4-4 PIANO MELODY.mid → 6 pairs
+  [61/65] STRING_60_4-4 PIANO STRING GUITAR PAD.mid → 8 pairs
+  [62/65] WALTZ 6-8 85 BPM FULL.mid → 8 pairs
+  [63/65] WALTZ 6-8 85 BPM PIANO STRING.mid → 8 pairs
+  [64/65] WALTZ 6-8 85 BPM STRING.mid → 8 pairs
+  [65/65] WALTZ 90 -6-8 REALL.mid → 8 pairs
+
+Saving 507 SFT pairs...
+============================================================
+Total SFT pairs: 507
+  continuation: 194
+  track_completion: 118
+  variation: 195
+Saved to: midigpt_pipeline\sft
+
+[OK] Build SFT Pairs (input→output) complete
+
+============================================================
+  STEP: SFT LoRA Training
+============================================================
+
+Device: cuda
+Loading base model...
+Base model loaded: 48,093,696 parameters
+LoRA applied: 663,552 trainable / 36,813,312 total (1.80%)
+  [WARN] SFT skip (labels<4) sft_0000.json: input=3928 output=15261 effective=0
+  [WARN] SFT skip (labels<4) sft_0001.json: input=10843 output=8400 effective=0
+  [WARN] SFT skip (labels<4) sft_0002.json: input=14546 output=4879 effective=0
+  [WARN] SFT skip (labels<4) sft_0003.json: input=16123 output=16123 effective=0
+  [WARN] SFT skip (labels<4) sft_0004.json: input=16123 output=16123 effective=0
+  [WARN] SFT skip (labels<4) sft_0005.json: input=16123 output=16123 effective=0
+  [WARN] SFT skip (labels<4) sft_0006.json: input=4334 output=16123 effective=0
+  [WARN] SFT skip (labels<4) sft_0009.json: input=4814 output=5264 effective=0
+  [WARN] SFT skip (labels<4) sft_0010.json: input=7239 output=2644 effective=0
+  [WARN] SFT skip (labels<4) sft_0011.json: input=8207 output=8207 effective=0
+  [WARN] SFT skip (labels<4) sft_0012.json: input=8207 output=8207 effective=0
+  [WARN] SFT skip (labels<4) sft_0013.json: input=8207 output=8217 effective=0
+  [WARN] SFT skip (labels<4) sft_0014.json: input=2484 output=8207 effective=0
+  [WARN] SFT skip (labels<4) sft_0015.json: input=3468 output=8207 effective=0
+  [WARN] SFT skip (labels<4) sft_0016.json: input=3142 output=11802 effective=0
+  [WARN] SFT skip (labels<4) sft_0017.json: input=8901 output=6122 effective=0
+  [WARN] SFT skip (labels<4) sft_0018.json: input=11227 output=3830 effective=0
+  [WARN] SFT skip (labels<4) sft_0019.json: input=12401 output=12401 effective=0
+  [WARN] SFT skip (labels<4) sft_0020.json: input=12401 output=12401 effective=0
+  [WARN] SFT skip (labels<4) sft_0021.json: input=12401 output=12401 effective=0
+  [WARN] SFT skip (labels<4) sft_0022.json: input=6859 output=12401 effective=0
+  [WARN] SFT skip (labels<4) sft_0024.json: input=3646 output=13921 effective=0
+  [WARN] SFT skip (labels<4) sft_0025.json: input=10016 output=7598 effective=0
+  [WARN] SFT skip (labels<4) sft_0026.json: input=13409 output=4382 effective=0
+  [WARN] SFT skip (labels<4) sft_0027.json: input=14834 output=14834 effective=0
+  [WARN] SFT skip (labels<4) sft_0028.json: input=14834 output=14834 effective=0
+  [WARN] SFT skip (labels<4) sft_0029.json: input=14834 output=15456 effective=0
+  [WARN] SFT skip (labels<4) sft_0030.json: input=5354 output=14834 effective=0
+  [WARN] SFT skip (labels<4) sft_0033.json: input=3384 output=3663 effective=0
+  [WARN] SFT skip (labels<4) sft_0034.json: input=5225 output=1881 effective=0
+  [WARN] SFT skip (labels<4) sft_0035.json: input=5775 output=5775 effective=0
+  [WARN] SFT skip (labels<4) sft_0036.json: input=5775 output=5775 effective=0
+  [WARN] SFT skip (labels<4) sft_0037.json: input=5775 output=5775 effective=0
+  [WARN] SFT skip (labels<4) sft_0039.json: input=2773 output=3082 effective=0
+  [WARN] SFT skip (labels<4) sft_0040.json: input=4560 output=1335 effective=0
+  [WARN] SFT skip (labels<4) sft_0041.json: input=5657 output=5657 effective=0
+  [WARN] SFT skip (labels<4) sft_0042.json: input=5657 output=5657 effective=0
+  [WARN] SFT skip (labels<4) sft_0043.json: input=5657 output=5686 effective=0
+  [WARN] SFT skip (labels<4) sft_0045.json: input=3247 output=5657 effective=0
+  [WARN] SFT skip (labels<4) sft_0047.json: input=2554 output=2501 effective=0
+  [WARN] SFT skip (labels<4) sft_0048.json: input=3901 output=1244 effective=0
+  [WARN] SFT skip (labels<4) sft_0049.json: input=4816 output=4816 effective=0
+  [WARN] SFT skip (labels<4) sft_0050.json: input=4816 output=4816 effective=0
+  [WARN] SFT skip (labels<4) sft_0051.json: input=4816 output=4816 effective=0
+  [WARN] SFT skip (labels<4) sft_0052.json: input=3778 output=11218 effective=0
+  [WARN] SFT skip (labels<4) sft_0053.json: input=6987 output=7821 effective=0
+  [WARN] SFT skip (labels<4) sft_0054.json: input=11383 output=3670 effective=0
+  [WARN] SFT skip (labels<4) sft_0055.json: input=14164 output=14164 effective=0
+  [WARN] SFT skip (labels<4) sft_0056.json: input=14164 output=14164 effective=0
+  [WARN] SFT skip (labels<4) sft_0057.json: input=14164 output=14594 effective=0
+  [WARN] SFT skip (labels<4) sft_0061.json: input=4073 output=4843 effective=0
+  [WARN] SFT skip (labels<4) sft_0062.json: input=6294 output=2593 effective=0
+  [WARN] SFT skip (labels<4) sft_0063.json: input=8814 output=8814 effective=0
+  [WARN] SFT skip (labels<4) sft_0064.json: input=8814 output=8814 effective=0
+  [WARN] SFT skip (labels<4) sft_0065.json: input=8814 output=8814 effective=0
+  [WARN] SFT skip (labels<4) sft_0067.json: input=6387 output=8814 effective=0
+  [WARN] SFT skip (labels<4) sft_0069.json: input=2134 output=2424 effective=0
+  [WARN] SFT skip (labels<4) sft_0070.json: input=3257 output=1271 effective=0
+  [WARN] SFT skip (labels<4) sft_0071.json: input=4495 output=4495 effective=0
+  [WARN] SFT skip (labels<4) sft_0072.json: input=4495 output=4495 effective=0
+  [WARN] SFT skip (labels<4) sft_0073.json: input=4495 output=4495 effective=0
+  [WARN] SFT skip (labels<4) sft_0077.json: input=3354 output=3904 effective=0
+  [WARN] SFT skip (labels<4) sft_0078.json: input=5142 output=2095 effective=0
+  [WARN] SFT skip (labels<4) sft_0079.json: input=7168 output=7168 effective=0
+  [WARN] SFT skip (labels<4) sft_0080.json: input=7168 output=7168 effective=0
+  [WARN] SFT skip (labels<4) sft_0081.json: input=7168 output=7168 effective=0
+  [WARN] SFT skip (labels<4) sft_0083.json: input=3764 output=7168 effective=0
+  [WARN] SFT skip (labels<4) sft_0085.json: input=2894 output=3547 effective=0
+  [WARN] SFT skip (labels<4) sft_0086.json: input=4485 output=1939 effective=0
+  [WARN] SFT skip (labels<4) sft_0087.json: input=6367 output=6367 effective=0
+  [WARN] SFT skip (labels<4) sft_0088.json: input=6367 output=6367 effective=0
+  [WARN] SFT skip (labels<4) sft_0089.json: input=6367 output=6367 effective=0
+  [WARN] SFT skip (labels<4) sft_0093.json: input=2431 output=5044 effective=0
+  [WARN] SFT skip (labels<4) sft_0094.json: input=4639 output=2834 effective=0
+  [WARN] SFT skip (labels<4) sft_0095.json: input=7301 output=7154 effective=0
+  [WARN] SFT skip (labels<4) sft_0096.json: input=7301 output=7154 effective=0
+  [WARN] SFT skip (labels<4) sft_0097.json: input=7301 output=7154 effective=0
+  [WARN] SFT skip (labels<4) sft_0098.json: input=2081 output=7301 effective=0
+  [WARN] SFT skip (labels<4) sft_0101.json: input=2118 output=4574 effective=0
+  [WARN] SFT skip (labels<4) sft_0102.json: input=4087 output=2605 effective=0
+  [WARN] SFT skip (labels<4) sft_0103.json: input=6528 output=6383 effective=0
+  [WARN] SFT skip (labels<4) sft_0104.json: input=6528 output=6383 effective=0
+  [WARN] SFT skip (labels<4) sft_0105.json: input=6528 output=6392 effective=0
+  [WARN] SFT skip (labels<4) sft_0106.json: input=4122 output=6528 effective=0
+  [WARN] SFT skip (labels<4) sft_0110.json: input=2790 output=2063 effective=0
+  [WARN] SFT skip (labels<4) sft_0111.json: input=4735 output=4591 effective=0
+  [WARN] SFT skip (labels<4) sft_0112.json: input=4735 output=4591 effective=0
+  [WARN] SFT skip (labels<4) sft_0113.json: input=4735 output=5121 effective=0
+  [WARN] SFT skip (labels<4) sft_0117.json: input=2184 output=4596 effective=0
+  [WARN] SFT skip (labels<4) sft_0118.json: input=4204 output=2574 effective=0
+  [WARN] SFT skip (labels<4) sft_0119.json: input=6612 output=6466 effective=0
+  [WARN] SFT skip (labels<4) sft_0120.json: input=6612 output=6466 effective=0
+  [WARN] SFT skip (labels<4) sft_0121.json: input=6612 output=6466 effective=0
+  [WARN] SFT skip (labels<4) sft_0126.json: input=2709 output=1199 effective=0
+  [WARN] SFT skip (labels<4) sft_0127.json: input=3838 output=3838 effective=0
+  [WARN] SFT skip (labels<4) sft_0128.json: input=3838 output=3838 effective=0
+  [WARN] SFT skip (labels<4) sft_0129.json: input=3838 output=3843 effective=0
+  [WARN] SFT skip (labels<4) sft_0133.json: input=3564 output=3533 effective=0
+  [WARN] SFT skip (labels<4) sft_0134.json: input=5104 output=2025 effective=0
+  [WARN] SFT skip (labels<4) sft_0135.json: input=5363 output=5526 effective=0
+  [WARN] SFT skip (labels<4) sft_0136.json: input=5363 output=5526 effective=0
+  [WARN] SFT skip (labels<4) sft_0137.json: input=5363 output=5568 effective=0
+  [WARN] SFT skip (labels<4) sft_0139.json: input=2838 output=5363 effective=0
+  [WARN] SFT skip (labels<4) sft_0140.json: input=2620 output=8752 effective=0
+  [WARN] SFT skip (labels<4) sft_0141.json: input=5788 output=5484 effective=0
+  [WARN] SFT skip (labels<4) sft_0142.json: input=8222 output=3186 effective=0
+  [WARN] SFT skip (labels<4) sft_0143.json: input=8742 output=8991 effective=0
+  [WARN] SFT skip (labels<4) sft_0144.json: input=8742 output=8991 effective=0
+  [WARN] SFT skip (labels<4) sft_0145.json: input=8742 output=8991 effective=0
+  [WARN] SFT skip (labels<4) sft_0150.json: input=3223 output=954 effective=0
+  [WARN] SFT skip (labels<4) sft_0151.json: input=4173 output=4173 effective=0
+  [WARN] SFT skip (labels<4) sft_0152.json: input=4173 output=4173 effective=0
+  [WARN] SFT skip (labels<4) sft_0153.json: input=4173 output=4173 effective=0
+  [WARN] SFT skip (labels<4) sft_0154.json: input=3044 output=11027 effective=0
+  [WARN] SFT skip (labels<4) sft_0155.json: input=6956 output=6958 effective=0
+  [WARN] SFT skip (labels<4) sft_0156.json: input=10019 output=4025 effective=0
+  [WARN] SFT skip (labels<4) sft_0157.json: input=10619 output=10932 effective=0
+  [WARN] SFT skip (labels<4) sft_0158.json: input=10619 output=10932 effective=0
+  [WARN] SFT skip (labels<4) sft_0159.json: input=10619 output=10932 effective=0
+  [WARN] SFT skip (labels<4) sft_0161.json: input=4750 output=10619 effective=0
+  [WARN] SFT skip (labels<4) sft_0162.json: input=2340 output=6325 effective=0
+  [WARN] SFT skip (labels<4) sft_0163.json: input=4085 output=4581 effective=0
+  [WARN] SFT skip (labels<4) sft_0164.json: input=6529 output=2137 effective=0
+  [WARN] SFT skip (labels<4) sft_0165.json: input=8662 output=8662 effective=0
+  [WARN] SFT skip (labels<4) sft_0166.json: input=8662 output=8662 effective=0
+  [WARN] SFT skip (labels<4) sft_0167.json: input=8662 output=8663 effective=0
+  [WARN] SFT skip (labels<4) sft_0170.json: input=3139 output=7920 effective=0
+  [WARN] SFT skip (labels<4) sft_0171.json: input=5188 output=5872 effective=0
+  [WARN] SFT skip (labels<4) sft_0172.json: input=7987 output=3073 effective=0
+  [WARN] SFT skip (labels<4) sft_0173.json: input=11056 output=11056 effective=0
+  [WARN] SFT skip (labels<4) sft_0174.json: input=11056 output=11056 effective=0
+  [WARN] SFT skip (labels<4) sft_0175.json: input=11056 output=11056 effective=0
+  [WARN] SFT skip (labels<4) sft_0177.json: input=3357 output=11056 effective=0
+  [WARN] SFT skip (labels<4) sft_0179.json: input=2071 output=3695 effective=0
+  [WARN] SFT skip (labels<4) sft_0180.json: input=3639 output=2149 effective=0
+  [WARN] SFT skip (labels<4) sft_0181.json: input=5597 output=5597 effective=0
+  [WARN] SFT skip (labels<4) sft_0182.json: input=5597 output=5597 effective=0
+  [WARN] SFT skip (labels<4) sft_0183.json: input=5597 output=5597 effective=0
+  [WARN] SFT skip (labels<4) sft_0188.json: input=2940 output=1815 effective=0
+  [WARN] SFT skip (labels<4) sft_0189.json: input=4586 output=4586 effective=0
+  [WARN] SFT skip (labels<4) sft_0190.json: input=4586 output=4586 effective=0
+  [WARN] SFT skip (labels<4) sft_0191.json: input=4586 output=4769 effective=0
+  [WARN] SFT skip (labels<4) sft_0196.json: input=2978 output=1845 effective=0
+  [WARN] SFT skip (labels<4) sft_0197.json: input=4652 output=4652 effective=0
+  [WARN] SFT skip (labels<4) sft_0198.json: input=4652 output=4652 effective=0
+  [WARN] SFT skip (labels<4) sft_0199.json: input=4652 output=4776 effective=0
+  [WARN] SFT skip (labels<4) sft_0204.json: input=2291 output=1567 effective=0
+  [WARN] SFT skip (labels<4) sft_0205.json: input=3746 output=3746 effective=0
+  [WARN] SFT skip (labels<4) sft_0206.json: input=3746 output=3746 effective=0
+  [WARN] SFT skip (labels<4) sft_0207.json: input=3746 output=3746 effective=0
+  [WARN] SFT skip (labels<4) sft_0211.json: input=2600 output=3276 effective=0
+  [WARN] SFT skip (labels<4) sft_0212.json: input=4263 output=1541 effective=0
+  [WARN] SFT skip (labels<4) sft_0213.json: input=5832 output=5832 effective=0
+  [WARN] SFT skip (labels<4) sft_0214.json: input=5832 output=5832 effective=0
+  [WARN] SFT skip (labels<4) sft_0215.json: input=5832 output=5832 effective=0
+  [WARN] SFT skip (labels<4) sft_0217.json: input=2602 output=5832 effective=0
+  [WARN] SFT skip (labels<4) sft_0218.json: input=2326 output=8740 effective=0
+  [WARN] SFT skip (labels<4) sft_0219.json: input=5026 output=5934 effective=0
+  [WARN] SFT skip (labels<4) sft_0220.json: input=7922 output=2974 effective=0
+  [WARN] SFT skip (labels<4) sft_0221.json: input=10835 output=10835 effective=0
+  [WARN] SFT skip (labels<4) sft_0222.json: input=10835 output=10835 effective=0
+  [WARN] SFT skip (labels<4) sft_0223.json: input=10835 output=11267 effective=0
+  [WARN] SFT skip (labels<4) sft_0224.json: input=3172 output=10835 effective=0
+  [WARN] SFT skip (labels<4) sft_0225.json: input=3172 output=10835 effective=0
+  [WARN] SFT skip (labels<4) sft_0226.json: input=3414 output=12714 effective=0
+  [WARN] SFT skip (labels<4) sft_0227.json: input=7501 output=8486 effective=0
+  [WARN] SFT skip (labels<4) sft_0228.json: input=11688 output=4227 effective=0
+  [WARN] SFT skip (labels<4) sft_0229.json: input=15823 output=15823 effective=0
+  [WARN] SFT skip (labels<4) sft_0230.json: input=15823 output=15823 effective=0
+  [WARN] SFT skip (labels<4) sft_0231.json: input=15823 output=15823 effective=0
+  [WARN] SFT skip (labels<4) sft_0232.json: input=2749 output=15823 effective=0
+  [WARN] SFT skip (labels<4) sft_0233.json: input=3729 output=15823 effective=0
+  [WARN] SFT skip (labels<4) sft_0235.json: input=3660 output=4421 effective=0
+  [WARN] SFT skip (labels<4) sft_0236.json: input=5814 output=2238 effective=0
+  [WARN] SFT skip (labels<4) sft_0237.json: input=8003 output=8003 effective=0
+  [WARN] SFT skip (labels<4) sft_0238.json: input=8003 output=8003 effective=0
+  [WARN] SFT skip (labels<4) sft_0239.json: input=8003 output=8071 effective=0
+  [WARN] SFT skip (labels<4) sft_0240.json: input=2863 output=9608 effective=0
+  [WARN] SFT skip (labels<4) sft_0241.json: input=5996 output=6370 effective=0
+  [WARN] SFT skip (labels<4) sft_0242.json: input=9193 output=3120 effective=0
+  [WARN] SFT skip (labels<4) sft_0243.json: input=12236 output=12236 effective=0
+  [WARN] SFT skip (labels<4) sft_0244.json: input=12236 output=12236 effective=0
+  [WARN] SFT skip (labels<4) sft_0245.json: input=12236 output=12236 effective=0
+  [WARN] SFT skip (labels<4) sft_0246.json: input=4167 output=12236 effective=0
+  [WARN] SFT skip (labels<4) sft_0247.json: input=3729 output=12236 effective=0
+  [WARN] SFT skip (labels<4) sft_0248.json: input=2427 output=8659 effective=0
+  [WARN] SFT skip (labels<4) sft_0249.json: input=5890 output=5317 effective=0
+  [WARN] SFT skip (labels<4) sft_0250.json: input=9475 output=1846 effective=0
+  [WARN] SFT skip (labels<4) sft_0251.json: input=11058 output=11050 effective=0
+  [WARN] SFT skip (labels<4) sft_0252.json: input=11058 output=11058 effective=0
+  [WARN] SFT skip (labels<4) sft_0253.json: input=11058 output=11058 effective=0
+  [WARN] SFT skip (labels<4) sft_0258.json: input=2660 output=741 effective=0
+  [WARN] SFT skip (labels<4) sft_0259.json: input=3317 output=3317 effective=0
+  [WARN] SFT skip (labels<4) sft_0260.json: input=3317 output=3317 effective=0
+  [WARN] SFT skip (labels<4) sft_0261.json: input=3317 output=3761 effective=0
+  [WARN] SFT skip (labels<4) sft_0265.json: input=3167 output=3535 effective=0
+  [WARN] SFT skip (labels<4) sft_0266.json: input=4462 output=2233 effective=0
+  [WARN] SFT skip (labels<4) sft_0267.json: input=6497 output=6497 effective=0
+  [WARN] SFT skip (labels<4) sft_0268.json: input=6497 output=6497 effective=0
+  [WARN] SFT skip (labels<4) sft_0269.json: input=6497 output=6968 effective=0
+  [WARN] SFT skip (labels<4) sft_0273.json: input=2715 output=3097 effective=0
+  [WARN] SFT skip (labels<4) sft_0274.json: input=3932 output=1858 effective=0
+  [WARN] SFT skip (labels<4) sft_0275.json: input=5640 output=5640 effective=0
+  [WARN] SFT skip (labels<4) sft_0276.json: input=5640 output=5640 effective=0
+  [WARN] SFT skip (labels<4) sft_0277.json: input=5640 output=5649 effective=0
+  [WARN] SFT skip (labels<4) sft_0279.json: input=2810 output=5640 effective=0
+  [WARN] SFT skip (labels<4) sft_0281.json: input=3457 output=3056 effective=0
+  [WARN] SFT skip (labels<4) sft_0282.json: input=5385 output=1222 effective=0
+  [WARN] SFT skip (labels<4) sft_0283.json: input=6214 output=6214 effective=0
+  [WARN] SFT skip (labels<4) sft_0284.json: input=6214 output=6214 effective=0
+  [WARN] SFT skip (labels<4) sft_0285.json: input=6214 output=6209 effective=0
+  [WARN] SFT skip (labels<4) sft_0286.json: input=2149 output=6214 effective=0
+  [WARN] SFT skip (labels<4) sft_0290.json: input=2475 output=1335 effective=0
+  [WARN] SFT skip (labels<4) sft_0291.json: input=3678 output=3678 effective=0
+  [WARN] SFT skip (labels<4) sft_0292.json: input=3678 output=3678 effective=0
+  [WARN] SFT skip (labels<4) sft_0293.json: input=3678 output=3696 effective=0
+  [WARN] SFT skip (labels<4) sft_0296.json: input=2475 output=14226 effective=0
+  [WARN] SFT skip (labels<4) sft_0297.json: input=8314 output=8016 effective=0
+  [WARN] SFT skip (labels<4) sft_0298.json: input=13284 output=3044 effective=0
+  [WARN] SFT skip (labels<4) sft_0299.json: input=16325 output=16302 effective=0
+  [WARN] SFT skip (labels<4) sft_0300.json: input=16325 output=16340 effective=0
+  [WARN] SFT skip (labels<4) sft_0301.json: input=16325 output=16325 effective=0
+  [WARN] SFT skip (labels<4) sft_0302.json: input=7129 output=16325 effective=0
+  [WARN] SFT skip (labels<4) sft_0303.json: input=4037 output=16325 effective=0
+  [WARN] SFT skip (labels<4) sft_0305.json: input=5745 output=5694 effective=0
+  [WARN] SFT skip (labels<4) sft_0306.json: input=8940 output=2060 effective=0
+  [WARN] SFT skip (labels<4) sft_0307.json: input=10827 output=10812 effective=0
+  [WARN] SFT skip (labels<4) sft_0308.json: input=10827 output=10812 effective=0
+  [WARN] SFT skip (labels<4) sft_0309.json: input=10827 output=10860 effective=0
+  [WARN] SFT skip (labels<4) sft_0310.json: input=5126 output=10827 effective=0
+  [WARN] SFT skip (labels<4) sft_0313.json: input=5040 output=4586 effective=0
+  [WARN] SFT skip (labels<4) sft_0314.json: input=7617 output=1641 effective=0
+  [WARN] SFT skip (labels<4) sft_0315.json: input=9099 output=9084 effective=0
+  [WARN] SFT skip (labels<4) sft_0316.json: input=9099 output=9084 effective=0
+  [WARN] SFT skip (labels<4) sft_0317.json: input=9099 output=9099 effective=0
+  [WARN] SFT skip (labels<4) sft_0319.json: input=2869 output=9099 effective=0
+  [WARN] SFT skip (labels<4) sft_0321.json: input=3619 output=3726 effective=0
+  [WARN] SFT skip (labels<4) sft_0322.json: input=5381 output=1735 effective=0
+  [WARN] SFT skip (labels<4) sft_0323.json: input=6966 output=6951 effective=0
+  [WARN] SFT skip (labels<4) sft_0324.json: input=6966 output=6951 effective=0
+  [WARN] SFT skip (labels<4) sft_0325.json: input=6966 output=6966 effective=0
+  [WARN] SFT skip (labels<4) sft_0329.json: input=4050 output=3757 effective=0
+  [WARN] SFT skip (labels<4) sft_0330.json: input=5617 output=2213 effective=0
+  [WARN] SFT skip (labels<4) sft_0331.json: input=7493 output=7495 effective=0
+  [WARN] SFT skip (labels<4) sft_0332.json: input=7493 output=7495 effective=0
+  [WARN] SFT skip (labels<4) sft_0333.json: input=7493 output=8800 effective=0
+  [WARN] SFT skip (labels<4) sft_0335.json: input=3842 output=7493 effective=0
+  [WARN] SFT skip (labels<4) sft_0338.json: input=2432 output=1049 effective=0
+  [WARN] SFT skip (labels<4) sft_0339.json: input=3478 output=3478 effective=0
+  [WARN] SFT skip (labels<4) sft_0340.json: input=3478 output=3478 effective=0
+  [WARN] SFT skip (labels<4) sft_0341.json: input=3478 output=3478 effective=0
+  [WARN] SFT skip (labels<4) sft_0347.json: input=2765 output=2765 effective=0
+  [WARN] SFT skip (labels<4) sft_0348.json: input=2765 output=2765 effective=0
+  [WARN] SFT skip (labels<4) sft_0349.json: input=2765 output=2735 effective=0
+  [WARN] SFT skip (labels<4) sft_0350.json: input=2117 output=2765 effective=0
+  [WARN] SFT skip (labels<4) sft_0351.json: input=2181 output=2765 effective=0
+  [WARN] SFT skip (labels<4) sft_0355.json: input=2471 output=2471 effective=0
+  [WARN] SFT skip (labels<4) sft_0356.json: input=2471 output=2471 effective=0
+  [WARN] SFT skip (labels<4) sft_0357.json: input=2471 output=2471 effective=0
+  [WARN] SFT skip (labels<4) sft_0368.json: input=2829 output=2751 effective=0
+  [WARN] SFT skip (labels<4) sft_0369.json: input=4316 output=1269 effective=0
+  [WARN] SFT skip (labels<4) sft_0370.json: input=5511 output=5376 effective=0
+  [WARN] SFT skip (labels<4) sft_0371.json: input=5511 output=5376 effective=0
+  [WARN] SFT skip (labels<4) sft_0372.json: input=5511 output=5402 effective=0
+  [WARN] SFT skip (labels<4) sft_0376.json: input=2230 output=2223 effective=0
+  [WARN] SFT skip (labels<4) sft_0377.json: input=3437 output=1016 effective=0
+  [WARN] SFT skip (labels<4) sft_0378.json: input=4451 output=4451 effective=0
+  [WARN] SFT skip (labels<4) sft_0379.json: input=4451 output=4451 effective=0
+  [WARN] SFT skip (labels<4) sft_0380.json: input=4451 output=4824 effective=0
+  [WARN] SFT skip (labels<4) sft_0384.json: input=5172 output=5628 effective=0
+  [WARN] SFT skip (labels<4) sft_0385.json: input=8721 output=1887 effective=0
+  [WARN] SFT skip (labels<4) sft_0386.json: input=10556 output=10556 effective=0
+  [WARN] SFT skip (labels<4) sft_0387.json: input=10556 output=10556 effective=0
+  [WARN] SFT skip (labels<4) sft_0388.json: input=10556 output=10572 effective=0
+  [WARN] SFT skip (labels<4) sft_0390.json: input=5232 output=10556 effective=0
+  [WARN] SFT skip (labels<4) sft_0392.json: input=3123 output=4479 effective=0
+  [WARN] SFT skip (labels<4) sft_0393.json: input=5248 output=2337 effective=0
+  [WARN] SFT skip (labels<4) sft_0394.json: input=7447 output=7447 effective=0
+  [WARN] SFT skip (labels<4) sft_0395.json: input=7447 output=7447 effective=0
+  [WARN] SFT skip (labels<4) sft_0396.json: input=7447 output=7447 effective=0
+  [WARN] SFT skip (labels<4) sft_0397.json: input=2460 output=7447 effective=0
+  [WARN] SFT skip (labels<4) sft_0400.json: input=3496 output=4530 effective=0
+  [WARN] SFT skip (labels<4) sft_0401.json: input=5712 output=2281 effective=0
+  [WARN] SFT skip (labels<4) sft_0402.json: input=7883 output=7883 effective=0
+  [WARN] SFT skip (labels<4) sft_0403.json: input=7883 output=7883 effective=0
+  [WARN] SFT skip (labels<4) sft_0404.json: input=7883 output=7896 effective=0
+  [WARN] SFT skip (labels<4) sft_0409.json: input=2535 output=916 effective=0
+  [WARN] SFT skip (labels<4) sft_0410.json: input=3403 output=3403 effective=0
+  [WARN] SFT skip (labels<4) sft_0411.json: input=3403 output=3403 effective=0
+  [WARN] SFT skip (labels<4) sft_0412.json: input=3403 output=3403 effective=0
+  [WARN] SFT skip (labels<4) sft_0417.json: input=2743 output=908 effective=0
+  [WARN] SFT skip (labels<4) sft_0418.json: input=3528 output=3528 effective=0
+  [WARN] SFT skip (labels<4) sft_0419.json: input=3528 output=3528 effective=0
+  [WARN] SFT skip (labels<4) sft_0420.json: input=3528 output=3528 effective=0
+  [WARN] SFT skip (labels<4) sft_0431.json: input=2195 output=721 effective=0
+  [WARN] SFT skip (labels<4) sft_0432.json: input=2818 output=2818 effective=0
+  [WARN] SFT skip (labels<4) sft_0433.json: input=2818 output=2818 effective=0
+  [WARN] SFT skip (labels<4) sft_0434.json: input=2818 output=2821 effective=0
+  [WARN] SFT skip (labels<4) sft_0439.json: input=2333 output=786 effective=0
+  [WARN] SFT skip (labels<4) sft_0440.json: input=3008 output=3008 effective=0
+  [WARN] SFT skip (labels<4) sft_0441.json: input=3008 output=3008 effective=0
+  [WARN] SFT skip (labels<4) sft_0442.json: input=3008 output=3008 effective=0
+  [WARN] SFT skip (labels<4) sft_0447.json: input=2735 output=996 effective=0
+  [WARN] SFT skip (labels<4) sft_0448.json: input=3722 output=3722 effective=0
+  [WARN] SFT skip (labels<4) sft_0449.json: input=3722 output=3722 effective=0
+  [WARN] SFT skip (labels<4) sft_0450.json: input=3722 output=3715 effective=0
+  [WARN] SFT skip (labels<4) sft_0451.json: input=2951 output=3722 effective=0
+  [WARN] SFT skip (labels<4) sft_0452.json: input=2133 output=3722 effective=0
+  [WARN] SFT skip (labels<4) sft_0455.json: input=2296 output=937 effective=0
+  [WARN] SFT skip (labels<4) sft_0456.json: input=3225 output=3225 effective=0
+  [WARN] SFT skip (labels<4) sft_0457.json: input=3225 output=3225 effective=0
+  [WARN] SFT skip (labels<4) sft_0458.json: input=3225 output=3785 effective=0
+  [WARN] SFT skip (labels<4) sft_0464.json: input=2361 output=2361 effective=0
+  [WARN] SFT skip (labels<4) sft_0465.json: input=2361 output=2361 effective=0
+  [WARN] SFT skip (labels<4) sft_0466.json: input=2361 output=2361 effective=0
+  [WARN] SFT skip (labels<4) sft_0469.json: input=2291 output=893 effective=0
+  [WARN] SFT skip (labels<4) sft_0470.json: input=3174 output=3174 effective=0
+  [WARN] SFT skip (labels<4) sft_0471.json: input=3174 output=3174 effective=0
+  [WARN] SFT skip (labels<4) sft_0472.json: input=3174 output=3172 effective=0
+  [WARN] SFT skip (labels<4) sft_0476.json: input=2386 output=4010 effective=0
+  [WARN] SFT skip (labels<4) sft_0477.json: input=4175 output=2205 effective=0
+  [WARN] SFT skip (labels<4) sft_0478.json: input=6421 output=6421 effective=0
+  [WARN] SFT skip (labels<4) sft_0479.json: input=6421 output=6421 effective=0
+  [WARN] SFT skip (labels<4) sft_0480.json: input=6421 output=6421 effective=0
+  [WARN] SFT skip (labels<4) sft_0484.json: input=2228 output=2540 effective=0
+  [WARN] SFT skip (labels<4) sft_0485.json: input=3781 output=937 effective=0
+  [WARN] SFT skip (labels<4) sft_0486.json: input=4758 output=4758 effective=0
+  [WARN] SFT skip (labels<4) sft_0487.json: input=4758 output=4758 effective=0
+  [WARN] SFT skip (labels<4) sft_0488.json: input=4758 output=4795 effective=0
+  [WARN] SFT skip (labels<4) sft_0489.json: input=3164 output=4758 effective=0
+  [WARN] SFT skip (labels<4) sft_0500.json: input=2955 output=2592 effective=0
+  [WARN] SFT skip (labels<4) sft_0501.json: input=4356 output=1159 effective=0
+  [WARN] SFT skip (labels<4) sft_0502.json: input=5503 output=5503 effective=0
+  [WARN] SFT skip (labels<4) sft_0503.json: input=5503 output=5503 effective=0
+  [WARN] SFT skip (labels<4) sft_0504.json: input=5503 output=5503 effective=0
+  [WARN] SFT skip (labels<4) sft_0505.json: input=2496 output=5503 effective=0
+  [INFO] SFT load: 171 ok, 0 schema-invalid, 0 malformed, 336 truncated-too-much
+SFT Dataset: 171 pairs, 43 batches/epoch
+
+Training: 20 epochs
+============================================================
+  Epoch 1 | Batch 10/43 | Loss 0.9142
+  Epoch 1 | Batch 20/43 | Loss 0.4513
+  Epoch 1 | Batch 30/43 | Loss 0.3658
+  Epoch 1 | Batch 40/43 | Loss 0.4145
+Epoch 1 | Avg Loss: 0.5899 | Valid: 43/43 | NaN: 0 | Time: 0.1min
+  Best LoRA saved (loss: 0.5899)
+  Epoch 2 | Batch 10/43 | Loss 0.6219
+  Epoch 2 | Batch 20/43 | Loss 0.5053
+  Epoch 2 | Batch 30/43 | Loss 0.6254
+  Epoch 2 | Batch 40/43 | Loss 0.4855
+Epoch 2 | Avg Loss: 0.5223 | Valid: 43/43 | NaN: 0 | Time: 0.2min
+  Best LoRA saved (loss: 0.5223)
+  Epoch 3 | Batch 10/43 | Loss 0.4807
+  Epoch 3 | Batch 20/43 | Loss 0.4325
+  Epoch 3 | Batch 30/43 | Loss 0.2872
+  Epoch 3 | Batch 40/43 | Loss 0.4715
+Epoch 3 | Avg Loss: 0.4744 | Valid: 43/43 | NaN: 0 | Time: 0.3min
+  Best LoRA saved (loss: 0.4744)
+  Epoch 4 | Batch 10/43 | Loss 0.3231
+  Epoch 4 | Batch 20/43 | Loss 0.4034
+  Epoch 4 | Batch 30/43 | Loss 0.5884
+  Epoch 4 | Batch 40/43 | Loss 0.4105
+Epoch 4 | Avg Loss: 0.4518 | Valid: 43/43 | NaN: 0 | Time: 0.4min
+  Best LoRA saved (loss: 0.4518)
+  Epoch 5 | Batch 10/43 | Loss 0.3299
+  Epoch 5 | Batch 20/43 | Loss 0.4233
+  Epoch 5 | Batch 30/43 | Loss 0.5170
+  Epoch 5 | Batch 40/43 | Loss 0.3384
+Epoch 5 | Avg Loss: 0.4159 | Valid: 43/43 | NaN: 0 | Time: 0.5min
+  Best LoRA saved (loss: 0.4159)
+  Epoch 6 | Batch 10/43 | Loss 0.5856
+  Epoch 6 | Batch 20/43 | Loss 0.4985
+  Epoch 6 | Batch 30/43 | Loss 0.4948
+  Epoch 6 | Batch 40/43 | Loss 0.2926
+Epoch 6 | Avg Loss: 0.3937 | Valid: 43/43 | NaN: 0 | Time: 0.6min
+  Best LoRA saved (loss: 0.3937)
+  Epoch 7 | Batch 10/43 | Loss 0.3114
+  Epoch 7 | Batch 20/43 | Loss 0.3572
+  Epoch 7 | Batch 30/43 | Loss 0.3869
+  Epoch 7 | Batch 40/43 | Loss 0.5167
+Epoch 7 | Avg Loss: 0.3766 | Valid: 43/43 | NaN: 0 | Time: 0.7min
+  Best LoRA saved (loss: 0.3766)
+  Epoch 8 | Batch 10/43 | Loss 0.3559
+  Epoch 8 | Batch 20/43 | Loss 0.4154
+  Epoch 8 | Batch 30/43 | Loss 0.4377
+  Epoch 8 | Batch 40/43 | Loss 0.3093
+Epoch 8 | Avg Loss: 0.3583 | Valid: 43/43 | NaN: 0 | Time: 0.9min
+  Best LoRA saved (loss: 0.3583)
+  Epoch 9 | Batch 10/43 | Loss 0.2734
+  Epoch 9 | Batch 20/43 | Loss 0.3844
+  Epoch 9 | Batch 30/43 | Loss 0.2741
+  Epoch 9 | Batch 40/43 | Loss 0.3105
+Epoch 9 | Avg Loss: 0.3478 | Valid: 43/43 | NaN: 0 | Time: 1.0min
+  Best LoRA saved (loss: 0.3478)
+  Epoch 10 | Batch 10/43 | Loss 0.2915
+  Epoch 10 | Batch 20/43 | Loss 0.3843
+  Epoch 10 | Batch 30/43 | Loss 0.3377
+  Epoch 10 | Batch 40/43 | Loss 0.2026
+Epoch 10 | Avg Loss: 0.3317 | Valid: 43/43 | NaN: 0 | Time: 1.1min
+  Best LoRA saved (loss: 0.3317)
+  Epoch 11 | Batch 10/43 | Loss 0.3114
+  Epoch 11 | Batch 20/43 | Loss 0.3156
+  Epoch 11 | Batch 30/43 | Loss 0.3290
+  Epoch 11 | Batch 40/43 | Loss 0.6858
+Epoch 11 | Avg Loss: 0.3227 | Valid: 43/43 | NaN: 0 | Time: 1.2min
+  Best LoRA saved (loss: 0.3227)
+  Epoch 12 | Batch 10/43 | Loss 0.2850
+  Epoch 12 | Batch 20/43 | Loss 0.2088
+  Epoch 12 | Batch 30/43 | Loss 0.2753
+  Epoch 12 | Batch 40/43 | Loss 0.2327
+Epoch 12 | Avg Loss: 0.3221 | Valid: 43/43 | NaN: 0 | Time: 1.3min
+  Best LoRA saved (loss: 0.3221)
+  Epoch 13 | Batch 10/43 | Loss 0.3486
+  Epoch 13 | Batch 20/43 | Loss 0.2690
+  Epoch 13 | Batch 30/43 | Loss 0.2872
+  Epoch 13 | Batch 40/43 | Loss 0.2165
+Epoch 13 | Avg Loss: 0.3092 | Valid: 43/43 | NaN: 0 | Time: 1.4min
+  Best LoRA saved (loss: 0.3092)
+  Epoch 14 | Batch 10/43 | Loss 0.1694
+  Epoch 14 | Batch 20/43 | Loss 0.2811
+  Epoch 14 | Batch 30/43 | Loss 0.3288
+  Epoch 14 | Batch 40/43 | Loss 0.3331
+Epoch 14 | Avg Loss: 0.3015 | Valid: 43/43 | NaN: 0 | Time: 1.5min
+  Best LoRA saved (loss: 0.3015)
+  Epoch 15 | Batch 10/43 | Loss 0.3741
+  Epoch 15 | Batch 20/43 | Loss 0.2471
+  Epoch 15 | Batch 30/43 | Loss 0.3711
+  Epoch 15 | Batch 40/43 | Loss 0.2154
+Epoch 15 | Avg Loss: 0.2951 | Valid: 43/43 | NaN: 0 | Time: 1.6min
+  Best LoRA saved (loss: 0.2951)
+  Epoch 16 | Batch 10/43 | Loss 0.2105
+  Epoch 16 | Batch 20/43 | Loss 0.3150
+  Epoch 16 | Batch 30/43 | Loss 0.3000
+  Epoch 16 | Batch 40/43 | Loss 0.3616
+Epoch 16 | Avg Loss: 0.2894 | Valid: 43/43 | NaN: 0 | Time: 1.7min
+  Best LoRA saved (loss: 0.2894)
+  Epoch 17 | Batch 10/43 | Loss 0.3395
+  Epoch 17 | Batch 20/43 | Loss 0.1890
+  Epoch 17 | Batch 30/43 | Loss 0.1769
+  Epoch 17 | Batch 40/43 | Loss 0.4818
+Epoch 17 | Avg Loss: 0.2867 | Valid: 43/43 | NaN: 0 | Time: 1.8min
+  Best LoRA saved (loss: 0.2867)
+  Epoch 18 | Batch 10/43 | Loss 0.4339
+  Epoch 18 | Batch 20/43 | Loss 0.2215
+  Epoch 18 | Batch 30/43 | Loss 0.3828
+  Epoch 18 | Batch 40/43 | Loss 0.3283
+Epoch 18 | Avg Loss: 0.2799 | Valid: 43/43 | NaN: 0 | Time: 1.9min
+  Best LoRA saved (loss: 0.2799)
+  Epoch 19 | Batch 10/43 | Loss 0.4025
+  Epoch 19 | Batch 20/43 | Loss 0.2250
+  Epoch 19 | Batch 30/43 | Loss 0.2483
+  Epoch 19 | Batch 40/43 | Loss 0.2115
+Epoch 19 | Avg Loss: 0.2784 | Valid: 43/43 | NaN: 0 | Time: 2.0min
+  Best LoRA saved (loss: 0.2784)
+  Epoch 20 | Batch 10/43 | Loss 0.2297
+  Epoch 20 | Batch 20/43 | Loss 0.2114
+  Epoch 20 | Batch 30/43 | Loss 0.1767
+  Epoch 20 | Batch 40/43 | Loss 0.3398
+Epoch 20 | Avg Loss: 0.2692 | Valid: 43/43 | NaN: 0 | Time: 2.1min
+  Best LoRA saved (loss: 0.2692)
+============================================================
+SFT LoRA training complete! Time: 2.1min
+Best loss: 0.2692
+LoRA weights: checkpoints\lora\lora_sft_best.bin
+
+[OK] SFT LoRA Training complete
+
+============================================================
+  PIPELINE COMPLETE
+============================================================
+  Total time:    0.4 hours (1563s)
+  MIDI input:    midi_data
+  Augmented:     midigpt_pipeline\augmented
+  Tokens:        midigpt_pipeline\tokenized
+  SFT pairs:     midigpt_pipeline\sft
+  Checkpoints:   ./checkpoints
+  Best model:    ./checkpoints/midigpt_best.pt
+  LoRA weights:  ./checkpoints/lora/lora_sft_best.bin
+============================================================
+
+(venv) C:\Users\USER\ableton>python test_generate.py
+MidiGPT: Model loaded (FP16)
+{'loaded': True, 'device': 'cuda', 'active_lora': None, 'vocab_size': 527, 'model_params': '48.1M', 'gpu': 'NVIDIA GeForce RTX 4080', 'vram_gb': 17.2}
+
+Generated: ./output/test_generated.mid
+
+(venv) C:\Users\USER\ableton>
+================================================================
+  END OF REPORT
+================================================================
