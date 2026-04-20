@@ -44,6 +44,17 @@ public:
     bool isAudioRecording() const            { return audioRecTrackId >= 0 && midiEngine.isPlaying(); }
     void finalizeAudioRecording();  // call after stop to create AudioClip
 
+    // PPP4 — input monitoring. When true, the armed track's audio input is
+    // mixed into that track's buffer so it flows through the track's
+    // plugins, fader and sends and becomes audible at the master.
+    //
+    // **Default OFF** — speaker+mic setups (laptop, studio monitors without
+    // headphones) create a feedback loop the first time the user arms a
+    // track. Users who want monitoring flip it on explicitly via
+    // setInputMonitoring() or a future UI toggle.
+    void setInputMonitoring(bool on) { inputMonitoringOn = on; }
+    bool isInputMonitoring() const   { return inputMonitoringOn; }
+
     /** AA4 — Additional MIDI input port latency in milliseconds.
      *  Added to device driver latency when timestamping recorded events.
      *  Positive values shift events earlier in the timeline. */
@@ -171,6 +182,11 @@ private:
     juce::AudioBuffer<float> audioRecBuffer;  // accumulates input samples
     int audioRecWritePos { 0 };
     double audioRecStartBeat { 0.0 };
+
+    // PPP4 — live input monitoring flag (see setInputMonitoring). Default
+    // off to avoid feedback loops on integrated speaker/mic hardware; UI
+    // caller opts in.
+    bool inputMonitoringOn { false };
 
     // Test beep on play start
     int testBeepSamples { 0 };

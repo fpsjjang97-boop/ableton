@@ -456,6 +456,22 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
         trackBuf.clear();
         getOrCreateTrackSynth(track.id).renderBlock(trackBuf, trackMidi);
 
+        // PPP4 — live input monitoring. When this track is the armed
+        // audio-recording target and monitoring is on, mix the raw device
+        // input into trackBuf before plugins/fader/sends so the user hears
+        // what's being captured routed through the track's processing.
+        if (inputMonitoringOn
+            && audioRecTrackId >= 0 && audioRecTrackId == track.id
+            && numInputChannels > 0)
+        {
+            const int monCh = juce::jmin(trackBuf.getNumChannels(), numInputChannels);
+            for (int ch = 0; ch < monCh; ++ch)
+            {
+                if (inputChannelData[ch] != nullptr)
+                    trackBuf.addFrom(ch, 0, inputChannelData[ch], numSamples);
+            }
+        }
+
         // S2 — mix audio clips at current beat into trackBuf
         if (! track.audioClips.empty())
         {
