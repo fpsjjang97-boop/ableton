@@ -43,8 +43,13 @@ void ResamplerWrapper::prepare (double sourceSr,
     bypass         = std::abs (sourceSr - destSr) < 1.0e-6;
     prepared       = true;
 
-    // Fallback backend: fresh Lagrange state per channel.
-    lagrange.assign ((size_t) numChannels, juce::LagrangeInterpolator{});
+    // Fallback backend: pre-grow once (RT-safe after first warm-up), then
+    // just reset state per prepare(). Use reserveChannels() from the main
+    // thread before playback to avoid any allocation in the audio thread.
+    if (lagrange.size() < (size_t) numChannels)
+        lagrange.resize ((size_t) numChannels);
+    for (size_t i = 0; i < (size_t) numChannels; ++i)
+        lagrange[i].reset();
 
    #if MIDIGPTDAW_WITH_R8BRAIN
     r8 = std::make_unique<R8Impl>();
@@ -121,6 +126,13 @@ int ResamplerWrapper::process (const juce::AudioBuffer<float>& src,
                                        numOut);
     }
     return numOut;
+}
+
+void ResamplerWrapper::reserveChannels (int n)
+{
+    if (n <= 0) return;
+    if (lagrange.size() < (size_t) n)
+        lagrange.resize ((size_t) n);
 }
 
 const char* ResamplerWrapper::backendName() const noexcept

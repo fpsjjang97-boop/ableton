@@ -41,7 +41,11 @@ if(MIDIGPTDAW_WITH_R8BRAIN)
     FetchContent_Declare(
         r8brain_free_src
         GIT_REPOSITORY https://github.com/avaneev/r8brain-free-src.git
-        GIT_TAG        master   # pin to a specific tag in NNN2
+        # Pinned to 7.1 (NNN2). Note: Avaneev changed tag format from
+        # "version-X.Y" (6.x) to just "X.Y" (7.x). If bumping, verify the
+        # r8b::CDSPResampler24 ctor signature hasn't drifted (NNN1 pimpl
+        # relies on it).
+        GIT_TAG        7.1
     )
     FetchContent_MakeAvailable(r8brain_free_src)
 

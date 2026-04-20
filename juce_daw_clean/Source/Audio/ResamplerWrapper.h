@@ -52,6 +52,12 @@ public:
     bool   isPrepared()   const noexcept { return prepared; }
     const char* backendName() const noexcept;
 
+    /** NNN2 — pre-grow internal per-channel state to at least `n` channels.
+        Call this from the main thread before playback starts so that the
+        first prepare() on the audio thread does not allocate. Safe to call
+        repeatedly; never shrinks. */
+    void reserveChannels (int n);
+
 private:
     double sourceOverDest { 1.0 };
     int    channels       { 0 };
