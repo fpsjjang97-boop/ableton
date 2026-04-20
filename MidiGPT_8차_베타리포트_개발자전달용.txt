@@ -1,0 +1,663 @@
+================================================================
+  MidiGPT 8차 베타 리포트 — 테스터(유환) → 개발자(지수)
+  날짜: 2026-04-20
+  테스트 환경: Windows 10, RTX 4080, Python 3.11.9, PyTorch 2.5.1+cu121
+================================================================
+
+
+================================================================
+[이번 테스트 진행 순서]
+================================================================
+
+1. git pull (d99bca0 포함) ✅
+2. midigpt_pipeline\sft 삭제 후 SFT만 재실행 ✅
+3. python -m midigpt.pipeline --midi_dir ./midi_data --skip_to sft ✅
+4. test_generate.py 생성 테스트 ✅
+5. scripts/regress_bar_continuity.py 회귀 테스트 ✅
+
+
+================================================================
+[SFT 학습 결과 — 정상 완료]
+================================================================
+
+  SFT pairs 생성:  585개
+  Epochs:          20
+  Best loss:       0.2426
+  NaN:             0
+  Valid:           147/147
+  소요시간:        5.7분
+  LoRA 저장:       checkpoints\lora\lora_sft_best.bin ✅
+
+
+================================================================
+[회귀 테스트 결과 — 전부 PASS]
+================================================================
+
+  avg empty_bar_ratio  : 0.0000   PASS  (thresh <= 0.05)
+  max bar_jump         : 0        PASS  (thresh <= 1)
+  max bar_loop_notes   : 40       PASS  (thresh <  128)
+  total duplicate_notes: 0        PASS  (thresh <= 0)
+  Overall: PASS
+
+
+================================================================
+[핵심 문제 — 수치 PASS지만 실제 생성 결과는 여전히 비정상]
+================================================================
+
+■ 증상 (Cubase에서 확인)
+  생성된 MIDI를 열면 노트가 초반 몇 마디에만 뭉쳐있고
+  나머지 구간은 완전히 비어있음. 음악으로 보기 힘든 수준.
+  (첨부 스크린샷 참고)
+
+■ 회귀 스크립트 한계로 추정
+  regress_bar_continuity.py 가 "생성된 노트 범위 안에서만"
+  측정하는 것으로 보임. 노트가 초반 몇 마디에만 있어도
+  그 안에서 연속적이면 PASS가 나오는 구조인 것 같음.
+  즉 "곡 전체 길이 대비 얼마나 채워졌는가"는 현재 측정 불가.
+
+  → 회귀 스크립트에 전체 길이 대비 노트 밀도 측정 항목
+    추가가 필요할 것 같음.
+
+■ EOS 조기 종료 문제 재확인 요청
+  노트가 초반에만 뭉쳐있는 증상은 모델이 생성 초반에
+  EOS 토큰을 출력하고 멈추는 것과 일치함.
+  inference/engine.py 의 EOS suppression 로직이
+  이 경우에도 제대로 작동하고 있는지 확인 부탁드림.
+
+
+================================================================
+[SFT 페어 빌드 — length skip 여전히 다수]
+================================================================
+
+  Total SFT pairs:          585개
+  Skipped at build time:    910개 (length=908, empty=2, tokenize=0)
+
+  7차 회신에서 예상하신 700~2,000개에 미치지 못했고
+  910개가 length 초과로 버려짐. 66% drop은 해소됐지만
+  여전히 skip 비율이 높음.
+
+  --window_bars 또는 --max_pair_tokens 조정이 필요한지
+  확인 부탁드림.
+
+
+================================================================
+[환경 정보]
+================================================================
+
+OS        : Windows 10 (19045.6691)
+Python    : 3.11.9 (venv)
+GPU       : NVIDIA GeForce RTX 4080 (17.2 GB)
+PyTorch   : 2.5.1+cu121
+CUDA      : 12.1
+작업 경로  : C:\Users\USER\ableton
+
+================================================================
+  END OF REPORT
+================================================================
+
+로그내역 
+
+
+(venv) C:\Users\USER\ableton>git pull origin main
+remote: Enumerating objects: 150, done.
+remote: Counting objects: 100% (150/150), done.
+remote: Compressing objects: 100% (80/80), done.
+remote: Total 126 (delta 89), reused 74 (delta 45), pack-reused 0 (from 0)
+Receiving objects: 100% (126/126), 90.66 KiB | 4.32 MiB/s, done.
+Resolving deltas: 100% (89/89), completed with 22 local objects.
+From https://github.com/fpsjjang97-boop/ableton
+ * branch            main       -> FETCH_HEAD
+   45e23e4..3687280  main       -> origin/main
+Updating 45e23e4..3687280
+Fast-forward
+ ...36\220\354\240\204\353\213\254\354\232\251.txt" | 2412 ++++++++++++++++++++
+ ...236\220\355\232\214\354\213\240_2026-04-20.txt" |  318 +++
+ juce_daw_clean/CMakeLists.txt                      |  147 ++
+ juce_daw_clean/Source/Audio/ClipStretchUtil.cpp    |   70 +
+ juce_daw_clean/Source/Audio/ClipStretchUtil.h      |   44 +
+ juce_daw_clean/Source/Audio/ResamplerWrapper.cpp   |  147 ++
+ juce_daw_clean/Source/Audio/ResamplerWrapper.h     |   78 +
+ juce_daw_clean/Source/Audio/TimeStretchWrapper.cpp |  109 +
+ juce_daw_clean/Source/Audio/TimeStretchWrapper.h   |   71 +
+ juce_daw_clean/Source/Command/EditCommands.cpp     |   31 +
+ juce_daw_clean/Source/Command/EditCommands.h       |   30 +
+ juce_daw_clean/Source/Core/AudioEngine.cpp         |  118 +-
+ juce_daw_clean/Source/Core/AudioEngine.h           |   25 +
+ juce_daw_clean/Source/MainWindow.cpp               |    7 +
+ juce_daw_clean/Source/UI/ArrangementView.cpp       |  213 +-
+ juce_daw_clean/Source/UI/ArrangementView.h         |   46 +
+ juce_daw_clean/tests/test_resampler.cpp            |  264 +++
+ juce_daw_clean/tests/test_stretch.cpp              |  279 +++
+ midi_data/808HIPHOP 80 4-4 ALL.mid                 |  Bin 0 -> 4898 bytes
+ .../808HIPHOP 80 4-4 BASS SYNTHPAD SYNTHLEAD.mid   |  Bin 0 -> 1245 bytes
+ midi_data/808HIPHOP 80 4-4 DRUM BASS SYNTHLEAD.mid |  Bin 0 -> 4575 bytes
+ midi_data/808HIPHOP 80 4-4 DRUM BASS SYNTHPAD.mid  |  Bin 0 -> 4562 bytes
+ .../808HIPHOP 80 4-4 DRUM SYNTHPAD SYNTHLEAD.mid   |  Bin 0 -> 4360 bytes
+ midi_data/BEDROOMPOP 110 4-4 ALL.mid               |  Bin 0 -> 8295 bytes
+ ...EDROOMPOP 110 4-4 BASS PIANO SYNTHPAD VOCAL.mid |  Bin 0 -> 5502 bytes
+ ...BEDROOMPOP 110 4-4 DRUM BASS PIANO SYNTHPAD.mid |  Bin 0 -> 6918 bytes
+ ...EDROOMPOP 110 4-4 DRUM PIANO SYNTHPAD VOCAL.mid |  Bin 0 -> 7192 bytes
+ midi_data/BEDROOMPOP 110 4-4 PIANO VOCAL.mid       |  Bin 0 -> 2923 bytes
+ ... 808BASS REESEBASS SYNTHLEAD SYNTHPAD VOCAL.mid |  Bin 0 -> 3413 bytes
+ midi_data/HIPHOP 70 4-4 ALL.mid                    |  Bin 0 -> 4989 bytes
+ ... 4-4 DRUM 808BASS REESEBASS SYNTHLEAD VOCAL.mid |  Bin 0 -> 4309 bytes
+ ...4 DRUM 808BASS REESEBASS SYNTHPAD SYNTHLEAD.mid |  Bin 0 -> 4175 bytes
+ ...0 4-4 DRUM 808BASS REESEBASS SYNTHPAD VOCAL.mid |  Bin 0 -> 3717 bytes
+ ...HIPHOP 70 4-4 DRUM SYNTHLEAD SYNTHPAD VOCAL.mid |  Bin 0 -> 4390 bytes
+ midi_data/KPOP GARAGE 165 4-4 PIANO VOCAL.mid      |  Bin 0 -> 3706 bytes
+ midigpt/build_sft_pairs.py                         |  346 ++-
+ midigpt/inference/engine.py                        |   76 +-
+ scripts/regress_bar_continuity.py                  |  225 ++
+ scripts/run_self_improvement_loop.py               |    6 +
+ test_generate2.py                                  |   18 +-
+ test_generate3.py                                  |   21 +
+ 41 files changed, 4965 insertions(+), 136 deletions(-)
+ create mode 100644 "MidiGPT_7\354\260\250_\353\262\240\355\203\200\353\246\254\355\217\254\355\212\270_\352\260\234\353\260\234\354\236\220\354\240\204\353\213\254\354\232\251.txt"
+ create mode 100644 "MidiGPT_7\354\260\250\353\214\200\354\235\221_\352\260\234\353\260\234\354\236\220\355\232\214\354\213\240_2026-04-20.txt"
+ create mode 100644 juce_daw_clean/Source/Audio/ClipStretchUtil.cpp
+ create mode 100644 juce_daw_clean/Source/Audio/ClipStretchUtil.h
+ create mode 100644 juce_daw_clean/Source/Audio/ResamplerWrapper.cpp
+ create mode 100644 juce_daw_clean/Source/Audio/ResamplerWrapper.h
+ create mode 100644 juce_daw_clean/Source/Audio/TimeStretchWrapper.cpp
+ create mode 100644 juce_daw_clean/Source/Audio/TimeStretchWrapper.h
+ create mode 100644 juce_daw_clean/tests/test_resampler.cpp
+ create mode 100644 juce_daw_clean/tests/test_stretch.cpp
+ create mode 100644 midi_data/808HIPHOP 80 4-4 ALL.mid
+ create mode 100644 midi_data/808HIPHOP 80 4-4 BASS SYNTHPAD SYNTHLEAD.mid
+ create mode 100644 midi_data/808HIPHOP 80 4-4 DRUM BASS SYNTHLEAD.mid
+ create mode 100644 midi_data/808HIPHOP 80 4-4 DRUM BASS SYNTHPAD.mid
+ create mode 100644 midi_data/808HIPHOP 80 4-4 DRUM SYNTHPAD SYNTHLEAD.mid
+ create mode 100644 midi_data/BEDROOMPOP 110 4-4 ALL.mid
+ create mode 100644 midi_data/BEDROOMPOP 110 4-4 BASS PIANO SYNTHPAD VOCAL.mid
+ create mode 100644 midi_data/BEDROOMPOP 110 4-4 DRUM BASS PIANO SYNTHPAD.mid
+ create mode 100644 midi_data/BEDROOMPOP 110 4-4 DRUM PIANO SYNTHPAD VOCAL.mid
+ create mode 100644 midi_data/BEDROOMPOP 110 4-4 PIANO VOCAL.mid
+ create mode 100644 midi_data/HIPHOP 70 4-4 808BASS REESEBASS SYNTHLEAD SYNTHPAD VOCAL.mid
+ create mode 100644 midi_data/HIPHOP 70 4-4 ALL.mid
+ create mode 100644 midi_data/HIPHOP 70 4-4 DRUM 808BASS REESEBASS SYNTHLEAD VOCAL.mid
+ create mode 100644 midi_data/HIPHOP 70 4-4 DRUM 808BASS REESEBASS SYNTHPAD SYNTHLEAD.mid
+ create mode 100644 midi_data/HIPHOP 70 4-4 DRUM 808BASS REESEBASS SYNTHPAD VOCAL.mid
+ create mode 100644 midi_data/HIPHOP 70 4-4 DRUM SYNTHLEAD SYNTHPAD VOCAL.mid
+ create mode 100644 midi_data/KPOP GARAGE 165 4-4 PIANO VOCAL.mid
+ create mode 100644 scripts/regress_bar_continuity.py
+
+(venv) C:\Users\USER\ableton>rmdir /s /q midigpt_pipeline\sft
+
+(venv) C:\Users\USER\ableton>python -m midigpt.pipeline --midi_dir ./midi_data --skip_to sft
+
+============================================================
+  STEP: Build SFT Pairs (input→output)
+============================================================
+
+Found 82 original MIDI files
+Strategies: continuation, track_completion, variation
+Output: midigpt_pipeline\sft
+============================================================
+  [1/82] 808HIPHOP 80 4-4 ALL.mid → 9 pairs
+  [2/82] 808HIPHOP 80 4-4 BASS SYNTHPAD SYNTHLEAD.mid → 11 pairs
+  [3/82] 808HIPHOP 80 4-4 DRUM BASS SYNTHLEAD.mid → 9 pairs
+  [4/82] 808HIPHOP 80 4-4 DRUM BASS SYNTHPAD.mid → 9 pairs
+  [5/82] 808HIPHOP 80 4-4 DRUM SYNTHPAD SYNTHLEAD.mid → 9 pairs
+  [6/82] BEDROOMPOP 110 4-4 ALL.mid → 3 pairs
+  [7/82] BEDROOMPOP 110 4-4 BASS PIANO SYNTHPAD VOCAL.mid → 15 pairs
+  [8/82] BEDROOMPOP 110 4-4 DRUM BASS PIANO SYNTHPAD.mid → 14 pairs
+  [9/82] BEDROOMPOP 110 4-4 DRUM PIANO SYNTHPAD VOCAL.mid → 6 pairs
+  [10/82] BEDROOMPOP 110 4-4 PIANO VOCAL.mid → 15 pairs
+  [11/82] CITY POP 105 4-4 ALL.mid → 3 pairs
+  [12/82] CITY POP 105 4-4 BASS_FINGER E.PIANO SYNTHPAD VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid → 15 pairs
+  [13/82] CITY POP 105 4-4 DRUM BASS_FINGER E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid → 12 pairs
+  [14/82] CITY POP 105 4-4 DRUM E.PIANO SYNTHPAD E.GUITAR1 E.GUITAR1_MUTE E.GUITAR2 VIOLIN_LEGATO1 VIOLIN2_LEGATO.mid → 3 pairs
+  [15/82] CITY POP 105 4-4 DRUM E.PIANO.mid → 24 pairs
+  [16/82] COLOR 190 4-4 BASS DRUM MELODY.mid → 24 pairs
+  [17/82] COLOR 190 4-4 PIANO BASS.mid → 24 pairs
+  [18/82] COLOR 190 4-4.mid → 3 pairs
+  [19/82] HIPHOP 63 4-4 ALL.mid → skipped
+  [20/82] HIPHOP 63 4-4 BASS E.GUITAR VOCAL.mid → 6 pairs
+  [21/82] HIPHOP 63 4-4 DRUM BASS E.GUITAR.mid → skipped
+  [22/82] HIPHOP 63 4-4 DRUM BASS VOCAL.mid → skipped
+  [23/82] HIPHOP 70 4-4 808BASS REESEBASS SYNTHLEAD SYNTHPAD VOCAL.mid → 3 pairs
+  [24/82] HIPHOP 70 4-4 ALL.mid → 3 pairs
+  [25/82] HIPHOP 70 4-4 DRUM 808BASS REESEBASS SYNTHLEAD VOCAL.mid → 3 pairs
+  [26/82] HIPHOP 70 4-4 DRUM 808BASS REESEBASS SYNTHPAD SYNTHLEAD.mid → 3 pairs
+  [27/82] HIPHOP 70 4-4 DRUM 808BASS REESEBASS SYNTHPAD VOCAL.mid → 3 pairs
+  [28/82] HIPHOP 70 4-4 DRUM SYNTHLEAD SYNTHPAD VOCAL.mid → 3 pairs
+  [29/82] HOUSE 123 4-4 ALL.mid → 3 pairs
+  [30/82] HOUSE 123 4-4 DRUM SYNTHBASS SYNTHPAD SYNTHPLUCK.mid → 6 pairs
+  [31/82] HOUSE 123 4-4 DRUM SYNTHBASS VOCAL.mid → 12 pairs
+  [32/82] HOUSE 123 4-4 DRUM SYNTHPAD SYNTHPLUCK VOCAL.mid → 6 pairs
+  [33/82] HOUSE 123 4-4 SYNTHBASS SYNTHPAD SYNTHPLUCK VOCAL.mid → 14 pairs
+  [34/82] J POP BASS DRUM 130 4-4.mid → 24 pairs
+  [35/82] J POP DRUM PIANO 140 4-4.mid → 12 pairs
+  [36/82] J POP MELODY+PIANO.mid → 21 pairs
+  [37/82] J POP PIANO BASS DRUM 130 4-4.mid → 3 pairs
+  [38/82] J POP PIANO+BASS+DRUM.mid → 6 pairs
+  [39/82] J POP.mid → skipped
+  [40/82] KPOP GARAGE 165 4-4 ALL.mid → 9 pairs
+  [41/82] KPOP GARAGE 165 4-4 DRUM PIANO SYNTHPAD VOCAL.mid → 12 pairs
+  [42/82] KPOP GARAGE 165 4-4 DRUM SYNTYBASS PIANO SYNTHPAD.mid → 12 pairs
+  [43/82] KPOP GARAGE 165 4-4 PIANO VOCAL.mid → 15 pairs
+  [44/82] KPOP GARAGE 165 4-4 SYNTHBASS PIANO SYNTHPAD VOCAL.mid → 12 pairs
+  [45/82] LATIN ALL 105 4-4.mid → skipped
+  [46/82] METAL 110 4-4 ALL GUITAR BASS.mid → 3 pairs
+  [47/82] METAL 110 4-4 ALL.mid → skipped
+  [48/82] METAL 110 4-4 BASS DRUM.mid → 6 pairs
+  [49/82] METAL 110 4-4 GUITAR DRUM.mid → 3 pairs
+  [50/82] ORCHESTRA 150 4-4 ALL.mid → 3 pairs
+  [51/82] ORCHESTRA 150 4-4 PIANO STRING.mid → 18 pairs
+  [52/82] ORCHESTRA 150 4-4 STRING BRASS WOODWIND.mid → 3 pairs
+  [53/82] ORCHESTRA 150 4-4 STRING BRASS.mid → 6 pairs
+  [54/82] ORCHESTRA 150 4-4 STRING PERC HARP CHOIR.mid → 7 pairs
+  [55/82] ORCHESTRA 150 4-4 STRING WOODWIND.mid → 15 pairs
+  [56/82] ORCHESTRA 4-4 115 ALL.mid → skipped
+  [57/82] ORCHESTRA 4-4 115 PIANO STRING BRASS WOODWIND.mid → skipped
+  [58/82] ORCHESTRA 4-4 115 PIANO STRING BRASS.mid → 3 pairs
+  [59/82] ORCHESTRA 4-4 115 PIANO STRING WOODWIND.mid → skipped
+  [60/82] ORCHESTRA 4-4 115 STRING PERC.mid → skipped
+  [61/82] ORCHESTRA 80 4-4 ALL.mid → 9 pairs
+  [62/82] ORCHESTRA 80 4-4 PIANO STRING.mid → 12 pairs
+  [63/82] ORCHESTRA 80 4-4 PIANO WOODWIND.mid → 12 pairs
+  [64/82] ORCHESTRA 80 4-4 STRING WOODWIND.mid → 11 pairs
+  [65/82] ORCHESTRA WALTZ 78 6-8 ALL.mid → skipped
+  [66/82] ORCHESTRA WALTZ 78 6-8 PIANO STRINGmid.mid → 3 pairs
+  [67/82] ORCHESTRA_67_6-8 ALL.mid → skipped
+  [68/82] ORCHESTRA_67_6-8 STRING,BRASS.mid → skipped
+  [69/82] ORCHESTRA_67_6-8 STRING,WOODWIND.mid → skipped
+  [70/82] ORCHESTRA_67_6-8 STRING.mid → 9 pairs
+  [71/82] ROCK 200 4-4 ALL.mid → 3 pairs
+  [72/82] ROCK 200 4-4 BASS DRUM.mid → 6 pairs
+  [73/82] ROCK 200 4-4 GUITAR BASS.mid → 3 pairs
+  [74/82] ROCK 200 4-4 GUITAR DRUM.mid → 3 pairs
+  [75/82] STRING_60_4-4 ALL.mid → 6 pairs
+  [76/82] STRING_60_4-4 PIANO MELODY STRING.mid → 9 pairs
+  [77/82] STRING_60_4-4 PIANO MELODY.mid → 12 pairs
+  [78/82] STRING_60_4-4 PIANO STRING GUITAR PAD.mid → 12 pairs
+  [79/82] WALTZ 6-8 85 BPM FULL.mid → skipped
+  [80/82] WALTZ 6-8 85 BPM PIANO STRING.mid → skipped
+  [81/82] WALTZ 6-8 85 BPM STRING.mid → 6 pairs
+  [82/82] WALTZ 90 -6-8 REALL.mid → 3 pairs
+
+Saving 585 SFT pairs...
+============================================================
+Total SFT pairs: 585
+  continuation: 582
+  track_completion: 3
+  variation: 0
+Skipped at build time: 910 (length=908, empty=2, tokenize=0)
+Saved to: midigpt_pipeline\sft
+
+[OK] Build SFT Pairs (input→output) complete
+
+============================================================
+  STEP: SFT LoRA Training
+============================================================
+
+Device: cuda
+Loading base model...
+Base model loaded: 48,093,696 parameters
+LoRA applied: 663,552 trainable / 36,813,312 total (1.80%)
+SFT Dataset: 585 pairs, 147 batches/epoch
+
+Training: 20 epochs
+============================================================
+  Epoch 1 | Batch 10/147 | Loss 1.1302
+  Epoch 1 | Batch 20/147 | Loss 1.6875
+  Epoch 1 | Batch 30/147 | Loss 0.2454
+  Epoch 1 | Batch 40/147 | Loss 1.6878
+  Epoch 1 | Batch 50/147 | Loss 0.1926
+  Epoch 1 | Batch 60/147 | Loss 0.6105
+  Epoch 1 | Batch 70/147 | Loss 0.5952
+  Epoch 1 | Batch 80/147 | Loss 0.4350
+  Epoch 1 | Batch 90/147 | Loss 1.6257
+  Epoch 1 | Batch 100/147 | Loss 0.3352
+  Epoch 1 | Batch 110/147 | Loss 0.5916
+  Epoch 1 | Batch 120/147 | Loss 0.3612
+  Epoch 1 | Batch 130/147 | Loss 0.3451
+  Epoch 1 | Batch 140/147 | Loss 0.4491
+Epoch 1 | Avg Loss: 0.7126 | Valid: 147/147 | NaN: 0 | Time: 0.3min
+  Best LoRA saved (loss: 0.7126)
+  Epoch 2 | Batch 10/147 | Loss 0.5602
+  Epoch 2 | Batch 20/147 | Loss 0.4065
+  Epoch 2 | Batch 30/147 | Loss 0.9901
+  Epoch 2 | Batch 40/147 | Loss 0.4361
+  Epoch 2 | Batch 50/147 | Loss 0.5465
+  Epoch 2 | Batch 60/147 | Loss 0.6243
+  Epoch 2 | Batch 70/147 | Loss 0.3849
+  Epoch 2 | Batch 80/147 | Loss 0.2691
+  Epoch 2 | Batch 90/147 | Loss 0.3403
+  Epoch 2 | Batch 100/147 | Loss 0.3452
+  Epoch 2 | Batch 110/147 | Loss 0.1918
+  Epoch 2 | Batch 120/147 | Loss 0.7766
+  Epoch 2 | Batch 130/147 | Loss 0.3222
+  Epoch 2 | Batch 140/147 | Loss 0.2887
+Epoch 2 | Avg Loss: 0.5431 | Valid: 147/147 | NaN: 0 | Time: 0.6min
+  Best LoRA saved (loss: 0.5431)
+  Epoch 3 | Batch 10/147 | Loss 0.7073
+  Epoch 3 | Batch 20/147 | Loss 0.5110
+  Epoch 3 | Batch 30/147 | Loss 0.5667
+  Epoch 3 | Batch 40/147 | Loss 0.4759
+  Epoch 3 | Batch 50/147 | Loss 0.2529
+  Epoch 3 | Batch 60/147 | Loss 0.2613
+  Epoch 3 | Batch 70/147 | Loss 0.2528
+  Epoch 3 | Batch 80/147 | Loss 0.1963
+  Epoch 3 | Batch 90/147 | Loss 0.7148
+  Epoch 3 | Batch 100/147 | Loss 0.2249
+  Epoch 3 | Batch 110/147 | Loss 0.3625
+  Epoch 3 | Batch 120/147 | Loss 0.3177
+  Epoch 3 | Batch 130/147 | Loss 1.0209
+  Epoch 3 | Batch 140/147 | Loss 0.2973
+Epoch 3 | Avg Loss: 0.4728 | Valid: 147/147 | NaN: 0 | Time: 0.9min
+  Best LoRA saved (loss: 0.4728)
+  Epoch 4 | Batch 10/147 | Loss 0.1454
+  Epoch 4 | Batch 20/147 | Loss 0.5411
+  Epoch 4 | Batch 30/147 | Loss 0.4857
+  Epoch 4 | Batch 40/147 | Loss 0.3307
+  Epoch 4 | Batch 50/147 | Loss 0.4358
+  Epoch 4 | Batch 60/147 | Loss 0.2707
+  Epoch 4 | Batch 70/147 | Loss 0.3064
+  Epoch 4 | Batch 80/147 | Loss 0.4847
+  Epoch 4 | Batch 90/147 | Loss 0.2957
+  Epoch 4 | Batch 100/147 | Loss 0.6449
+  Epoch 4 | Batch 110/147 | Loss 0.2724
+  Epoch 4 | Batch 120/147 | Loss 0.4052
+  Epoch 4 | Batch 130/147 | Loss 0.6408
+  Epoch 4 | Batch 140/147 | Loss 0.6622
+Epoch 4 | Avg Loss: 0.4179 | Valid: 147/147 | NaN: 0 | Time: 1.2min
+  Best LoRA saved (loss: 0.4179)
+  Epoch 5 | Batch 10/147 | Loss 0.3093
+  Epoch 5 | Batch 20/147 | Loss 0.4065
+  Epoch 5 | Batch 30/147 | Loss 0.2092
+  Epoch 5 | Batch 40/147 | Loss 0.3320
+  Epoch 5 | Batch 50/147 | Loss 0.4055
+  Epoch 5 | Batch 60/147 | Loss 0.6822
+  Epoch 5 | Batch 70/147 | Loss 0.3233
+  Epoch 5 | Batch 80/147 | Loss 0.5555
+  Epoch 5 | Batch 90/147 | Loss 0.6014
+  Epoch 5 | Batch 100/147 | Loss 0.3027
+  Epoch 5 | Batch 110/147 | Loss 0.2450
+  Epoch 5 | Batch 120/147 | Loss 0.5248
+  Epoch 5 | Batch 130/147 | Loss 0.2546
+  Epoch 5 | Batch 140/147 | Loss 0.6329
+Epoch 5 | Avg Loss: 0.3892 | Valid: 147/147 | NaN: 0 | Time: 1.5min
+  Best LoRA saved (loss: 0.3892)
+  Epoch 6 | Batch 10/147 | Loss 0.4279
+  Epoch 6 | Batch 20/147 | Loss 0.2352
+  Epoch 6 | Batch 30/147 | Loss 0.4232
+  Epoch 6 | Batch 40/147 | Loss 0.4661
+  Epoch 6 | Batch 50/147 | Loss 0.2905
+  Epoch 6 | Batch 60/147 | Loss 0.2450
+  Epoch 6 | Batch 70/147 | Loss 0.3787
+  Epoch 6 | Batch 80/147 | Loss 0.4524
+  Epoch 6 | Batch 90/147 | Loss 0.5149
+  Epoch 6 | Batch 100/147 | Loss 0.1376
+  Epoch 6 | Batch 110/147 | Loss 0.6535
+  Epoch 6 | Batch 120/147 | Loss 0.2125
+  Epoch 6 | Batch 130/147 | Loss 0.2688
+  Epoch 6 | Batch 140/147 | Loss 0.2574
+Epoch 6 | Avg Loss: 0.3641 | Valid: 147/147 | NaN: 0 | Time: 1.8min
+  Best LoRA saved (loss: 0.3641)
+  Epoch 7 | Batch 10/147 | Loss 0.3360
+  Epoch 7 | Batch 20/147 | Loss 0.2966
+  Epoch 7 | Batch 30/147 | Loss 0.4694
+  Epoch 7 | Batch 40/147 | Loss 0.4263
+  Epoch 7 | Batch 50/147 | Loss 0.2524
+  Epoch 7 | Batch 60/147 | Loss 0.1252
+  Epoch 7 | Batch 70/147 | Loss 0.3563
+  Epoch 7 | Batch 80/147 | Loss 0.1844
+  Epoch 7 | Batch 90/147 | Loss 0.2269
+  Epoch 7 | Batch 100/147 | Loss 0.6364
+  Epoch 7 | Batch 110/147 | Loss 0.2931
+  Epoch 7 | Batch 120/147 | Loss 0.2605
+  Epoch 7 | Batch 130/147 | Loss 0.2862
+  Epoch 7 | Batch 140/147 | Loss 0.3201
+Epoch 7 | Avg Loss: 0.3452 | Valid: 147/147 | NaN: 0 | Time: 2.1min
+  Best LoRA saved (loss: 0.3452)
+  Epoch 8 | Batch 10/147 | Loss 0.3205
+  Epoch 8 | Batch 20/147 | Loss 0.2470
+  Epoch 8 | Batch 30/147 | Loss 0.2146
+  Epoch 8 | Batch 40/147 | Loss 0.2372
+  Epoch 8 | Batch 50/147 | Loss 0.1575
+  Epoch 8 | Batch 60/147 | Loss 0.1758
+  Epoch 8 | Batch 70/147 | Loss 0.4264
+  Epoch 8 | Batch 80/147 | Loss 0.3979
+  Epoch 8 | Batch 90/147 | Loss 0.4028
+  Epoch 8 | Batch 100/147 | Loss 0.2696
+  Epoch 8 | Batch 110/147 | Loss 0.4322
+  Epoch 8 | Batch 120/147 | Loss 0.3011
+  Epoch 8 | Batch 130/147 | Loss 0.1704
+  Epoch 8 | Batch 140/147 | Loss 0.2323
+Epoch 8 | Avg Loss: 0.3296 | Valid: 147/147 | NaN: 0 | Time: 2.4min
+  Best LoRA saved (loss: 0.3296)
+  Epoch 9 | Batch 10/147 | Loss 0.2652
+  Epoch 9 | Batch 20/147 | Loss 0.4056
+  Epoch 9 | Batch 30/147 | Loss 0.3230
+  Epoch 9 | Batch 40/147 | Loss 0.2776
+  Epoch 9 | Batch 50/147 | Loss 0.6075
+  Epoch 9 | Batch 60/147 | Loss 0.2228
+  Epoch 9 | Batch 70/147 | Loss 0.2743
+  Epoch 9 | Batch 80/147 | Loss 0.3569
+  Epoch 9 | Batch 90/147 | Loss 0.0954
+  Epoch 9 | Batch 100/147 | Loss 0.2257
+  Epoch 9 | Batch 110/147 | Loss 0.1668
+  Epoch 9 | Batch 120/147 | Loss 0.1933
+  Epoch 9 | Batch 130/147 | Loss 0.2955
+  Epoch 9 | Batch 140/147 | Loss 0.3964
+Epoch 9 | Avg Loss: 0.3193 | Valid: 147/147 | NaN: 0 | Time: 2.7min
+  Best LoRA saved (loss: 0.3193)
+  Epoch 10 | Batch 10/147 | Loss 0.2331
+  Epoch 10 | Batch 20/147 | Loss 0.3333
+  Epoch 10 | Batch 30/147 | Loss 0.2510
+  Epoch 10 | Batch 40/147 | Loss 0.2603
+  Epoch 10 | Batch 50/147 | Loss 0.3947
+  Epoch 10 | Batch 60/147 | Loss 0.4799
+  Epoch 10 | Batch 70/147 | Loss 0.3046
+  Epoch 10 | Batch 80/147 | Loss 0.4423
+  Epoch 10 | Batch 90/147 | Loss 0.3604
+  Epoch 10 | Batch 100/147 | Loss 0.2411
+  Epoch 10 | Batch 110/147 | Loss 0.2009
+  Epoch 10 | Batch 120/147 | Loss 0.3937
+  Epoch 10 | Batch 130/147 | Loss 0.6144
+  Epoch 10 | Batch 140/147 | Loss 0.3966
+Epoch 10 | Avg Loss: 0.3020 | Valid: 147/147 | NaN: 0 | Time: 2.9min
+  Best LoRA saved (loss: 0.3020)
+  Epoch 11 | Batch 10/147 | Loss 0.2444
+  Epoch 11 | Batch 20/147 | Loss 0.3185
+  Epoch 11 | Batch 30/147 | Loss 0.3151
+  Epoch 11 | Batch 40/147 | Loss 0.2106
+  Epoch 11 | Batch 50/147 | Loss 0.3374
+  Epoch 11 | Batch 60/147 | Loss 0.4237
+  Epoch 11 | Batch 70/147 | Loss 0.1766
+  Epoch 11 | Batch 80/147 | Loss 0.2369
+  Epoch 11 | Batch 90/147 | Loss 0.5332
+  Epoch 11 | Batch 100/147 | Loss 0.3420
+  Epoch 11 | Batch 110/147 | Loss 0.2240
+  Epoch 11 | Batch 120/147 | Loss 0.3631
+  Epoch 11 | Batch 130/147 | Loss 0.5938
+  Epoch 11 | Batch 140/147 | Loss 0.1420
+Epoch 11 | Avg Loss: 0.2951 | Valid: 147/147 | NaN: 0 | Time: 3.2min
+  Best LoRA saved (loss: 0.2951)
+  Epoch 12 | Batch 10/147 | Loss 0.3623
+  Epoch 12 | Batch 20/147 | Loss 0.1958
+  Epoch 12 | Batch 30/147 | Loss 0.2942
+  Epoch 12 | Batch 40/147 | Loss 0.3030
+  Epoch 12 | Batch 50/147 | Loss 0.2616
+  Epoch 12 | Batch 60/147 | Loss 0.2342
+  Epoch 12 | Batch 70/147 | Loss 0.2724
+  Epoch 12 | Batch 80/147 | Loss 0.3777
+  Epoch 12 | Batch 90/147 | Loss 0.5444
+  Epoch 12 | Batch 100/147 | Loss 0.2104
+  Epoch 12 | Batch 110/147 | Loss 0.4117
+  Epoch 12 | Batch 120/147 | Loss 0.2022
+  Epoch 12 | Batch 130/147 | Loss 0.3053
+  Epoch 12 | Batch 140/147 | Loss 0.4225
+Epoch 12 | Avg Loss: 0.2907 | Valid: 147/147 | NaN: 0 | Time: 3.5min
+  Best LoRA saved (loss: 0.2907)
+  Epoch 13 | Batch 10/147 | Loss 0.2823
+  Epoch 13 | Batch 20/147 | Loss 0.2661
+  Epoch 13 | Batch 30/147 | Loss 0.2945
+  Epoch 13 | Batch 40/147 | Loss 0.4073
+  Epoch 13 | Batch 50/147 | Loss 0.3467
+  Epoch 13 | Batch 60/147 | Loss 0.3114
+  Epoch 13 | Batch 70/147 | Loss 0.2268
+  Epoch 13 | Batch 80/147 | Loss 0.2141
+  Epoch 13 | Batch 90/147 | Loss 0.1681
+  Epoch 13 | Batch 100/147 | Loss 0.3638
+  Epoch 13 | Batch 110/147 | Loss 0.2509
+  Epoch 13 | Batch 120/147 | Loss 0.3107
+  Epoch 13 | Batch 130/147 | Loss 0.5260
+  Epoch 13 | Batch 140/147 | Loss 0.5183
+Epoch 13 | Avg Loss: 0.2786 | Valid: 147/147 | NaN: 0 | Time: 3.8min
+  Best LoRA saved (loss: 0.2786)
+  Epoch 14 | Batch 10/147 | Loss 0.3314
+  Epoch 14 | Batch 20/147 | Loss 0.4377
+  Epoch 14 | Batch 30/147 | Loss 0.3733
+  Epoch 14 | Batch 40/147 | Loss 0.2397
+  Epoch 14 | Batch 50/147 | Loss 0.2085
+  Epoch 14 | Batch 60/147 | Loss 0.3220
+  Epoch 14 | Batch 70/147 | Loss 0.1974
+  Epoch 14 | Batch 80/147 | Loss 0.1841
+  Epoch 14 | Batch 90/147 | Loss 0.3316
+  Epoch 14 | Batch 100/147 | Loss 0.1634
+  Epoch 14 | Batch 110/147 | Loss 0.3204
+  Epoch 14 | Batch 120/147 | Loss 0.2482
+  Epoch 14 | Batch 130/147 | Loss 0.3448
+  Epoch 14 | Batch 140/147 | Loss 0.2347
+Epoch 14 | Avg Loss: 0.2652 | Valid: 147/147 | NaN: 0 | Time: 4.0min
+  Best LoRA saved (loss: 0.2652)
+  Epoch 15 | Batch 10/147 | Loss 0.3083
+  Epoch 15 | Batch 20/147 | Loss 0.2599
+  Epoch 15 | Batch 30/147 | Loss 0.1428
+  Epoch 15 | Batch 40/147 | Loss 0.2791
+  Epoch 15 | Batch 50/147 | Loss 0.1912
+  Epoch 15 | Batch 60/147 | Loss 0.1291
+  Epoch 15 | Batch 70/147 | Loss 0.2053
+  Epoch 15 | Batch 80/147 | Loss 0.2763
+  Epoch 15 | Batch 90/147 | Loss 0.1560
+  Epoch 15 | Batch 100/147 | Loss 0.2324
+  Epoch 15 | Batch 110/147 | Loss 0.2637
+  Epoch 15 | Batch 120/147 | Loss 0.1339
+  Epoch 15 | Batch 130/147 | Loss 0.2207
+  Epoch 15 | Batch 140/147 | Loss 0.2101
+Epoch 15 | Avg Loss: 0.2663 | Valid: 147/147 | NaN: 0 | Time: 4.3min
+  Epoch 16 | Batch 10/147 | Loss 0.2830
+  Epoch 16 | Batch 20/147 | Loss 0.1940
+  Epoch 16 | Batch 30/147 | Loss 0.3831
+  Epoch 16 | Batch 40/147 | Loss 0.1359
+  Epoch 16 | Batch 50/147 | Loss 0.1641
+  Epoch 16 | Batch 60/147 | Loss 0.3111
+  Epoch 16 | Batch 70/147 | Loss 0.3028
+  Epoch 16 | Batch 80/147 | Loss 0.2466
+  Epoch 16 | Batch 90/147 | Loss 0.1795
+  Epoch 16 | Batch 100/147 | Loss 0.1885
+  Epoch 16 | Batch 110/147 | Loss 0.1845
+  Epoch 16 | Batch 120/147 | Loss 0.2609
+  Epoch 16 | Batch 130/147 | Loss 0.2249
+  Epoch 16 | Batch 140/147 | Loss 0.1879
+Epoch 16 | Avg Loss: 0.2607 | Valid: 147/147 | NaN: 0 | Time: 4.6min
+  Best LoRA saved (loss: 0.2607)
+  Epoch 17 | Batch 10/147 | Loss 0.2778
+  Epoch 17 | Batch 20/147 | Loss 0.1381
+  Epoch 17 | Batch 30/147 | Loss 0.0835
+  Epoch 17 | Batch 40/147 | Loss 0.3716
+  Epoch 17 | Batch 50/147 | Loss 0.2085
+  Epoch 17 | Batch 60/147 | Loss 0.1890
+  Epoch 17 | Batch 70/147 | Loss 0.3200
+  Epoch 17 | Batch 80/147 | Loss 0.1568
+  Epoch 17 | Batch 90/147 | Loss 0.2690
+  Epoch 17 | Batch 100/147 | Loss 0.2732
+  Epoch 17 | Batch 110/147 | Loss 0.3314
+  Epoch 17 | Batch 120/147 | Loss 0.2704
+  Epoch 17 | Batch 130/147 | Loss 0.2314
+  Epoch 17 | Batch 140/147 | Loss 0.2325
+Epoch 17 | Avg Loss: 0.2510 | Valid: 147/147 | NaN: 0 | Time: 4.9min
+  Best LoRA saved (loss: 0.2510)
+  Epoch 18 | Batch 10/147 | Loss 0.2809
+  Epoch 18 | Batch 20/147 | Loss 0.4413
+  Epoch 18 | Batch 30/147 | Loss 0.1783
+  Epoch 18 | Batch 40/147 | Loss 0.2171
+  Epoch 18 | Batch 50/147 | Loss 0.2266
+  Epoch 18 | Batch 60/147 | Loss 0.3024
+  Epoch 18 | Batch 70/147 | Loss 0.3902
+  Epoch 18 | Batch 80/147 | Loss 0.2809
+  Epoch 18 | Batch 90/147 | Loss 0.2184
+  Epoch 18 | Batch 100/147 | Loss 0.3157
+  Epoch 18 | Batch 110/147 | Loss 0.2869
+  Epoch 18 | Batch 120/147 | Loss 0.2496
+  Epoch 18 | Batch 130/147 | Loss 0.2419
+  Epoch 18 | Batch 140/147 | Loss 0.1522
+Epoch 18 | Avg Loss: 0.2524 | Valid: 147/147 | NaN: 0 | Time: 5.1min
+  Epoch 19 | Batch 10/147 | Loss 0.3684
+  Epoch 19 | Batch 20/147 | Loss 0.1960
+  Epoch 19 | Batch 30/147 | Loss 0.1579
+  Epoch 19 | Batch 40/147 | Loss 0.1960
+  Epoch 19 | Batch 50/147 | Loss 0.2167
+  Epoch 19 | Batch 60/147 | Loss 0.2468
+  Epoch 19 | Batch 70/147 | Loss 0.1626
+  Epoch 19 | Batch 80/147 | Loss 0.1986
+  Epoch 19 | Batch 90/147 | Loss 0.1907
+  Epoch 19 | Batch 100/147 | Loss 0.2180
+  Epoch 19 | Batch 110/147 | Loss 0.2418
+  Epoch 19 | Batch 120/147 | Loss 0.1644
+  Epoch 19 | Batch 130/147 | Loss 0.1251
+  Epoch 19 | Batch 140/147 | Loss 0.3113
+Epoch 19 | Avg Loss: 0.2426 | Valid: 147/147 | NaN: 0 | Time: 5.4min
+  Best LoRA saved (loss: 0.2426)
+  Epoch 20 | Batch 10/147 | Loss 0.2642
+  Epoch 20 | Batch 20/147 | Loss 0.1158
+  Epoch 20 | Batch 30/147 | Loss 0.4086
+  Epoch 20 | Batch 40/147 | Loss 0.1710
+  Epoch 20 | Batch 50/147 | Loss 0.1391
+  Epoch 20 | Batch 60/147 | Loss 0.3413
+  Epoch 20 | Batch 70/147 | Loss 0.1816
+  Epoch 20 | Batch 80/147 | Loss 0.2735
+  Epoch 20 | Batch 90/147 | Loss 0.1548
+  Epoch 20 | Batch 100/147 | Loss 0.1755
+  Epoch 20 | Batch 110/147 | Loss 0.2142
+  Epoch 20 | Batch 120/147 | Loss 0.1102
+  Epoch 20 | Batch 130/147 | Loss 0.3014
+  Epoch 20 | Batch 140/147 | Loss 0.2663
+Epoch 20 | Avg Loss: 0.2454 | Valid: 147/147 | NaN: 0 | Time: 5.7min
+============================================================
+SFT LoRA training complete! Time: 5.7min
+Best loss: 0.2426
+LoRA weights: checkpoints\lora\lora_sft_best.bin
+
+[OK] SFT LoRA Training complete
+
+============================================================
+  PIPELINE COMPLETE
+============================================================
+  Total time:    0.1 hours (514s)
+  MIDI input:    midi_data
+  Augmented:     midigpt_pipeline\augmented
+  Tokens:        midigpt_pipeline\tokenized
+  SFT pairs:     midigpt_pipeline\sft
+  Checkpoints:   ./checkpoints
+  Best model:    ./checkpoints/midigpt_best.pt
+  LoRA weights:  ./checkpoints/lora/lora_sft_best.bin
+============================================================
+
+(venv) C:\Users\USER\ableton>python test_generate.py
+MidiGPT: Model loaded (FP16)
+{'loaded': True, 'device': 'cuda', 'active_lora': None, 'vocab_size': 527, 'model_params': '48.1M', 'gpu': 'NVIDIA GeForce RTX 4080', 'vram_gb': 17.2}
+
+Generated: ./output/test_generated.mid
+
+(venv) C:\Users\USER\ableton>python test_generate.py
+MidiGPT: Model loaded (FP16)
+{'loaded': True, 'device': 'cuda', 'active_lora': None, 'vocab_size': 527, 'model_params': '48.1M', 'gpu': 'NVIDIA GeForce RTX 4080', 'vram_gb': 17.2}
+
+Generated: ./output/test_generated.mid
+
+(venv) C:\Users\USER\ableton>python scripts/regress_bar_continuity.py ./output/
+================================================================
+Bar-continuity regression: 1 file(s) analyzed
+================================================================
+  avg empty_bar_ratio    : 0.0000  PASS  (thresh <= 0.05)
+  max bar_jump           : 0       PASS  (thresh <= 1)
+  max bar_loop_notes     : 40       PASS  (thresh <  128)
+  total duplicate_notes  : 0       PASS  (thresh <= 0)
+================================================================
+Overall: PASS
+
+(venv) C:\Users\USER\ableton>
+
