@@ -28,6 +28,9 @@ public:
 
     std::function<void(MidiClip*)> onClipSelected;
     std::function<void()> onTrackListChanged;
+    // PPP3 review — hint channel for status-bar messages triggered by
+    // view-local actions (e.g. "Press Space to record" after R arm).
+    std::function<void(juce::String)> onStatusMessage;
 
     // U7 — selected track tracking (PluginBrowser / future)
     int getSelectedTrackId() const { return selectedTrackId; }
@@ -56,6 +59,28 @@ private:
 
     static constexpr int trackHeight = 48;
     static constexpr int headerWidth = 160;
+
+    // PPP3/PPP2 review — track-header button layout, single source of
+    // truth for paint and hit-test. Buttons (R, M, S) are right-aligned
+    // inside the header row with a fixed 8 px right margin and 2 px gap.
+    // Index 0 = R (leftmost), 1 = M, 2 = S (rightmost).
+    static constexpr int headerBtnW         = 16;
+    static constexpr int headerBtnGap       = 2;
+    static constexpr int headerBtnCount     = 3;
+    static constexpr int headerBtnRightPad  = 8;
+    static constexpr int headerBtnLeft (int idx)
+    {
+        return headerWidth - headerBtnRightPad - headerBtnW
+             - (headerBtnCount - 1 - idx) * (headerBtnGap + headerBtnW);
+    }
+    static constexpr int headerBtnRight (int idx)
+    {
+        return headerBtnLeft(idx) + headerBtnW;
+    }
+    // Track-name field runs from left margin to just before the leftmost
+    // button. Subtract 2 px so the name never butts up against the R box.
+    static constexpr int headerNameLeft     = 10;
+    static constexpr int headerNameWidth() { return headerBtnLeft(0) - headerNameLeft - 2; }
 
     float beatsVisible { 64.0f };
     float scrollXBeats { 0.0f };
@@ -119,6 +144,18 @@ private:
     int      fadeTrackIdx { -1 };
     int      fadeClipIdx  { -1 };
     static constexpr int fadeHandleHeight = 8;
+
+    // PPP2 — shared "before" snapshot for audio-clip drag undo. Populated at
+    // mouseDown for both fade and trim paths; compared against the clip's
+    // live state at mouseUp to build an AudioClipEditCmd. Stored as raw
+    // pointer because AudioClip is a POD-ish struct — invalid if the user
+    // removes the clip mid-drag, but such concurrent edits are UI-gated.
+    struct AudioClip* audioDragClip { nullptr };
+    double      audioDragBeforeStartBeat           { 0.0 };
+    double      audioDragBeforeLengthBeats         { 0.0 };
+    juce::int64 audioDragBeforeSourceOffsetSamples { 0 };
+    double      audioDragBeforeFadeInBeats         { 0.0 };
+    double      audioDragBeforeFadeOutBeats        { 0.0 };
 
     float beatToX(double beat) const;
     double xToBeat(float x) const;

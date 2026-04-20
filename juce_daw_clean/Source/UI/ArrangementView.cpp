@@ -138,23 +138,30 @@ void ArrangementView::paint(juce::Graphics& g)
         g.setColour(track.colour);
         g.fillRect(0, y, 4, th);
 
-        // Track name
+        // Track name — width derived from header button layout (review fix).
         g.setColour(track.mute ? juce::Colours::grey : juce::Colours::white);
         g.setFont(13.0f);
-        g.drawText(track.name, 10, y, headerWidth - 50, th,
+        g.drawText(track.name, headerNameLeft, y, headerNameWidth(), th,
                    juce::Justification::centredLeft);
 
-        // M/S indicators
+        // R/M/S indicators. All three share the headerBtnLeft/right helpers
+        // so paint rects match the mouseDown hit rects automatically.
         g.setFont(10.0f);
+        {
+            const bool armed = (audioEngine.getAudioRecordingTrack() == track.id);
+            g.setColour(armed ? juce::Colour(0xFFE53935)
+                              : juce::Colour(0xFF555555));
+            g.drawText("R", headerBtnLeft(0), y, headerBtnW, th, juce::Justification::centred);
+        }
         if (track.mute)
         {
             g.setColour(juce::Colour(0xFFFF5722));
-            g.drawText("M", headerWidth - 40, y, 16, th, juce::Justification::centred);
+            g.drawText("M", headerBtnLeft(1), y, headerBtnW, th, juce::Justification::centred);
         }
         if (track.solo)
         {
             g.setColour(juce::Colour(0xFFFFC107));
-            g.drawText("S", headerWidth - 20, y, 16, th, juce::Justification::centred);
+            g.drawText("S", headerBtnLeft(2), y, headerBtnW, th, juce::Justification::centred);
         }
 
         // Timeline row bg
@@ -937,11 +944,32 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
             repaint();
             return;
         }
-        if (localX >= headerWidth - 58 && localX < headerWidth - 42)
+        if (localX >= headerBtnLeft(0) && localX < headerBtnRight(0))
+        {
+            // PPP3 — audio record arm toggle. Clicking R sets this track as
+            // the audio recording target; clicking R on the already-armed
+            // track disarms. Transport state is left alone — user still
+            // needs to press Play (or the Space bar) to start capture, and
+            // DD1's callback only writes when midiEngine.isPlaying(). Hint
+            // the user via the status bar so the two-step sequence is
+            // discoverable without a tutorial overlay.
+            const int curArmed = audioEngine.getAudioRecordingTrack();
+            const int newId    = tracks[(size_t)trackIdx].id;
+            const bool armNow  = (curArmed != newId);
+            audioEngine.setAudioRecordingTrack(armNow ? newId : -1);
+            if (onStatusMessage)
+            {
+                onStatusMessage (armNow
+                    ? juce::String("Armed '") + tracks[(size_t)trackIdx].name
+                      + "' — press Space to record audio"
+                    : juce::String("Disarmed audio recording"));
+            }
+        }
+        else if (localX >= headerBtnLeft(1) && localX < headerBtnRight(1))
         {
             tracks[(size_t)trackIdx].mute = !tracks[(size_t)trackIdx].mute;
         }
-        else if (localX >= headerWidth - 40 && localX < headerWidth - 20)
+        else if (localX >= headerBtnLeft(2) && localX < headerBtnRight(2))
         {
             // II3 — exclusive solo: plain click unsolos others, Ctrl = additive
             bool newSolo = !tracks[(size_t)trackIdx].solo;
@@ -1029,6 +1057,19 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
         return;
     }
 
+    // PPP2 — shared helper: snapshot the drag-target clip's state so
+    // mouseUp can build an AudioClipEditCmd covering fade and trim drags
+    // through a single undo command.
+    auto snapForUndo = [&] (AudioClip& ac)
+    {
+        audioDragClip                      = &ac;
+        audioDragBeforeStartBeat           = ac.startBeat;
+        audioDragBeforeLengthBeats         = ac.lengthBeats;
+        audioDragBeforeSourceOffsetSamples = ac.sourceOffsetSamples;
+        audioDragBeforeFadeInBeats         = ac.fadeInBeats;
+        audioDragBeforeFadeOutBeats        = ac.fadeOutBeats;
+    };
+
     // PPP1 — audio clip fade handle hit test. Top fadeHandleHeight px of
     // the clip row; ±5 px X tolerance. Must run BEFORE the trim hit test
     // because a fresh fade handle at fadeInBeats==0 sits on the clip edge,
@@ -1047,6 +1088,7 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
                     fadeMode     = FadeMode::In;
                     fadeTrackIdx = trackIdx;
                     fadeClipIdx  = ci;
+                    snapForUndo(ac);
                     return;
                 }
                 if (std::abs((float)e.x - hOut) <= 5.0f)
@@ -1054,6 +1096,7 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
                     fadeMode     = FadeMode::Out;
                     fadeTrackIdx = trackIdx;
                     fadeClipIdx  = ci;
+                    snapForUndo(ac);
                     return;
                 }
             }
@@ -1071,6 +1114,7 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
             trimMode = TrimMode::Left;
             trimTrackIdx = trackIdx;
             trimClipIdx  = ci;
+            snapForUndo(ac);
             return;
         }
         if (std::abs((float)e.x - rightX) <= 6.0f)
@@ -1078,6 +1122,7 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
             trimMode = TrimMode::Right;
             trimTrackIdx = trackIdx;
             trimClipIdx  = ci;
+            snapForUndo(ac);
             return;
         }
     }
@@ -1367,6 +1412,34 @@ void ArrangementView::mouseUp(const juce::MouseEvent&)
 
     autoDragTrackIdx = -1;
     autoDragPointIdx = -1;
+    // PPP2 — finalize fade/trim drag as a single AudioClipEditCmd on
+    // the undo stack. Unified command covers the four fields the user
+    // can touch during a drag (start/length/sourceOffset/fade in/out).
+    if (audioDragClip != nullptr && undoManager != nullptr)
+    {
+        AudioClipEditCmd::Snap before;
+        before.startBeat           = audioDragBeforeStartBeat;
+        before.lengthBeats         = audioDragBeforeLengthBeats;
+        before.sourceOffsetSamples = audioDragBeforeSourceOffsetSamples;
+        before.fadeInBeats         = audioDragBeforeFadeInBeats;
+        before.fadeOutBeats        = audioDragBeforeFadeOutBeats;
+        auto after = AudioClipEditCmd::snapshot(*audioDragClip);
+
+        const bool changed =
+               before.startBeat           != after.startBeat
+            || before.lengthBeats         != after.lengthBeats
+            || before.sourceOffsetSamples != after.sourceOffsetSamples
+            || before.fadeInBeats         != after.fadeInBeats
+            || before.fadeOutBeats        != after.fadeOutBeats;
+
+        if (changed)
+        {
+            undoManager->beginNewTransaction("Edit audio clip");
+            undoManager->perform(new AudioClipEditCmd(audioDragClip, before, after));
+        }
+    }
+    audioDragClip = nullptr;
+
     trimMode = TrimMode::None;     // X3
     trimTrackIdx = -1;
     trimClipIdx = -1;

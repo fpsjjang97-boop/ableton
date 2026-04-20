@@ -152,6 +152,13 @@ MainWindow::MainContent::MainContent()
         markDirty();
     };
 
+    // PPP3 review — surface arrangement-view hints (R arm toggle, etc.)
+    // through the window's status bar.
+    arrangementView.onStatusMessage = [this](juce::String msg)
+    {
+        statusBar.setMessage(msg);
+    };
+
     // Default track with empty clip
     auto& track = audioEngine.getTrackModel().addTrack("MidiGPT Track 1");
     audioEngine.prebuildTrackSynth(track.id); // T1 — GUI-thread alloc

@@ -1,4 +1,5 @@
 #include "EditCommands.h"
+#include "../Audio/AudioClip.h"
 #include <cmath>
 
 // ---------------------------------------------------------------------------
@@ -322,3 +323,33 @@ bool MoveClipCmd::undo()
     clip->lengthBeats = beforeLen;
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// PPP2 — AudioClipEditCmd
+// ---------------------------------------------------------------------------
+AudioClipEditCmd::AudioClipEditCmd(AudioClip* c, Snap b, Snap a)
+    : clip(c), before(b), after(a) {}
+
+AudioClipEditCmd::Snap AudioClipEditCmd::snapshot(const AudioClip& c)
+{
+    Snap s;
+    s.startBeat           = c.startBeat;
+    s.lengthBeats         = c.lengthBeats;
+    s.sourceOffsetSamples = c.sourceOffsetSamples;
+    s.fadeInBeats         = c.fadeInBeats;
+    s.fadeOutBeats        = c.fadeOutBeats;
+    return s;
+}
+
+void AudioClipEditCmd::apply(const Snap& s)
+{
+    if (clip == nullptr) return;
+    clip->startBeat           = s.startBeat;
+    clip->lengthBeats         = s.lengthBeats;
+    clip->sourceOffsetSamples = s.sourceOffsetSamples;
+    clip->fadeInBeats         = s.fadeInBeats;
+    clip->fadeOutBeats        = s.fadeOutBeats;
+}
+
+bool AudioClipEditCmd::perform() { if (!clip) return false; apply(after);  return true; }
+bool AudioClipEditCmd::undo()    { if (!clip) return false; apply(before); return true; }

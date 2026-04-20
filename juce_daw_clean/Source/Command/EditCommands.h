@@ -153,3 +153,33 @@ private:
     double beforeStart, beforeLen;
     double afterStart, afterLen;
 };
+
+/** PPP2 — AudioClip edit undo (fade + trim + move).
+ *  Captures all drag-mutable fields at mouseDown / mouseUp and restores
+ *  them in pairs. Covers X3 trim handles and PPP1 fade handles through
+ *  one command class to keep the drag plumbing uniform. */
+struct AudioClip;
+class AudioClipEditCmd : public juce::UndoableAction
+{
+public:
+    struct Snap
+    {
+        double      startBeat;
+        double      lengthBeats;
+        juce::int64 sourceOffsetSamples;
+        double      fadeInBeats;
+        double      fadeOutBeats;
+    };
+
+    AudioClipEditCmd(AudioClip* clip, Snap before, Snap after);
+    bool perform() override;
+    bool undo() override;
+
+    /** Helper: snapshot the drag-mutable state of an AudioClip. */
+    static Snap snapshot(const AudioClip& clip);
+
+private:
+    AudioClip* clip;
+    Snap before, after;
+    void apply(const Snap& s);
+};
