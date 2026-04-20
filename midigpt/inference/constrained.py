@@ -134,6 +134,15 @@ class MidiGrammarFSM:
         else:
             self._states.pop(batch, None)
 
+    def current_bar(self, batch: int = 0) -> int:
+        """Return the highest Bar_N index seen on this batch, or -1 if none.
+
+        Used by engine.py's EOS suppression to enforce a minimum bar count
+        on generated sequences (8차 리포트: "초반 몇 마디에만 뭉침" 방어).
+        """
+        st = self._states.get(batch)
+        return st.current_bar if st is not None else -1
+
     def apply(self, logits_row: torch.Tensor, batch: int = 0) -> torch.Tensor:
         """Mask logits that would violate the grammar.
 

@@ -463,6 +463,7 @@ class MidiGPTInference:
         idx: torch.Tensor,
         max_new_tokens: int = 512,
         min_new_tokens: int = 0,
+        min_bars: int = 0,                 # 8차 대응 — bar-count 기반 EOS suppression
         temperature: float = 0.9,
         top_k: int = 50,
         top_p: float = 0.95,
@@ -541,6 +542,18 @@ class MidiGPTInference:
             # ``min_new_tokens`` / ``min_length`` parameters).
             if min_new_tokens > 0 and step < min_new_tokens:
                 logits[:, eos_id] = float("-inf")
+
+            # 8차 리포트 대응 — min_bars 기반 EOS suppression.
+            # min_new_tokens 는 "토큰 개수" 만 보장하므로, 모델이 Pos/Pitch/Vel/
+            # Dur 를 한 자리에 도배해서 토큰 쿼터를 채우고도 실제 bar 수가
+            # 2~3 에 그치는 경우가 존재했음 ("초반 몇 마디에만 뭉침"). Bar_N
+            # 토큰 방출 횟수를 FSM 으로 추적해 목표 bar 수 이하면 EOS 금지.
+            if min_bars > 0 and grammar is not None:
+                # current_bar 는 방출된 최고 Bar 인덱스 (0-based). 예를 들어
+                # Bar_7 까지 나왔다면 8 bar 생성됐다는 뜻. batch 0 기준.
+                cur_bar = grammar.current_bar(batch=0)
+                if cur_bar < (min_bars - 1):
+                    logits[:, eos_id] = float("-inf")
 
             # ----- Always suppress PAD token during generation -----
             # PAD (id=0) is a training artifact (sequence padding). The model
@@ -979,6 +992,7 @@ class MidiGPTInference:
         chords: list[ChordEvent] | None = None,
         max_tokens: int = 1024,
         min_new_tokens: int = 256,
+        min_bars: int = 8,                 # 8차 — bar-count 기반 EOS 바닥.
         temperature: float = 0.9,
         top_k: int = 50,
         top_p: float = 0.95,
@@ -1128,6 +1142,7 @@ class MidiGPTInference:
                         input_tensor,
                         max_new_tokens=max_tokens,
                         min_new_tokens=min_new_tokens,
+                        min_bars=min_bars,
                         temperature=temperature,
                         top_k=top_k,
                         top_p=top_p,
@@ -1189,6 +1204,7 @@ class MidiGPTInference:
         chords: list[ChordEvent] | None = None,
         max_tokens: int = 1024,
         min_new_tokens: int = 256,
+        min_bars: int = 8,                 # 8차 — bar-count 기반 EOS 바닥.
         temperature: float = 0.9,
         top_k: int = 50,
         top_p: float = 0.95,
@@ -1237,6 +1253,7 @@ class MidiGPTInference:
                 input_tensor,
                 max_new_tokens=max_tokens,
                 min_new_tokens=min_new_tokens,
+                min_bars=min_bars,
                 temperature=temperature,
                 top_k=top_k,
                 top_p=top_p,

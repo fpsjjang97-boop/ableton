@@ -603,7 +603,7 @@ void MainWindow::MainContent::timerCallback()
 
 void MainWindow::MainContent::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF0E0E0E));
+    g.fillAll(juce::Colour(MetallicLookAndFeel::bgDarkest));
 }
 
 void MainWindow::MainContent::resized()
@@ -629,6 +629,21 @@ void MainWindow::MainContent::resized()
 
     // Arrangement / session canvas fills the rest (center column).
     arrangementView.setBounds(area);
+
+    // Review fix — force the active tab's content component to re-layout
+    // and paint. JUCE TabbedComponent caches bounds from the FIRST time
+    // a tab is selected; if that happened before MainContent was sized
+    // (our ctor calls setCurrentTabIndex before setSize), the content
+    // gets 0×0 bounds and stays blank until the user toggles tabs.
+    if (auto* cur = bottomTabs.getCurrentContentComponent())
+    {
+        // TabbedComponent lays out content inside bounds minus the tab bar.
+        const int tabBarH = bottomTabs.getTabBarDepth();
+        auto inner = bottomTabs.getLocalBounds().withTrimmedTop(tabBarH);
+        cur->setBounds(inner);
+        cur->setVisible(true);
+        cur->repaint();
+    }
 }
 
 // =============================================================================

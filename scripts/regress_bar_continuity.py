@@ -56,9 +56,19 @@ class FileMetrics:
     bar_jump_max: int
     bar_loop_notes: int
     duplicate_note_count: int
+    # 8차 리포트 대응 — 내부 회귀 PASS 지만 전체 길이 대비 심하게 짧은
+    # 생성물을 잡지 못했음. 아래 필드는 "생성 범위" 뿐 아니라 "기대
+    # 길이 대비" 관점을 더해 EOS 조기 종료 symptom 을 수치화한다.
+    first_note_bar: int
+    last_note_bar: int
+    notes_per_occupied_bar: float
+    length_ratio: float          # last_note_bar / expected_bars (1.0 = 꽉 참)
+    trailing_truncation_bars: int  # expected_bars - (last_note_bar+1)
 
 
-def analyze_midi(midi_path: Path, bar_seconds_fallback: float = 2.0) -> FileMetrics:
+def analyze_midi(midi_path: Path,
+                 bar_seconds_fallback: float = 2.0,
+                 expected_bars: int = 0) -> FileMetrics:
     """Compute bar-continuity metrics for one MIDI file.
 
     A bar is considered "occupied" if at least one note starts within it
@@ -88,6 +98,10 @@ def analyze_midi(midi_path: Path, bar_seconds_fallback: float = 2.0) -> FileMetr
             path=str(midi_path), note_count=0, total_bars=0,
             occupied_bars=0, empty_bars=0, empty_bar_ratio=0.0,
             bar_jump_max=0, bar_loop_notes=0, duplicate_note_count=0,
+            first_note_bar=-1, last_note_bar=-1,
+            notes_per_occupied_bar=0.0,
+            length_ratio=0.0,
+            trailing_truncation_bars=expected_bars,
         )
 
     # Bar index for each note (by start time).
@@ -121,6 +135,21 @@ def analyze_midi(midi_path: Path, bar_seconds_fallback: float = 2.0) -> FileMetr
     )
     duplicate_note_count = sum(c - 1 for c in keys.values() if c > 1)
 
+    # 8차 — EOS 조기 종료 및 "짧은 생성" 검출용 지표.
+    notes_per_occupied_bar = (note_count / occupied_bars) if occupied_bars > 0 else 0.0
+    last_note_bar_idx = max_bar
+    first_note_bar_idx = min_bar
+
+    if expected_bars > 0:
+        # User knows the target bar count (e.g. test_generate asked for 32 bars).
+        # length_ratio < 1 → 생성이 짧음. 0.3 이하면 전형적 EOS 조기 종료.
+        length_ratio = min(1.0, (last_note_bar_idx + 1) / expected_bars)
+        trailing_truncation = max(0, expected_bars - (last_note_bar_idx + 1))
+    else:
+        # Without an expected length we can't judge truncation — report 1.0.
+        length_ratio = 1.0
+        trailing_truncation = 0
+
     return FileMetrics(
         path=str(midi_path),
         note_count=note_count,
@@ -131,6 +160,11 @@ def analyze_midi(midi_path: Path, bar_seconds_fallback: float = 2.0) -> FileMetr
         bar_jump_max=bar_jump_max,
         bar_loop_notes=bar_loop_notes,
         duplicate_note_count=duplicate_note_count,
+        first_note_bar=first_note_bar_idx,
+        last_note_bar=last_note_bar_idx,
+        notes_per_occupied_bar=round(notes_per_occupied_bar, 2),
+        length_ratio=round(length_ratio, 4),
+        trailing_truncation_bars=trailing_truncation,
     )
 
 
@@ -144,6 +178,12 @@ def main() -> int:
     parser.add_argument("--thresh-jump", type=int, default=1)
     parser.add_argument("--thresh-loop", type=int, default=128)
     parser.add_argument("--thresh-dup", type=int, default=0)
+    # 8차 대응: 기대 bar 수와 최소 length_ratio. expected-bars 0 이면
+    # 이 판정은 skip (하위 호환). 0 초과면 EOS 조기 종료 detection on.
+    parser.add_argument("--expected-bars", type=int, default=0,
+                        help="target bar count per MIDI; enables length_ratio check")
+    parser.add_argument("--thresh-length", type=float, default=0.75,
+                        help="min length_ratio (last_note_bar+1 / expected_bars)")
     args = parser.parse_args()
 
     target = Path(args.midi_dir)
@@ -161,7 +201,7 @@ def main() -> int:
     results: list[FileMetrics] = []
     for f in files:
         try:
-            m = analyze_midi(f)
+            m = analyze_midi(f, expected_bars=args.expected_bars)
         except (OSError, ValueError, IndexError, KeyError) as e:
             print(f"  [WARN] Cannot analyze {f.name}: {e}")
             continue
@@ -176,12 +216,19 @@ def main() -> int:
     agg_jump = max(r.bar_jump_max for r in results)
     agg_loop = max(r.bar_loop_notes for r in results)
     agg_dup = sum(r.duplicate_note_count for r in results)
+    # 8차 신규 집계: 최소 length_ratio, 평균 notes_per_occupied_bar,
+    # 최대 trailing_truncation_bars.
+    agg_length_min  = min(r.length_ratio for r in results)
+    agg_density_avg = sum(r.notes_per_occupied_bar for r in results) / len(results)
+    agg_trunc_max   = max(r.trailing_truncation_bars for r in results)
 
     pass_empty = agg_empty <= args.thresh_empty
     pass_jump = agg_jump <= args.thresh_jump
     pass_loop = agg_loop < args.thresh_loop
     pass_dup = agg_dup <= args.thresh_dup
-    all_pass = pass_empty and pass_jump and pass_loop and pass_dup
+    # length_ratio gate: expected_bars=0 이면 스킵 (하위 호환).
+    pass_length = (args.expected_bars <= 0) or (agg_length_min >= args.thresh_length)
+    all_pass = pass_empty and pass_jump and pass_loop and pass_dup and pass_length
 
     print("=" * 64)
     print(f"Bar-continuity regression: {len(results)} file(s) analyzed")
@@ -194,6 +241,16 @@ def main() -> int:
           f"{'PASS' if pass_loop else 'FAIL'}  (thresh <  {args.thresh_loop})")
     print(f"  total duplicate_notes  : {agg_dup}       "
           f"{'PASS' if pass_dup else 'FAIL'}  (thresh <= {args.thresh_dup})")
+    # 8차 추가 지표 — expected_bars 주어졌을 때만 PASS/FAIL 판정.
+    if args.expected_bars > 0:
+        print(f"  min length_ratio       : {agg_length_min:.4f}  "
+              f"{'PASS' if pass_length else 'FAIL'}  "
+              f"(thresh >= {args.thresh_length}, expected_bars={args.expected_bars})")
+        print(f"  max trailing_truncation: {agg_trunc_max} bars "
+              f"(of {args.expected_bars})")
+    else:
+        print(f"  length_ratio           : n/a — pass --expected-bars N to enable")
+    print(f"  avg notes/occupied_bar : {agg_density_avg:.2f}")
     print("=" * 64)
     print(f"Overall: {'PASS' if all_pass else 'FAIL'}")
 
@@ -205,12 +262,17 @@ def main() -> int:
                 "max_bar_jump": agg_jump,
                 "max_bar_loop_notes": agg_loop,
                 "total_duplicate_notes": agg_dup,
+                "min_length_ratio": agg_length_min,
+                "max_trailing_truncation_bars": agg_trunc_max,
+                "avg_notes_per_occupied_bar": agg_density_avg,
             },
             "thresholds": {
                 "empty": args.thresh_empty,
                 "jump": args.thresh_jump,
                 "loop": args.thresh_loop,
                 "dup": args.thresh_dup,
+                "length": args.thresh_length if args.expected_bars > 0 else None,
+                "expected_bars": args.expected_bars,
             },
             "pass": all_pass,
         }
