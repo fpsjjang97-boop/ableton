@@ -306,6 +306,15 @@ async def generate(
 import base64 as _b64
 
 
+class TrackRoleJson(BaseModel):
+    """Sprint XXX — 클라이언트가 다른 트랙들의 역할을 함께 보낼 때 쓴다.
+    encoder.TrackRole 와 동일 스키마."""
+    name: str = "other"
+    role: str = "accomp"
+    human_playable: bool = False
+    main: bool = True
+
+
 class GenerateJsonRequest(BaseModel):
     midi_base64: str
     style: str = "base"
@@ -332,6 +341,20 @@ class GenerateJsonRequest(BaseModel):
     end_bar: int = 8
     min_bars: int = 8
     target_track: str = ""
+    # Sprint XXX — §20-7 SongContext 승격. nested 필드는 모두 선택적이라
+    # 구 클라이언트도 그대로 동작한다.
+    tracks: list[TrackRoleJson] = []
+    section_map: list[tuple[int, str]] = []
+    chord_map:   list[tuple[int, str]] = []
+    groove:      float = 0.5
+    density:     float = 0.5
+    energy:      float = 0.5
+    register_low:  int = 21
+    register_high: int = 108
+    melodic_anchor: list[int] = []
+    user_hint: str = ""
+    # Personalization (§20-10). "user:<id>/<profile>" 규약.
+    active_lora: str = ""
 
 
 @app.post("/generate_json")
@@ -365,6 +388,41 @@ def generate_json(req: GenerateJsonRequest):
         if req.end_bar > req.start_bar:
             effective_min_bars = max(1, req.end_bar - req.start_bar)
 
+        # Sprint XXX — if the client supplied active_lora, activate it
+        # (and accept that the user LoRA may already be warmed via
+        # personalization.register_standard_adapters at boot).
+        if req.active_lora:
+            try:
+                _inference.activate_lora(req.active_lora)
+            except Exception as e:
+                # Activation is best-effort; a missing adapter should
+                # degrade to base model rather than 500 the request.
+                print(f"[server] activate_lora({req.active_lora}) skipped: {e}",
+                      flush=True)
+
+        # Sprint WWW — build a SongContext from the nested request fields
+        # so the engine's elevated conditioning path sees a single object
+        # instead of many loose kwargs.
+        from midigpt.tokenizer.encoder import SongContext, TrackRole
+        ctx = SongContext(
+            target_task=req.task,
+            target_track=req.target_track,
+            start_bar=req.start_bar,
+            end_bar=req.end_bar,
+            tracks=[TrackRole(name=t.name, role=t.role,
+                              human_playable=t.human_playable,
+                              main=t.main) for t in req.tracks],
+            section_map=list(req.section_map),
+            chord_map=list(req.chord_map),
+            groove=req.groove,
+            density=req.density,
+            energy=req.energy,
+            register_low=req.register_low,
+            register_high=req.register_high,
+            melodic_anchor=list(req.melodic_anchor),
+            user_hint=req.user_hint,
+        )
+
         _inference.generate_to_midi(
             midi_path=str(tmp_in),
             output_path=str(tmp_out),
@@ -382,6 +440,7 @@ def generate_json(req: GenerateJsonRequest):
             start_bar=req.start_bar,
             end_bar=req.end_bar,
             target_track=req.target_track,
+            context=ctx,
         )
 
         out_bytes = tmp_out.read_bytes()
