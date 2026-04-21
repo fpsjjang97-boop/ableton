@@ -6,6 +6,7 @@
 #include "../Automation/AutomationEditor.h"
 #include "../Plugin/PluginEditorWindow.h"
 #include "../Command/EditCommands.h"
+#include "../Audio/ClipStretchUtil.h"  // OOO4 — offline stretch helper
 #include "LookAndFeel.h"          // palette tokens (review fix — unify hex → token)
 
 ArrangementView::ArrangementView(AudioEngine& engine)
@@ -835,6 +836,12 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
                     acMenu.addItem(1, "Pitch Shift...");
                     acMenu.addItem(2, "Playback Rate...");
                     acMenu.addItem(3, "Fade In/Out...");
+                    acMenu.addSeparator();
+                    // OOO4 — offline pitch/time stretch (ClipStretchUtil).
+                    // Bakes the ratio+pitch into the clip buffer itself so
+                    // playback doesn't pay the coupled-rate compromise.
+                    acMenu.addItem(5, "Apply Stretch...");
+                    acMenu.addSeparator();
                     acMenu.addItem(4, "Delete Audio Clip");
                     acMenu.showMenuAsync(juce::PopupMenu::Options(),
                         [this, tid = trk.id, ai](int r) {
@@ -884,6 +891,40 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
                                         if (rr == 1 && tp3 != nullptr && ai < (int)tp3->audioClips.size()) {
                                             tp3->audioClips[(size_t)ai].fadeInBeats = juce::jmax(0.0, aw->getTextEditorContents("in").getDoubleValue());
                                             tp3->audioClips[(size_t)ai].fadeOutBeats = juce::jmax(0.0, aw->getTextEditorContents("out").getDoubleValue());
+                                        }
+                                        delete aw; repaint();
+                                    }), false);
+                            }
+                            else if (r == 5) // OOO4 — Apply Stretch
+                            {
+                                auto* aw = new juce::AlertWindow("Apply Stretch",
+                                    "Time ratio (>1 longer, <1 shorter) + Pitch scale (>1 up, <1 down).\n"
+                                    "RubberBand backend required — if not built with MIDIGPTDAW_WITH_RUBBERBAND,\n"
+                                    "the clip is left unchanged (fallback to coupled playback rate).",
+                                    juce::MessageBoxIconType::NoIcon);
+                                aw->addTextEditor("time",  "1.0");
+                                aw->addTextEditor("pitch", "1.0");
+                                aw->addButton("OK", 1); aw->addButton("Cancel", 0);
+                                aw->enterModalState(true, juce::ModalCallbackFunction::create(
+                                    [this, tid, ai, aw](int rr) {
+                                        auto* tp3 = audioEngine.getTrackModel().getTrack(tid);
+                                        if (rr == 1 && tp3 != nullptr
+                                            && ai < (int)tp3->audioClips.size())
+                                        {
+                                            const double tr = juce::jlimit(0.25, 4.0,
+                                                aw->getTextEditorContents("time").getDoubleValue());
+                                            const double ps = juce::jlimit(0.5, 2.0,
+                                                aw->getTextEditorContents("pitch").getDoubleValue());
+                                            auto r = midigpt_daw::stretchAudioClip(
+                                                tp3->audioClips[(size_t)ai], tr, ps);
+                                            if (! r.success)
+                                                juce::AlertWindow::showMessageBoxAsync(
+                                                    juce::MessageBoxIconType::InfoIcon,
+                                                    "Stretch not applied",
+                                                    juce::String("Backend: ") + r.backend
+                                                        + "\nReason: " + r.reason
+                                                        + "\n\nClip unchanged; playback will use the "
+                                                          "coupled playbackRate / pitchSemitones fields.");
                                         }
                                         delete aw; repaint();
                                     }), false);

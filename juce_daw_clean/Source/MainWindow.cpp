@@ -528,6 +528,25 @@ bool MainWindow::MainContent::keyPressed(const juce::KeyPress& key, juce::Compon
     { arrangementView.setZoomBeats(64.0f); return true; }
     if (key == juce::KeyPress('3', juce::ModifierKeys::ctrlModifier, 0))
     { arrangementView.setZoomBeats(128.0f); return true; }
+    // F5 = Refresh UI (manual paint workaround, menu id 420).
+    if (key == juce::KeyPress(juce::KeyPress::F5Key))
+    {
+        std::function<void(juce::Component*)> walk = [&](juce::Component* n) {
+            if (n == nullptr) return;
+            n->repaint();
+            for (int i = 0; i < n->getNumChildComponents(); ++i)
+                walk(n->getChildComponent(i));
+        };
+        walk(this);
+        if (auto* top = getTopLevelComponent())
+        {
+            const auto b = top->getBounds();
+            top->setBounds(b.withWidth(b.getWidth() + 1));
+            top->setBounds(b);
+        }
+        statusBar.setMessage("UI refreshed (F5)");
+        return true;
+    }
     // GG5 — ? key = shortcut overlay
     if (key == juce::KeyPress('/', juce::ModifierKeys::shiftModifier, '?')
         || key == juce::KeyPress(juce::KeyPress::F1Key))
@@ -867,6 +886,12 @@ juce::PopupMenu MainWindow::MainContent::getMenuForIndex(int idx, const juce::St
             menu.addItem(401, "Arrangement",       true, false);
             menu.addItem(402, "Mixer",             true, false);
             menu.addItem(403, "Piano Roll",        true, false);
+            menu.addSeparator();
+            // 2026-04-21 — manual paint workaround. If cold-start WM_PAINT
+            // cascade misses children (paint-on-hover symptom), F5 walks
+            // the tree and repaints everything. User-visible escape hatch
+            // while the environmental paint issue is investigated.
+            menu.addItem(420, "Refresh UI (F5)",   true, false);
             menu.addSeparator();
             { // QQ6 — snap selector
                 juce::PopupMenu snapMenu;
@@ -1282,6 +1307,27 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
         case 403: // Piano Roll
             bottomTabs.setCurrentTabIndex(0);
             break;
+        case 420: // Refresh UI — manual paint workaround
+        {
+            // Walk every descendant and force a repaint. Also nudge the
+            // window width by 1 px so Windows compositor treats it as a
+            // proper redraw event.
+            std::function<void(juce::Component*)> walk = [&](juce::Component* n) {
+                if (n == nullptr) return;
+                n->repaint();
+                for (int i = 0; i < n->getNumChildComponents(); ++i)
+                    walk(n->getChildComponent(i));
+            };
+            walk (this);
+            if (auto* top = getTopLevelComponent())
+            {
+                const auto b = top->getBounds();
+                top->setBounds(b.withWidth(b.getWidth() + 1));
+                top->setBounds(b);
+            }
+            statusBar.setMessage("UI refreshed");
+            break;
+        }
         case 602: // Audio Settings
         {
             auto* comp = new juce::AudioDeviceSelectorComponent(
