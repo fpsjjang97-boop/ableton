@@ -353,3 +353,26 @@ void AudioClipEditCmd::apply(const Snap& s)
 
 bool AudioClipEditCmd::perform() { if (!clip) return false; apply(after);  return true; }
 bool AudioClipEditCmd::undo()    { if (!clip) return false; apply(before); return true; }
+
+// ---- TTT — MidiClipSnapshotCmd -------------------------------------------
+
+MidiClipSnapshotCmd::MidiClipSnapshotCmd(MidiClip* c,
+                                         juce::MidiMessageSequence b,
+                                         juce::MidiMessageSequence a)
+    : clip(c), before(std::move(b)), after(std::move(a)) {}
+
+bool MidiClipSnapshotCmd::perform()
+{
+    if (clip == nullptr) return false;
+    clip->sequence = after;
+    clip->sequence.updateMatchedPairs();
+    return true;
+}
+
+bool MidiClipSnapshotCmd::undo()
+{
+    if (clip == nullptr) return false;
+    clip->sequence = before;
+    clip->sequence.updateMatchedPairs();
+    return true;
+}

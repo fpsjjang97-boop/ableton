@@ -173,8 +173,45 @@ void MixerPanel::rebuildStrips()
                 : juce::String("FX 체인 활성/바이패스 (첫 슬롯)"));
             cs.fxBypassBtn->onClick = [this, id = track.id, &btn = *cs.fxBypassBtn] {
                 auto* t = audioEngine.getTrackModel().getTrack(id);
-                if (t != nullptr && ! t->plugins.empty())
-                    t->plugins[0].bypass = ! btn.getToggleState();
+                if (t == nullptr || t->plugins.empty()) return;
+
+                // TTT — right-click (or shift+click) opens a per-slot
+                // bypass popup covering every plugin in the chain.
+                // Left-click keeps the existing slot-0 toggle UX so
+                // single-plugin tracks feel the same.
+                const auto mods = juce::ModifierKeys::getCurrentModifiers();
+                if (mods.isRightButtonDown() || mods.isShiftDown())
+                {
+                    juce::PopupMenu menu;
+                    for (int si = 0; si < (int) t->plugins.size(); ++si)
+                    {
+                        menu.addItem (si + 1,
+                            juce::String (si + 1) + ". "
+                                + (t->plugins[(size_t) si].displayName.isNotEmpty()
+                                       ? t->plugins[(size_t) si].displayName
+                                       : juce::String ("<plugin>"))
+                                + (t->plugins[(size_t) si].bypass ? "  [BYPASS]" : ""),
+                            true, t->plugins[(size_t) si].bypass);
+                    }
+                    menu.showMenuAsync (juce::PopupMenu::Options{},
+                        [this, id] (int choice)
+                        {
+                            if (choice <= 0) return;
+                            auto* t2 = audioEngine.getTrackModel().getTrack(id);
+                            const int si = choice - 1;
+                            if (t2 != nullptr && si < (int) t2->plugins.size())
+                                t2->plugins[(size_t) si].bypass = ! t2->plugins[(size_t) si].bypass;
+                            refresh();
+                        });
+                    // Revert the toggle that left-click would've made —
+                    // the button's paint tracks slot 0 only, and we
+                    // didn't intend to flip slot 0 on a right-click.
+                    btn.setToggleState (! t->plugins[0].bypass,
+                                         juce::dontSendNotification);
+                    return;
+                }
+
+                t->plugins[0].bypass = ! btn.getToggleState();
             };
             addAndMakeVisible(*cs.fxBypassBtn);
         }

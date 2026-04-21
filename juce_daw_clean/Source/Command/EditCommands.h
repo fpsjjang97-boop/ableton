@@ -154,6 +154,26 @@ private:
     double afterStart, afterLen;
 };
 
+/** TTT — Whole-sequence snapshot undo for bulk transforms. Captures
+ *  the clip's MidiMessageSequence before the transform runs; undo
+ *  restores it verbatim. Used by reverse/invert/humanize/transpose/
+ *  quantize/groove where per-note diff tracking would be disproportionate.
+ *  Cost: one sequence copy per transform. MidiMessageSequence is cheap
+ *  to copy (roughly proportional to note count), so this is acceptable
+ *  even for dense clips. */
+class MidiClipSnapshotCmd : public juce::UndoableAction
+{
+public:
+    MidiClipSnapshotCmd(MidiClip* clip,
+                        juce::MidiMessageSequence before,
+                        juce::MidiMessageSequence after);
+    bool perform() override;
+    bool undo() override;
+private:
+    MidiClip* clip;
+    juce::MidiMessageSequence before, after;
+};
+
 /** PPP2 — AudioClip edit undo (fade + trim + move).
  *  Captures all drag-mutable fields at mouseDown / mouseUp and restores
  *  them in pairs. Covers X3 trim handles and PPP1 fade handles through

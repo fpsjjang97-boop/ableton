@@ -260,6 +260,19 @@ void ArrangementView::paint(juce::Graphics& g)
                 g.drawText(label, (int)(drawX + 4), y + 2, (int)(drawW - 8), 12,
                            juce::Justification::topLeft);
 
+                // TTT — gain indicator (only when non-unity). Small
+                // inline text in the bottom-right of the clip header so
+                // users see their Alt+scroll adjustments persist.
+                if (std::abs(clip.gain - 1.0f) > 0.01f && drawW > 60)
+                {
+                    g.setColour (juce::Colour (MetallicLookAndFeel::accent).withAlpha (0.85f));
+                    g.setFont (9.0f);
+                    const juce::String lbl = "g " + juce::String (clip.gain, 2);
+                    g.drawText (lbl, (int) (drawX + 4), y + 14,
+                                (int) drawW - 8, 10,
+                                juce::Justification::topLeft);
+                }
+
                 // Take-count badge so users can spot clips with stashed
                 // takes from the arrangement (match the PianoRoll badge
                 // styling — amber pill, compact).
@@ -1618,6 +1631,37 @@ void ArrangementView::mouseDoubleClick(const juce::MouseEvent& e)
 
 void ArrangementView::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
 {
+    // TTT — Alt+scroll over a MIDI clip body adjusts clip.gain directly.
+    // Each wheel tick = ±0.05 gain (clamped 0..2). Discoverable alternative
+    // to the "Set Clip Gain..." dialog in the right-click menu.
+    if (e.mods.isAltDown() && e.x >= headerWidth)
+    {
+        auto& tracks = audioEngine.getTrackModel().getTracks();
+        for (int vi = 0; vi < (int) visibleTrackIndices.size(); ++vi)
+        {
+            const int trackIdx = visibleTrackIndices[(size_t) vi];
+            if (trackIdx < 0 || trackIdx >= (int) tracks.size()) continue;
+            const int yTop = yForVisibleRow (vi);
+            const int yBot = yTop + heightForVisibleRow (vi);
+            if (e.y < yTop || e.y >= yBot) continue;
+
+            auto& track = tracks[(size_t) trackIdx];
+            const double beat = xToBeat ((float) e.x);
+            for (auto& c : track.clips)
+            {
+                if (beat >= c.startBeat && beat < c.startBeat + c.lengthBeats)
+                {
+                    c.gain = juce::jlimit (0.0f, 2.0f,
+                        c.gain + (w.deltaY > 0.0f ? 0.05f : -0.05f));
+                    repaint();
+                    return;
+                }
+            }
+            break;
+        }
+        return;
+    }
+
     if (e.mods.isCtrlDown())
     {
         // Zoom horizontal

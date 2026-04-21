@@ -1025,25 +1025,39 @@ bool PianoRoll::keyPressed(const juce::KeyPress& key, juce::Component*)
     }
 
     // MIDI transforms — Shift+R/I/H for reverse/invert/humanize.
-    // All three honor selectedIndices when non-empty, else act on the
-    // whole clip. Transforms mutate the clip in place; undo not yet
-    // wired (follow-up sprint).
+    // Each transform is wrapped in MidiClipSnapshotCmd (TTT) so Ctrl+Z
+    // fully restores the prior sequence. Snapshot-based undo keeps the
+    // transform implementations free of per-note diff tracking.
     if (key.getModifiers().isShiftDown() && currentClip != nullptr)
     {
         std::vector<int> sel (selectedIndices.begin(), selectedIndices.end());
 
-        if (key.getKeyCode() == 'R')
+        auto runWithUndo = [this, &sel] (const char* txnName,
+                                          std::function<void()> op)
         {
-            MidiTransforms::reverse (currentClip->sequence, sel);
+            juce::MidiMessageSequence before = currentClip->sequence;
+            op();
+            juce::MidiMessageSequence after = currentClip->sequence;
+            if (undoManager != nullptr)
+            {
+                undoManager->beginNewTransaction (txnName);
+                undoManager->perform (new MidiClipSnapshotCmd (
+                    currentClip, std::move (before), std::move (after)));
+            }
             repaint();
             if (onNotesChanged) onNotesChanged();
+        };
+
+        if (key.getKeyCode() == 'R')
+        {
+            runWithUndo ("Reverse",
+                [this, &sel] { MidiTransforms::reverse (currentClip->sequence, sel); });
             return true;
         }
         if (key.getKeyCode() == 'I')
         {
-            MidiTransforms::invert (currentClip->sequence, sel);
-            repaint();
-            if (onNotesChanged) onNotesChanged();
+            runWithUndo ("Invert",
+                [this, &sel] { MidiTransforms::invert (currentClip->sequence, sel); });
             return true;
         }
         if (key.getKeyCode() == 'H')
@@ -1051,9 +1065,12 @@ bool PianoRoll::keyPressed(const juce::KeyPress& key, juce::Component*)
             // Defaults tuned for "musical" jitter: 1/32 note worth of
             // timing scatter, ~5% velocity scatter. Nothing surgical;
             // users who want precision can compose Humanize + Quantize.
-            MidiTransforms::humanize (currentClip->sequence, 0.03125, 0.05f, sel);
-            repaint();
-            if (onNotesChanged) onNotesChanged();
+            runWithUndo ("Humanize",
+                [this, &sel]
+                {
+                    MidiTransforms::humanize (currentClip->sequence,
+                                              0.03125, 0.05f, sel);
+                });
             return true;
         }
     }
@@ -1098,6 +1115,8 @@ void PianoRoll::applyGroove (const juce::String& templateName, double strength)
     if (! selectedIndices.empty())
         sel.assign (selectedIndices.begin(), selectedIndices.end());
 
+    juce::MidiMessageSequence before = currentClip->sequence; // TTT snapshot
+
     const double beatsPerBar = beatsPerBarProvider
                                    ? (double) juce::jmax (1, beatsPerBarProvider())
                                    : 4.0;
@@ -1107,6 +1126,13 @@ void PianoRoll::applyGroove (const juce::String& templateName, double strength)
                  strength,
                  sel,
                  beatsPerBar);
+
+    if (undoManager != nullptr)
+    {
+        undoManager->beginNewTransaction ("Groove: " + templateName);
+        undoManager->perform (new MidiClipSnapshotCmd (
+            currentClip, std::move (before), currentClip->sequence));
+    }
 
     repaint();
     if (onNotesChanged) onNotesChanged();
@@ -1139,6 +1165,8 @@ void PianoRoll::quantizeNotes(double strength)
 
     if (targets.empty()) return;
 
+    juce::MidiMessageSequence before = seq; // TTT snapshot
+
     int moved = 0;
     for (int idx : targets)
     {
@@ -1163,6 +1191,15 @@ void PianoRoll::quantizeNotes(double strength)
     if (moved == 0) return;
 
     seq.updateMatchedPairs();
+
+    if (undoManager != nullptr)
+    {
+        undoManager->beginNewTransaction (
+            strength >= 0.999 ? "Quantize" : "Quantize (soft)");
+        undoManager->perform (new MidiClipSnapshotCmd (
+            currentClip, std::move (before), seq));
+    }
+
     repaint();
     if (onNotesChanged) onNotesChanged();
 }
