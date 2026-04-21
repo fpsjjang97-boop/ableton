@@ -50,6 +50,126 @@ def midi_to_name(n):
 
 # ─── 분석 함수들 ───
 
+# 2026-04-21 결함리스트 #10 대응 — Reviewer 계층 확장. 기존 scale/velocity/
+# rhythm/distribution 체크 외에 "실제 코드 진행을 따르는가" + "트랙끼리
+# 충돌하는가" 를 판정. 출력은 기존 체크들과 같은 dict 형식.
+_CHORD_TONE_INTERVALS = {
+    # triad + 7th (engine.py _CHORD_TONE_INTERVALS 와 동일 의도, reviewer
+    # 는 순수 분석 path 라 별도 정의해 의존성 방향 단순화).
+    "maj":  [0, 4, 7],       "maj7": [0, 4, 7, 11],
+    "min":  [0, 3, 7],       "m7":   [0, 3, 7, 10],
+    "7":    [0, 4, 7, 10],
+    "dim":  [0, 3, 6],       "aug":  [0, 4, 8],
+    "sus4": [0, 5, 7],       "sus2": [0, 2, 7],
+}
+
+
+def check_chord_adherence(notes_with_beat, chord_progression, bar_duration_beats=4.0):
+    """노트가 주어진 코드 진행을 얼마나 잘 따르는가.
+
+    Args:
+        notes_with_beat: list of (pitch_int, start_beat_float) tuples.
+        chord_progression: list of (root_name, quality, start_beat, length_beats).
+        bar_duration_beats: 4 (4/4) default.
+
+    Returns dict with keys:
+        downbeat_chord_tone_ratio  — 강박(beat 0/2)에서 chord tone 비율 (%)
+        per_bar_adherence          — 각 bar 별 chord tone 비율
+        average_adherence          — 전체 bar 평균
+    """
+    if not notes_with_beat or not chord_progression:
+        return {"status": "no_data"}
+
+    # Map from absolute beat → (root_pc, quality) lookup
+    def chord_at(beat):
+        for root_name, quality, start, length in chord_progression:
+            if start <= beat < start + length:
+                try:
+                    root_pc = NOTE_NAMES.index(root_name)
+                except ValueError:
+                    return None
+                return (root_pc, quality)
+        return None
+
+    def is_chord_tone(pitch, chord):
+        if chord is None:
+            return None
+        root_pc, quality = chord
+        intervals = _CHORD_TONE_INTERVALS.get(quality, [0, 4, 7])
+        allowed = {(root_pc + iv) % 12 for iv in intervals}
+        return (pitch % 12) in allowed
+
+    # Bar-level aggregation
+    per_bar = {}
+    downbeat_hits = 0
+    downbeat_total = 0
+    for pitch, beat in notes_with_beat:
+        bar_idx = int(beat / bar_duration_beats)
+        chord = chord_at(beat)
+        ct = is_chord_tone(pitch, chord)
+        if ct is None:
+            continue
+        per_bar.setdefault(bar_idx, [0, 0])  # [chord_tone, total]
+        per_bar[bar_idx][1] += 1
+        if ct:
+            per_bar[bar_idx][0] += 1
+
+        # Downbeat = 박자 정수 또는 0.5 이하
+        beat_in_bar = beat - bar_idx * bar_duration_beats
+        if abs(beat_in_bar - round(beat_in_bar)) < 0.05 and int(round(beat_in_bar)) in (0, 2):
+            downbeat_total += 1
+            if ct:
+                downbeat_hits += 1
+
+    adherence = {b: (ct / total * 100) if total > 0 else 0
+                 for b, (ct, total) in per_bar.items()}
+    avg = (sum(adherence.values()) / len(adherence)) if adherence else 0
+    downbeat_ratio = (downbeat_hits / downbeat_total * 100) if downbeat_total > 0 else 0
+
+    return {
+        "downbeat_chord_tone_ratio": round(downbeat_ratio, 1),
+        "per_bar_adherence":         {b: round(v, 1) for b, v in adherence.items()},
+        "average_adherence":         round(avg, 1),
+        "bars_checked":              len(per_bar),
+    }
+
+
+def check_track_conflicts(tracks, window_seconds=0.1, min_pitch_sep=2):
+    """여러 트랙이 동시 타이밍에 충돌(너무 가까운 피치 중복) 여부 검증.
+
+    Args:
+        tracks: list of dicts {"name": str, "notes": [(pitch, start_sec), ...]}.
+        window_seconds: same-time 판정 창.
+        min_pitch_sep: 최소 허용 반음 간격. 미만은 충돌로 계수.
+
+    Returns dict with:
+        conflict_count — 시간-피치 근접 중복 수
+        worst_pair     — (track_a, track_b, count) 가장 자주 충돌한 쌍
+    """
+    if len(tracks) < 2:
+        return {"status": "single_track"}
+
+    pairs_count = {}
+    total = 0
+    for i in range(len(tracks)):
+        for j in range(i + 1, len(tracks)):
+            na, nb = tracks[i]["notes"], tracks[j]["notes"]
+            conflicts = 0
+            for (pa, ta) in na:
+                for (pb, tb) in nb:
+                    if abs(ta - tb) <= window_seconds and abs(pa - pb) < min_pitch_sep:
+                        conflicts += 1
+            pairs_count[(tracks[i]["name"], tracks[j]["name"])] = conflicts
+            total += conflicts
+
+    worst = max(pairs_count.items(), key=lambda kv: kv[1]) if pairs_count else (("", ""), 0)
+    return {
+        "conflict_count": total,
+        "worst_pair":     (worst[0][0], worst[0][1], worst[1]),
+        "pairs":          {f"{a}|{b}": c for (a, b), c in pairs_count.items()},
+    }
+
+
 def check_scale_consistency(notes, root, scale_name):
     """스케일 일관성 검증"""
     root_idx = NOTE_NAMES.index(root)

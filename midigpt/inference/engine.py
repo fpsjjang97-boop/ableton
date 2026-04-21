@@ -158,6 +158,47 @@ def _allowed_pitch_classes(root_pc: int, quality: str) -> set[int]:
     return {(root_pc + iv) % 12 for iv in intervals}
 
 
+# Chord-tone intervals — the *strong* tones of each chord (root / 3rd / 5th /
+# 7th). Used by _apply_harmonic_mask to BOOST these pitches on top of the
+# scale mask, answering defect #3 of 2026-04-21 결함리스트: the old mask
+# was a binary scale filter so `D, F, A, B` were just as likely as chord
+# tones on a C maj chord. Boosting chord tones makes the generated line
+# actually sound like "the chord" instead of "some scale".
+_CHORD_TONE_INTERVALS: dict[str, list[int]] = {
+    "maj":    [0, 4, 7],
+    "maj7":   [0, 4, 7, 11],
+    "maj9":   [0, 4, 7, 11],
+    "add9":   [0, 4, 7],
+    "6":      [0, 4, 7, 9],
+    "min":    [0, 3, 7],
+    "m7":     [0, 3, 7, 10],
+    "m9":     [0, 3, 7, 10],
+    "madd9":  [0, 3, 7],
+    "m6":     [0, 3, 7, 9],
+    "7":      [0, 4, 7, 10],
+    "9":      [0, 4, 7, 10],
+    "13":     [0, 4, 7, 10],
+    "7sus4":  [0, 5, 7, 10],
+    "sus4":   [0, 5, 7],
+    "sus2":   [0, 2, 7],
+    "dim":    [0, 3, 6],
+    "dim7":   [0, 3, 6, 9],
+    "m7b5":   [0, 3, 6, 10],
+    "aug":    [0, 4, 8],
+    "aug7":   [0, 4, 8, 10],
+}
+
+
+def _chord_tone_pitch_classes(root_pc: int, quality: str) -> set[int]:
+    """Return the strong-tone pitch classes (root/3rd/5th/7th) for this chord."""
+    intervals = _CHORD_TONE_INTERVALS.get(quality)
+    if intervals is None:
+        # Unknown quality — fall back to a plain triad so at least the root
+        # and fifth are boosted. Safer than an empty set (no boost at all).
+        intervals = [0, 4, 7]
+    return {(root_pc + iv) % 12 for iv in intervals}
+
+
 # ---------------------------------------------------------------------------
 # Phase 1 sampling utilities
 # ---------------------------------------------------------------------------
@@ -433,16 +474,33 @@ class MidiGPTInference:
         return _parse_chord_from_context(tokens_reversed)
 
     def _apply_harmonic_mask(
-        self, logits: torch.Tensor, context_ids: list[int]
+        self, logits: torch.Tensor, context_ids: list[int],
+        chord_tone_boost: float = 1.5,
     ) -> torch.Tensor:
-        """Mask pitch tokens that fall outside the active chord's scale.
+        """Mask off-scale pitches + boost chord-tone pitches.
+
+        2026-04-21 결함리스트 #3 대응: 이전 버전은 scale 외부만 -inf 로
+        자르는 binary 마스크라 C maj 화음에서도 D/F/A/B 가 chord-tone 과
+        동등한 확률로 뽑혔다. 결과적으로 "같은 조성 안에서 헤매는 음"이
+        나오고 "해당 코드가 들리는 반주"가 안 됨.
+
+        이번 구현은 두 단계 —
+          (1) off-scale → -inf (기존 동작 유지)
+          (2) chord tone (root/3rd/5th/7th) 의 양수 logit 에 배수 가산
+              점수를 더해 샘플링 확률을 끌어올림. chord_tone_boost=1.5 는
+              softmax 후 대략 chord tone 의 상대 확률을 50% 정도 높이는
+              수준으로 과도한 지배(1.0 확률)를 피하면서 조성감 확보.
+              0 이하는 boost 없음과 동치.
 
         Args:
             logits: Raw logits for the next token, shape (vocab_size,)
             context_ids: All token IDs generated so far (used to find active chord)
+            chord_tone_boost: multiplier applied to positive logits at chord-
+                tone pitches. 1.0 = 기존 동작. 1.3~1.8 권장.
 
         Returns:
-            logits with disallowed Pitch tokens set to -inf.
+            logits with off-scale Pitch tokens set to -inf and chord tones
+            biased upward.
         """
         chord_info = self._find_active_chord(context_ids)
         if chord_info is None:
@@ -450,11 +508,19 @@ class MidiGPTInference:
 
         root_pc, quality = chord_info
         allowed_pcs = _allowed_pitch_classes(root_pc, quality)
+        chord_pcs   = _chord_tone_pitch_classes(root_pc, quality) \
+                      if chord_tone_boost > 1.0 else set()
 
         for token_id, midi_pitch in self._pitch_token_ids.items():
             pc = midi_pitch % 12
             if pc not in allowed_pcs:
                 logits[token_id] = float("-inf")
+            elif pc in chord_pcs:
+                v = logits[token_id].item()
+                # Only upscale positive evidence; leaving negatives alone
+                # avoids "rescuing" pitches the model already didn't want.
+                if v > 0:
+                    logits[token_id] = v * chord_tone_boost
 
         return logits
 
