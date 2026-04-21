@@ -893,6 +893,11 @@ juce::PopupMenu MainWindow::MainContent::getMenuForIndex(int idx, const juce::St
             // while the environmental paint issue is investigated.
             menu.addItem(420, "Refresh UI (F5)",   true, false);
             menu.addSeparator();
+            // 2026-04-21 — DAW inventory B 섹션의 Tempo map editor UI.
+            // MidiEngine::tempoMap 데이터 모델은 이미 있음; 텍스트 기반
+            // "beat,bpm" 편집기로 1차 구현.
+            menu.addItem(421, "Tempo Map...",      true, false);
+            menu.addSeparator();
             { // QQ6 — snap selector
                 juce::PopupMenu snapMenu;
                 snapMenu.addItem(410, "Off",    true, false);
@@ -1307,6 +1312,65 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
         case 403: // Piano Roll
             bottomTabs.setCurrentTabIndex(0);
             break;
+        case 421: // Tempo Map editor — DAW inventory B 섹션
+        {
+            // Build "beat,bpm" text from existing map. Map is std::map so
+            // iteration order is by key (beat) ascending. 단일 tempo 이면
+            // 빈 map 으로 표시되며 사용자가 "0,120" 등 라인 추가하는 식.
+            auto& me = audioEngine.getMidiEngine();
+            juce::String text;
+            for (const auto& [beat, bpm] : me.getTempoMap())
+                text << beat << "," << bpm << "\n";
+            if (text.isEmpty())
+                text = juce::String (me.getTempo()) ; // seed hint
+
+            auto* aw = new juce::AlertWindow("Tempo Map",
+                "Edit tempo changes below.\n"
+                "One per line: <beat>,<bpm>\n"
+                "Example:\n"
+                "    0,120\n"
+                "    16,140\n"
+                "    32,100\n\n"
+                "Leave empty + OK to clear the map (single tempo mode).",
+                juce::MessageBoxIconType::NoIcon);
+            aw->addTextEditor("map", text, {}, true);   // true = multiline
+            aw->getTextEditor("map")->setMultiLine(true, true);
+            aw->getTextEditor("map")->setReturnKeyStartsNewLine(true);
+            aw->addButton("OK", 1);
+            aw->addButton("Cancel", 0);
+            aw->enterModalState(true, juce::ModalCallbackFunction::create(
+                [this, aw](int r) {
+                    if (r == 1)
+                    {
+                        auto& me2 = audioEngine.getMidiEngine();
+                        me2.clearTempoMap();
+                        auto lines = juce::StringArray::fromLines(
+                            aw->getTextEditorContents("map"));
+                        int added = 0;
+                        for (auto& line : lines)
+                        {
+                            auto t = line.trim();
+                            if (t.isEmpty() || t.startsWithChar('#')) continue;
+                            auto parts = juce::StringArray::fromTokens(t, ",", "");
+                            if (parts.size() >= 2)
+                            {
+                                double beat = parts[0].getDoubleValue();
+                                double bpm  = parts[1].getDoubleValue();
+                                if (beat >= 0.0 && bpm > 0.0)
+                                {
+                                    me2.addTempoChange(beat, bpm);
+                                    ++added;
+                                }
+                            }
+                        }
+                        statusBar.setMessage("Tempo map: " + juce::String(added)
+                                             + " entries");
+                        markDirty();
+                    }
+                    delete aw;
+                }), false);
+            break;
+        }
         case 420: // Refresh UI — manual paint workaround
         {
             // Walk every descendant and force a repaint. Also nudge the
