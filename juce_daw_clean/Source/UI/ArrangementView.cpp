@@ -259,6 +259,25 @@ void ArrangementView::paint(juce::Graphics& g)
                 label += " | " + juce::String(bars) + "bar";
                 g.drawText(label, (int)(drawX + 4), y + 2, (int)(drawW - 8), 12,
                            juce::Justification::topLeft);
+
+                // Take-count badge so users can spot clips with stashed
+                // takes from the arrangement (match the PianoRoll badge
+                // styling — amber pill, compact).
+                if (! clip.takes.empty() && drawW > 60)
+                {
+                    const int badgeW = 26;
+                    const int badgeH = 12;
+                    const int bx = (int) (drawX + drawW) - badgeW - 2;
+                    const int by = y + 2;
+                    g.setColour (juce::Colour (MetallicLookAndFeel::accent).withAlpha (0.9f));
+                    g.fillRoundedRectangle ((float) bx, (float) by,
+                                             (float) badgeW, (float) badgeH, 2.5f);
+                    g.setColour (juce::Colour (MetallicLookAndFeel::bgDarkest));
+                    g.setFont (9.0f);
+                    g.drawText ("T:" + juce::String ((int) clip.takes.size()),
+                                bx, by, badgeW, badgeH,
+                                juce::Justification::centred);
+                }
             }
         }
 

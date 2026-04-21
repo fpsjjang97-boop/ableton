@@ -7,6 +7,7 @@
 #include "PianoRoll.h"
 #include "../Command/EditCommands.h"
 #include "../Core/Groove.h"
+#include "../Core/MidiTransforms.h"
 #include "LookAndFeel.h"   // palette tokens (review fix)
 
 PianoRoll::PianoRoll()
@@ -1021,6 +1022,40 @@ bool PianoRoll::keyPressed(const juce::KeyPress& key, juce::Component*)
                 if (onNotesChanged) onNotesChanged();
             });
         return true;
+    }
+
+    // MIDI transforms — Shift+R/I/H for reverse/invert/humanize.
+    // All three honor selectedIndices when non-empty, else act on the
+    // whole clip. Transforms mutate the clip in place; undo not yet
+    // wired (follow-up sprint).
+    if (key.getModifiers().isShiftDown() && currentClip != nullptr)
+    {
+        std::vector<int> sel (selectedIndices.begin(), selectedIndices.end());
+
+        if (key.getKeyCode() == 'R')
+        {
+            MidiTransforms::reverse (currentClip->sequence, sel);
+            repaint();
+            if (onNotesChanged) onNotesChanged();
+            return true;
+        }
+        if (key.getKeyCode() == 'I')
+        {
+            MidiTransforms::invert (currentClip->sequence, sel);
+            repaint();
+            if (onNotesChanged) onNotesChanged();
+            return true;
+        }
+        if (key.getKeyCode() == 'H')
+        {
+            // Defaults tuned for "musical" jitter: 1/32 note worth of
+            // timing scatter, ~5% velocity scatter. Nothing surgical;
+            // users who want precision can compose Humanize + Quantize.
+            MidiTransforms::humanize (currentClip->sequence, 0.03125, 0.05f, sel);
+            repaint();
+            if (onNotesChanged) onNotesChanged();
+            return true;
+        }
     }
 
     // Groove: G = open picker (popup with built-in templates).

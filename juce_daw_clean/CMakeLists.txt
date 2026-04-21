@@ -120,6 +120,7 @@ target_sources(MidiGPTDAW PRIVATE
     Source/Core/TrackModel.h
     Source/Core/TrackModel.cpp
     Source/Core/Groove.h
+    Source/Core/MidiTransforms.h
 
     # UI components
     Source/UI/LookAndFeel.h
