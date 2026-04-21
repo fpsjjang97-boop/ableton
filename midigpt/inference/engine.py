@@ -1284,6 +1284,7 @@ class MidiGPTInference:
         start_bar: int = 0,                 # UUU — target bar range start (inclusive)
         end_bar: int = 0,                   # UUU — target bar range end (exclusive). 0 = unused
         target_track: str = "",             # UUU — category name ("drums", "bass", …)
+        regenerate_on_empty_bars: int = 2,  # VVV — retry budget if reviewer flags sparse output
     ) -> str:
         """Generate variation and save as MIDI file.
 
@@ -1332,38 +1333,95 @@ class MidiGPTInference:
                 input_ids.append(tid)
 
         input_tensor = torch.tensor([input_ids], dtype=torch.long, device=self.device)
-
-        # Fresh grammar per call; warm with the prompt so Bar/Pos/Track state
-        # carries into generation — identical to generate_variation sampling path.
-        grammar: Optional[MidiGrammarFSM] = None
-        if use_grammar:
-            grammar = MidiGrammarFSM(
-                vocab=self.vocab,
-                allow_forward_bar_jump=grammar_forward_bar_jump,
-                dedup_pitches=grammar_dedup_pitches,
-            )
-            for tid in input_ids:
-                grammar.observe(tid, batch=0)
-
-        with torch.no_grad():
-            output = self._generate_with_harmony(
-                input_tensor,
-                max_new_tokens=max_tokens,
-                min_new_tokens=min_new_tokens,
-                min_bars=min_bars,
-                temperature=temperature,
-                top_k=top_k,
-                top_p=top_p,
-                eos_id=self.vocab.eos_id,
-                repetition_penalty=repetition_penalty,
-                no_repeat_ngram_size=no_repeat_ngram_size,
-                use_kv_cache=use_kv_cache,
-                grammar=grammar,
-            )
-
-        variation_ids = output[0].tolist()[len(input_ids):]
         tempo = meta.tempo if meta else 120.0
-        self.decoder.decode_to_midi(variation_ids, output_path, tempo=tempo)
+
+        # Sprint VVV — empty-bar reviewer loop (종합리뷰 §20-4).
+        # Generate → decode → reviewer.check_bar_density. If the bar
+        # coverage in the target range is unacceptable, regenerate with
+        # a bumped temperature (small nudge, not full randomness) up to
+        # `regenerate_on_empty_bars` times.
+        try:
+            from agents.reviewer import check_bar_density  # lazy import
+        except Exception:
+            check_bar_density = None  # reviewer optional; fall through
+
+        attempt = 0
+        current_temp = temperature
+        while True:
+            # Fresh grammar per call; warm with the prompt so Bar/Pos/Track
+            # state carries into generation.
+            grammar: Optional[MidiGrammarFSM] = None
+            if use_grammar:
+                grammar = MidiGrammarFSM(
+                    vocab=self.vocab,
+                    allow_forward_bar_jump=grammar_forward_bar_jump,
+                    dedup_pitches=grammar_dedup_pitches,
+                )
+                for tid in input_ids:
+                    grammar.observe(tid, batch=0)
+
+            with torch.no_grad():
+                output = self._generate_with_harmony(
+                    input_tensor,
+                    max_new_tokens=max_tokens,
+                    min_new_tokens=min_new_tokens,
+                    min_bars=min_bars,
+                    temperature=current_temp,
+                    top_k=top_k,
+                    top_p=top_p,
+                    eos_id=self.vocab.eos_id,
+                    repetition_penalty=repetition_penalty,
+                    no_repeat_ngram_size=no_repeat_ngram_size,
+                    use_kv_cache=use_kv_cache,
+                    grammar=grammar,
+                )
+
+            variation_ids = output[0].tolist()[len(input_ids):]
+
+            # Reviewer gate — skip if disabled or reviewer unavailable.
+            if (check_bar_density is None
+                    or regenerate_on_empty_bars <= 0
+                    or attempt >= regenerate_on_empty_bars):
+                break
+
+            # Decode to (pitch, start_beat) pairs in-memory for the gate.
+            notes = self.decoder.decode_to_notes(
+                variation_ids, initial_track=target_track or None)
+            # DecodedNote.start_tick is in ticks; normalize to beats
+            # assuming standard 480-tick division (matches _write_midi).
+            TPQ = 480
+            notes_with_beat = [(n.pitch, n.start_tick / TPQ) for n in notes]
+
+            target_bars = (end_bar - start_bar) if end_bar > start_bar else None
+            gate = check_bar_density(
+                notes_with_beat,
+                start_bar=start_bar if end_bar > start_bar else 0,
+                end_bar=end_bar if end_bar > start_bar else None,
+                min_notes_per_bar=1,
+            )
+            try:
+                print(f"[engine] VVV gate attempt={attempt} "
+                      f"empty={gate.get('empty_bars')} "
+                      f"longest_empty_run={gate.get('longest_empty_run')} "
+                      f"pass={gate.get('pass')}", flush=True)
+            except Exception:
+                pass
+
+            if gate.get("pass"):
+                break
+
+            attempt += 1
+            # Slight temperature nudge so the retry doesn't clone the bad
+            # pass. +0.07 per retry is conservative — enough for token-level
+            # divergence without losing the conditioning signal.
+            current_temp = min(1.5, current_temp + 0.07)
+
+        # VVV — pass target_track as the decoder's initial-track hint so
+        # un-prefixed notes in the output don't collapse to accomp.
+        self.decoder.decode_to_midi(
+            variation_ids, output_path, tempo=tempo,
+            initial_track=target_track or None,
+        )
         return output_path
 
     # ------------------------------------------------------------------

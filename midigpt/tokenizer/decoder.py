@@ -18,6 +18,7 @@ from .vocab import (
     MidiVocab, VOCAB, NOTE_NAMES, CHORD_QUALITIES,
     NUM_POSITIONS, PITCH_MIN, PITCH_MAX, NUM_VELOCITIES,
     NUM_CC_EXPRESSION, NUM_CC_MODULATION, NUM_PITCH_BEND,
+    TRACK_TYPES,
 )
 
 
@@ -43,16 +44,25 @@ class MidiDecoder:
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
-    def decode_to_notes(self, token_ids: list[int]) -> list[DecodedNote]:
-        """Decode token IDs to a list of DecodedNote objects."""
+    def decode_to_notes(self, token_ids: list[int],
+                        initial_track: str | None = None) -> list[DecodedNote]:
+        """Decode token IDs to a list of DecodedNote objects.
+
+        ``initial_track`` (Sprint VVV) overrides the "accomp" default for
+        the *prefix* before the model has emitted a Track_ token. Pass the
+        target_track value from the request so notes the model emits before
+        committing to an explicit track don't silently collapse into accomp
+        (partner review §7-3 / §20-3).
+        """
         tokens = self.vocab.decode_ids(token_ids)
-        return self._tokens_to_notes(tokens)
+        return self._tokens_to_notes(tokens, initial_track=initial_track)
 
     def decode_to_midi(
         self,
         token_ids: list[int],
         output_path: str,
         tempo: float = 120.0,
+        initial_track: str | None = None,
     ) -> str:
         """Decode token IDs and write a MIDI file.
 
@@ -61,7 +71,7 @@ class MidiDecoder:
         if mido is None:
             raise ImportError("mido is required for MIDI file output")
 
-        notes = self.decode_to_notes(token_ids)
+        notes = self.decode_to_notes(token_ids, initial_track=initial_track)
         self._write_midi(notes, output_path, tempo)
         return output_path
 
@@ -108,11 +118,17 @@ class MidiDecoder:
     # ------------------------------------------------------------------
     # Token parsing
     # ------------------------------------------------------------------
-    def _tokens_to_notes(self, tokens: list[str]) -> list[DecodedNote]:
+    def _tokens_to_notes(self, tokens: list[str],
+                         initial_track: str | None = None) -> list[DecodedNote]:
         """Parse token strings into note events.
 
         Handles both old combined ``Chord_Cmaj7`` tokens and new factored
         ``ChordRoot_`` / ``ChordQual_`` tokens transparently.
+
+        ``initial_track`` (VVV) replaces the historic "accomp" default.
+        Valid values come from ``vocab.TRACK_TYPES``; unknown values fall
+        back to "other" (a deliberately-neutral bucket, not accomp — the
+        whole point is to not pretend every unlabelled note is accomp).
         """
         # Expand any legacy chord tokens before parsing
         tokens = self._expand_legacy_tokens(tokens)
@@ -121,7 +137,13 @@ class MidiDecoder:
 
         current_bar = 0
         current_pos = 0
-        current_track = "accomp"
+        # VVV — default changed from hardcoded "accomp" to caller-supplied
+        # hint or "other". partner review §20-3: "decoder 의 default accomp
+        # fallback 이 어떤 조건에서 발동하는지 줄이기".
+        if initial_track and initial_track in TRACK_TYPES:
+            current_track = initial_track
+        else:
+            current_track = "other"
         current_pitch: int | None = None
         current_vel = 8  # default mid velocity
         current_dur = 4  # default quarter note

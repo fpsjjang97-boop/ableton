@@ -170,6 +170,79 @@ def check_track_conflicts(tracks, window_seconds=0.1, min_pitch_sep=2):
     }
 
 
+def check_bar_density(notes_with_beat, start_bar: int = 0,
+                      end_bar: int | None = None,
+                      beats_per_bar: float = 4.0,
+                      min_notes_per_bar: int = 1):
+    """Sprint VVV — empty-bar / sparse-output guard (종합리뷰 §6-2, §20-4).
+
+    The "긴 파일인데 중간 마디가 비는" symptom (9차까지 반복 확인) needs a
+    detector at the reviewer level so the generation loop can reject or
+    regenerate. This walks the target bar range and counts note-ons per bar.
+
+    Args:
+        notes_with_beat: list of (pitch, start_beat, ...). Only start_beat is used.
+        start_bar:       inclusive. Defaults to 0.
+        end_bar:         exclusive. Defaults to max bar seen in the input.
+        beats_per_bar:   1.0 = quarter, 4.0 = 4/4 default.
+        min_notes_per_bar: a bar with fewer note-ons than this is flagged.
+
+    Returns dict with:
+        total_bars          — end_bar - start_bar
+        empty_bars          — count where note-count == 0
+        sparse_bars         — count where 0 < count < min_notes_per_bar
+        density             — notes per bar overall
+        longest_empty_run   — longest consecutive-empty-bar stretch
+        pass                — True iff no empty bars AND no run > 1 sparse
+        histogram           — list[int] per-bar note count (length total_bars)
+    """
+    if beats_per_bar <= 0:
+        beats_per_bar = 4.0
+
+    max_beat = 0.0
+    for ev in notes_with_beat:
+        # Support both (pitch, beat) pairs and full tuples.
+        b = ev[1] if len(ev) >= 2 else 0.0
+        if b > max_beat:
+            max_beat = b
+    if end_bar is None:
+        end_bar = int(max_beat / beats_per_bar) + 1
+    if end_bar <= start_bar:
+        return {"status": "empty_range", "pass": False}
+
+    total = end_bar - start_bar
+    histogram = [0] * total
+    for ev in notes_with_beat:
+        b = ev[1] if len(ev) >= 2 else 0.0
+        bar_idx = int(b / beats_per_bar) - start_bar
+        if 0 <= bar_idx < total:
+            histogram[bar_idx] += 1
+
+    empty_bars = sum(1 for c in histogram if c == 0)
+    sparse_bars = sum(1 for c in histogram
+                      if 0 < c < min_notes_per_bar)
+    total_notes = sum(histogram)
+    density = total_notes / total if total else 0.0
+
+    run = longest = 0
+    for c in histogram:
+        if c == 0:
+            run += 1
+            longest = max(longest, run)
+        else:
+            run = 0
+
+    return {
+        "total_bars":        total,
+        "empty_bars":        empty_bars,
+        "sparse_bars":       sparse_bars,
+        "density":           density,
+        "longest_empty_run": longest,
+        "pass":              empty_bars == 0 and longest <= 0,
+        "histogram":         histogram,
+    }
+
+
 def check_scale_consistency(notes, root, scale_name):
     """스케일 일관성 검증"""
     root_idx = NOTE_NAMES.index(root)
