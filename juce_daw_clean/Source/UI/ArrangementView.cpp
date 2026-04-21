@@ -1958,7 +1958,11 @@ void ArrangementView::showTrackContextMenu(int trackIdx)
                 }
                 else
                 {
-                    // Freeze: render track to AudioClip
+                    // Freeze: render track to AudioClip. Enhancements
+                    // 2026-04-21: apply the per-track plugin chain so the
+                    // frozen audio includes FX (prior version rendered
+                    // only bare synth output), and prepare the plugins at
+                    // the same sample rate used for the offline render.
                     double maxBeat = 16.0;
                     for (auto& c : track.clips)
                         maxBeat = juce::jmax(maxBeat, c.startBeat + c.lengthBeats);
@@ -1973,12 +1977,21 @@ void ArrangementView::showTrackContextMenu(int trackIdx)
                         frozen.sourceSampleRate = sr;
                         frozen.buffer.setSize(2, totalSamples);
                         frozen.buffer.clear();
+                        frozen.sourceName = track.name + " (frozen)";
 
-                        // Simple offline render of this track's MIDI through its synth
                         auto& syn = audioEngine.getOrCreateTrackSynth(track.id);
                         auto seq = track.flattenForPlayback();
                         const double bps = audioEngine.getTempo() / 60.0;
                         const int blockSize = 512;
+                        const bool hasFx = ! track.plugins.empty();
+
+                        // Re-prepare synth + plugin chain at the offline SR
+                        // so plugin state is coherent with the render. After
+                        // freeze finishes they'll be re-prepared again by
+                        // audioDeviceAboutToStart during normal playback.
+                        syn.prepare(sr, blockSize);
+                        if (hasFx)
+                            audioEngine.getPluginChains().prepareAll(sr, blockSize);
 
                         for (int pos = 0; pos < totalSamples; pos += blockSize)
                         {
@@ -2001,6 +2014,17 @@ void ArrangementView::showTrackContextMenu(int trackIdx)
                             juce::AudioBuffer<float> buf(2, thisBlock);
                             buf.clear();
                             syn.renderBlock(buf, mb);
+
+                            // Run the track's plugin chain on the synth
+                            // output so the frozen audio matches what the
+                            // user hears live. Uses a scratch MidiBuffer
+                            // per call to avoid sharing state.
+                            if (hasFx)
+                            {
+                                juce::MidiBuffer fxMidi;
+                                audioEngine.getPluginChains().processTrack(
+                                    track.id, track, buf, fxMidi);
+                            }
 
                             for (int ch = 0; ch < 2; ++ch)
                                 frozen.buffer.copyFrom(ch, pos, buf, ch, 0, thisBlock);

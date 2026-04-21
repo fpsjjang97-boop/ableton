@@ -457,9 +457,15 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
             trackMidi.addEvent(msg, meta.samplePosition);
         }
 
-        // Render MIDI → trackBuf via per-track synth (S1 — no cross-talk)
+        // Render MIDI → trackBuf via per-track synth (S1 — no cross-talk).
+        // Freeze improvement (2026-04-21): when the track is frozen, the
+        // pre-rendered audio clip below already represents the full
+        // synth+plugin output. Skip the live synth render so we don't
+        // double-play the notes (previous behaviour had both the frozen
+        // audio clip AND the realtime synth audible at the same time).
         trackBuf.clear();
-        getOrCreateTrackSynth(track.id).renderBlock(trackBuf, trackMidi);
+        if (! track.frozen)
+            getOrCreateTrackSynth(track.id).renderBlock(trackBuf, trackMidi);
 
         // PPP4 — live input monitoring. When this track is the armed
         // audio-recording target and monitoring is on, mix the raw device
