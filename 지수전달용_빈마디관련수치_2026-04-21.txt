@@ -1,0 +1,17 @@
+지수 전달용: 빈 마디 관련 현재 수치
+작성일: 2026-04-21
+
+현재 가운데 빈 마디 관련 수치는 코드상 이렇게 잡혀 있음.
+
+- min_notes_per_bar = 1
+- empty_bars == 0 이어야 reviewer pass
+- longest_empty_run <= 0 이어야 pass
+- regenerate_on_empty_bars = 2 라서 지금은 빈 마디가 걸려도 2번만 재생성하고 종료
+- min_bars = 8
+- grammar_forward_bar_jump = 1
+
+내 판단:
+
+- 기준 자체가 느슨한 쪽은 아님
+- 오히려 재생성 횟수 2가 적거나, 모델이 이 조건을 만족하는 출력을 아직 잘 못 만드는 쪽에 가까워 보임
+- 즉 지금 핵심 조정 후보는 regenerate_on_empty_bars 값과, reviewer 이후 bar coverage를 더 강하게 강제하는 쪽으로 보임
