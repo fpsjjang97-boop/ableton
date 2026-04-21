@@ -118,6 +118,33 @@ void AudioEngine::play()
     if (midiEngine.getPositionBeats() > 64.0)
         midiEngine.setPositionBeats(0.0);
 
+    // Sprint SSS — auto-stash comping. If the armed track's last clip
+    // already holds notes, preserve it as a take before the new pass
+    // overwrites / overdubs. Runs only once per play(), and only when
+    // the feature is enabled (default on).
+    if (autoStashOnRecord && recordingTrackId >= 0)
+    {
+        if (auto* rt = trackModel.getTrack(recordingTrackId))
+        {
+            if (rt->armed && ! rt->clips.empty())
+            {
+                auto& clip = rt->clips.back();
+                bool hasNotes = false;
+                for (int i = 0; i < clip.sequence.getNumEvents(); ++i)
+                {
+                    if (clip.sequence.getEventPointer(i)->message.isNoteOn())
+                    { hasNotes = true; break; }
+                }
+                if (hasNotes)
+                {
+                    const juce::String label = "Take "
+                        + juce::String((int) clip.takes.size() + 1);
+                    clip.stashCurrentAsTake(label);
+                }
+            }
+        }
+    }
+
     // Y5 — start count-in phase: metronome on, transport stays paused until
     // pre-roll elapses (handled in audioDeviceIOCallback).
     if (countInBars > 0)

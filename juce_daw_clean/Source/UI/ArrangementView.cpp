@@ -1662,6 +1662,7 @@ void ArrangementView::showClipContextMenu(Track& track, int clipIdx)
     if (track.clips[(size_t)clipIdx].loopEnabled)
         menu.addItem(21, "Set Loop Length...");
     menu.addItem(22, "Set Swing..."); // UU3
+    menu.addItem(23, "Set Clip Gain..."); // SSS
 
     menu.showMenuAsync(juce::PopupMenu::Options(),
         [this, tid = track.id, clipIdx](int result)
@@ -1763,6 +1764,22 @@ void ArrangementView::showClipContextMenu(Track& track, int clipIdx)
                         auto* tp2 = audioEngine.getTrackModel().getTrack(tid);
                         if (r == 1 && tp2 != nullptr && clipIdx < (int)tp2->clips.size())
                             tp2->clips[(size_t)clipIdx].swing = (float)juce::jlimit(0.0, 0.5,
+                                aw->getTextEditorContents("val").getDoubleValue());
+                        delete aw; repaint();
+                    }), false);
+            }
+            else if (result == 23) // SSS — set clip gain
+            {
+                auto* aw = new juce::AlertWindow("Clip Gain",
+                    "Velocity multiplier (0.0=mute, 1.0=unity, 2.0=max):",
+                    juce::MessageBoxIconType::NoIcon);
+                aw->addTextEditor("val", juce::String(track.clips[(size_t)clipIdx].gain, 2));
+                aw->addButton("OK", 1); aw->addButton("Cancel", 0);
+                aw->enterModalState(true, juce::ModalCallbackFunction::create(
+                    [this, tid, clipIdx, aw](int r) {
+                        auto* tp2 = audioEngine.getTrackModel().getTrack(tid);
+                        if (r == 1 && tp2 != nullptr && clipIdx < (int)tp2->clips.size())
+                            tp2->clips[(size_t)clipIdx].gain = (float) juce::jlimit(0.0, 2.0,
                                 aw->getTextEditorContents("val").getDoubleValue());
                         delete aw; repaint();
                     }), false);

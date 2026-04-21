@@ -38,6 +38,10 @@ struct MidiClip
     bool loopEnabled { false };
     double loopLengthBeats { 4.0 };
 
+    /** Per-clip velocity gain. 1.0 = unchanged, 0.0 = silent, 2.0 = max
+     *  boost (clamped to 127). Applied at flattenForPlayback. */
+    float gain { 1.0f };
+
     /** Take lanes — alternate captured sequences (for comping).
      *  sequence is always the "active" take that playback reads.
      *  takes[] holds stashed alternates; swapping promotes one of them
@@ -179,6 +183,18 @@ struct Track
                 // KK6 — per-clip channel override
                 if (clip.channel > 0 && clip.channel <= 16)
                     msg.setChannel(clip.channel);
+
+                // Per-clip velocity gain. Applied to note-ons only; we
+                // deliberately don't touch CC/pitch-bend here since "gain"
+                // conceptually means note loudness, not controller scale.
+                if (msg.isNoteOn() && std::abs(clip.gain - 1.0f) > 0.001f)
+                {
+                    const int v  = msg.getVelocity();
+                    const int vv = juce::jlimit(1, 127,
+                                       (int) std::round((float) v * clip.gain));
+                    msg.setVelocity((float) vv / 127.0f);
+                }
+
                 result.addEvent(msg);
             }
             } // PP4 loop iteration

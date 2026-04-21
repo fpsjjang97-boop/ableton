@@ -155,14 +155,22 @@ void MixerPanel::rebuildStrips()
         addAndMakeVisible(*cs.dbLabel);
 
         // HH4 — FX bypass button (toggles bypass on first plugin slot)
+        // SSS — label reflects slot count ("FX" alone = 1 slot,
+        // "FX×N" = multi-slot chain) so users see at a glance that
+        // more than one plugin is loaded even though this button only
+        // toggles the first slot.
         if (! track.plugins.empty())
         {
-            cs.fxBypassBtn = std::make_unique<juce::TextButton>("FX");
+            const int n = (int) track.plugins.size();
+            const juce::String lbl = n > 1 ? ("FX×" + juce::String(n)) : juce::String("FX");
+            cs.fxBypassBtn = std::make_unique<juce::TextButton>(lbl);
             cs.fxBypassBtn->setClickingTogglesState(true);
             cs.fxBypassBtn->setToggleState(! track.plugins[0].bypass, juce::dontSendNotification);
             cs.fxBypassBtn->setColour(juce::TextButton::buttonOnColourId, juce::Colour(MetallicLookAndFeel::accent));
             cs.fxBypassBtn->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF333333));
-            cs.fxBypassBtn->setTooltip("FX 체인 활성/바이패스 (첫 슬롯)");  // Sprint 47 KKK3
+            cs.fxBypassBtn->setTooltip(n > 1
+                ? juce::String("FX 체인 활성/바이패스 — ") + juce::String(n) + " 슬롯 (첫 슬롯만 토글)"
+                : juce::String("FX 체인 활성/바이패스 (첫 슬롯)"));
             cs.fxBypassBtn->onClick = [this, id = track.id, &btn = *cs.fxBypassBtn] {
                 auto* t = audioEngine.getTrackModel().getTrack(id);
                 if (t != nullptr && ! t->plugins.empty())

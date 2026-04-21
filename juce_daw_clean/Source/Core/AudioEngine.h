@@ -35,6 +35,14 @@ public:
     void setRecordingTargetTrack(int trackId) { recordingTrackId = trackId; }
     int  getRecordingTargetTrack() const      { return recordingTrackId; }
 
+    /** Auto-stash comping — when on, play() stashes the armed track's
+     *  latest clip into takes[] if it already contains notes, then
+     *  starts recording into a fresh empty clip. Each record pass
+     *  becomes a distinct take the user can compare / swap via the
+     *  PianoRoll 'T' picker. */
+    void setAutoStashOnRecord(bool on) { autoStashOnRecord = on; }
+    bool isAutoStashOnRecord() const   { return autoStashOnRecord; }
+
     /** Y1 — true when a track is armed for record AND transport is playing. */
     bool isRecording() const { return recordingTrackId >= 0 && midiEngine.isPlaying(); }
 
@@ -176,6 +184,7 @@ private:
     int recordingTrackId { -1 };
     juce::MidiMessageCollector midiInputCollector;
     double midiInputLatencyMs { 0.0 }; // AA4
+    bool autoStashOnRecord { true };
 
     // DD1 — audio recording state
     int audioRecTrackId { -1 };
