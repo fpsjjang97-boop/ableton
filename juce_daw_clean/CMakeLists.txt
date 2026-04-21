@@ -119,6 +119,7 @@ target_sources(MidiGPTDAW PRIVATE
     Source/Core/SynthEngine.cpp
     Source/Core/TrackModel.h
     Source/Core/TrackModel.cpp
+    Source/Core/Groove.h
 
     # UI components
     Source/UI/LookAndFeel.h

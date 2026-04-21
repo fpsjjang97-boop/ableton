@@ -105,6 +105,15 @@ private:
     int   autoDragPointIdx { -1 };
     float autoLaneHPx { 12.0f };
 
+    // Bezier curve editing — Alt+drag on a point adjusts its outgoing
+    // segment curvature instead of moving the point. Matches Ableton's
+    // "grab-midpoint-to-bend" semantic but anchored on the point itself
+    // so hit-testing stays simple.
+    enum class AutoDragMode { Value, Curve };
+    AutoDragMode autoDragMode { AutoDragMode::Value };
+    int   autoDragStartY     { 0 };
+    float autoDragStartCurve { 0.0f };
+
     // GG3 — track reorder drag state
     int trackDragFrom { -1 };
     int trackDragTo   { -1 };

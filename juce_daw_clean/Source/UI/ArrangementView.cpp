@@ -420,14 +420,19 @@ void ArrangementView::paint(juce::Graphics& g)
             g.setColour(juce::Colour(0xFF4CAF50));
             g.strokePath(path, juce::PathStrokeType(1.0f));
 
-            // Draw control points
+            // Draw control points. Points with a non-zero outgoing curve
+            // are drawn in amber + 1 px larger so the user can see which
+            // segments are bent (and which are linear).
             for (auto& pt : lane.points)
             {
                 float px = beatToX(pt.beat);
                 if (px < headerWidth || px > getWidth()) continue;
                 float py = laneTop + laneH * (1.0f - juce::jlimit(0.0f, 1.0f, pt.value));
-                g.setColour(juce::Colour(0xFF4CAF50));
-                g.fillEllipse(px - 2.0f, py - 2.0f, 4.0f, 4.0f);
+                const bool curved = std::abs(pt.curve) > 0.001f;
+                g.setColour(curved ? juce::Colour(MetallicLookAndFeel::accent)
+                                   : juce::Colour(0xFF4CAF50));
+                const float r = curved ? 3.0f : 2.0f;
+                g.fillEllipse(px - r, py - r, r * 2.0f, r * 2.0f);
             }
         }
 
@@ -1096,6 +1101,20 @@ void ArrangementView::mouseDown(const juce::MouseEvent& e)
         }
         autoDragTrackIdx = trackIdx;
         autoDragPointIdx = hitIdx;
+
+        // Alt+drag on an existing point bends the segment that leaves it
+        // (writes to points[hitIdx].curve; valueAt already applies a
+        // power curve when |curve| > 0.001).
+        if (e.mods.isAltDown() && hitIdx >= 0 && hitIdx < (int)lane->points.size())
+        {
+            autoDragMode       = AutoDragMode::Curve;
+            autoDragStartY     = e.y;
+            autoDragStartCurve = lane->points[(size_t)hitIdx].curve;
+        }
+        else
+        {
+            autoDragMode = AutoDragMode::Value;
+        }
         repaint();
         return;
     }
@@ -1385,6 +1404,18 @@ void ArrangementView::mouseDrag(const juce::MouseEvent& e)
     const int laneH   = 12;
 
     auto& pt = lane->points[(size_t)autoDragPointIdx];
+
+    if (autoDragMode == AutoDragMode::Curve)
+    {
+        // ~50 px vertical drag = full ±1 curve. Dragging up makes the
+        // segment bulge up (convex, positive curve); down = concave.
+        const float dy = (float)(e.y - autoDragStartY);
+        pt.curve = juce::jlimit(-1.0f, 1.0f,
+            autoDragStartCurve - dy * 0.02f);
+        repaint();
+        return;
+    }
+
     pt.beat  = juce::jmax(0.0, xToBeat((float)e.x));
     pt.value = juce::jlimit(0.0f, 1.0f,
         1.0f - (float)(e.y - laneTop) / (float)laneH);

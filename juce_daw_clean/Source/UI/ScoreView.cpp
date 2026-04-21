@@ -98,6 +98,23 @@ void ScoreView::drawNotes (juce::Graphics& g)
     if (currentClip == nullptr) return;
     auto& seq = currentClip->sequence;
 
+    // Barlines at every bar (consults project time signature).
+    const double beatsPerBar = beatsPerBarProvider
+                                   ? (double) juce::jmax (1, beatsPerBarProvider())
+                                   : 4.0;
+    {
+        g.setColour (juce::Colour (MetallicLookAndFeel::textDim).withAlpha (0.5f));
+        const double firstBeat = juce::jmax (0.0, (double)(scrollX / beatWidth));
+        const double lastBeat  = firstBeat + (double)(getWidth() - clefColumnWidth) / beatWidth;
+        for (double b = std::ceil (firstBeat / beatsPerBar) * beatsPerBar;
+             b <= lastBeat; b += beatsPerBar)
+        {
+            const float bx = beatToX (b);
+            if (bx < clefColumnWidth || bx > getWidth()) continue;
+            g.drawLine (bx, (float) trebleTopY, bx, (float) bassBotY, 0.8f);
+        }
+    }
+
     const float headW = (float) staffLineSpacing * 1.1f;
     const float headH = (float) staffLineSpacing * 0.9f;
 
@@ -118,27 +135,48 @@ void ScoreView::drawNotes (juce::Graphics& g)
 
         const int y = pitchToStaffY (pitch);
 
-        // Filled oval notehead.
-        g.setColour (juce::Colour (MetallicLookAndFeel::accentLight));
-        g.fillEllipse (x - headW * 0.5f, (float) y - headH * 0.5f,
-                       headW, headH);
-
-        // Stem — up when below B4 line, down otherwise. Simple register rule.
-        const bool stemUp = pitch < 71;
-        const float stemX = stemUp ? (x + headW * 0.45f) : (x - headW * 0.45f);
-        const float stemY0 = (float) y;
-        const float stemY1 = stemY0 + (stemUp ? -staffLineSpacing * 3.5f
-                                               :  staffLineSpacing * 3.5f);
-        g.setColour (juce::Colour (MetallicLookAndFeel::textPrimary));
-        g.drawLine (stemX, stemY0, stemX, stemY1, 1.2f);
-
-        // Flag for <= 8th note duration. Drawn as a short slant.
+        // Notehead: filled for quarter and shorter, open for half/whole.
         auto [label, buckets] = quantiseDuration (durBeats);
-        if (juce::String (label) == "1/8" || juce::String (label) == "1/16")
+        const juce::String labelS (label);
+        const bool openHead = (labelS == "1" || labelS == "1/2");
+
+        g.setColour (juce::Colour (MetallicLookAndFeel::accentLight));
+        if (openHead)
         {
-            g.drawLine (stemX, stemY1,
-                        stemX + (stemUp ? 5.0f : -5.0f),
-                        stemY1 + (stemUp ? 4.0f : -4.0f), 1.2f);
+            g.drawEllipse (x - headW * 0.5f, (float) y - headH * 0.5f,
+                           headW, headH, 1.4f);
+        }
+        else
+        {
+            g.fillEllipse (x - headW * 0.5f, (float) y - headH * 0.5f,
+                           headW, headH);
+        }
+
+        // Whole notes have no stem; everything else does.
+        if (labelS != "1")
+        {
+            const bool stemUp = pitch < 71;
+            const float stemX = stemUp ? (x + headW * 0.45f) : (x - headW * 0.45f);
+            const float stemY0 = (float) y;
+            const float stemY1 = stemY0 + (stemUp ? -staffLineSpacing * 3.5f
+                                                   :  staffLineSpacing * 3.5f);
+            g.setColour (juce::Colour (MetallicLookAndFeel::textPrimary));
+            g.drawLine (stemX, stemY0, stemX, stemY1, 1.2f);
+
+            // Flag: one stroke for 8th, two for 16th. Drawn as short slants.
+            if (labelS == "1/8" || labelS == "1/16")
+            {
+                g.drawLine (stemX, stemY1,
+                            stemX + (stemUp ? 5.0f : -5.0f),
+                            stemY1 + (stemUp ? 4.0f : -4.0f), 1.2f);
+                if (labelS == "1/16")
+                {
+                    const float y2 = stemY1 + (stemUp ? 4.0f : -4.0f);
+                    g.drawLine (stemX, y2,
+                                stemX + (stemUp ? 5.0f : -5.0f),
+                                y2 + (stemUp ? 4.0f : -4.0f), 1.2f);
+                }
+            }
         }
 
         // Sharp glyph (simple '#') for black keys. Key-signature handling
@@ -151,13 +189,26 @@ void ScoreView::drawNotes (juce::Graphics& g)
                         juce::Justification::centredRight);
         }
 
-        // Duration label (tiny) below notehead for a/b verification — kill
-        // later once beaming/ties are in place.
-        g.setColour (juce::Colour (MetallicLookAndFeel::textDim));
-        g.setFont (7.0f);
-        g.drawText (label, (int) x - 8,
-                    (int) (stemY1 + (stemUp ? 4 : 4)), 16, 10,
-                    juce::Justification::centred);
+        // Tie across bar boundary — if the note spans a barline, draw a
+        // curved arc from the notehead to the barline so readers see it
+        // as "held" rather than as a duplicate note. Full tie-splitting
+        // (actually drawing two noteheads joined by a slur) is larger
+        // scope; this arc is the visual hint MVP.
+        const double nextBar = std::ceil (startBeat / beatsPerBar + 1e-9) * beatsPerBar;
+        if (endBeat > nextBar + 0.05)
+        {
+            const float x2 = beatToX (nextBar);
+            if (x2 > clefColumnWidth && x2 < getWidth())
+            {
+                juce::Path arc;
+                const float arcY = (float) y + headH * 0.55f;
+                arc.startNewSubPath (x + headW * 0.4f, arcY);
+                arc.quadraticTo ((x + x2) * 0.5f, arcY + 5.0f,
+                                 x2 - 2.0f, arcY);
+                g.setColour (juce::Colour (MetallicLookAndFeel::accent));
+                g.strokePath (arc, juce::PathStrokeType (1.2f));
+            }
+        }
     }
 }
 
