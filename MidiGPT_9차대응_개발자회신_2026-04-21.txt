@@ -1,0 +1,94 @@
+================================================================
+MidiGPT 9차 베타 리포트 — 개발자 회신
+대상: 테스터(유환) | 날짜: 2026-04-21
+대응 커밋: (이번 커밋 hash 참조)
+================================================================
+
+9차 리포트 분석 결과, 두 의심 모두 **정확**했습니다.
+
+────────────────────────────────────────────────────────────────
+[의심 1] active_lora: None — 맞음. LoRA 가 로드되지 않고 있었음
+────────────────────────────────────────────────────────────────
+
+test_generate.py 가 MidiGPTInference 를 만들고 generate_to_midi
+만 호출하고 있었음. register_lora / activate_lora 호출이 빠져
+있어 Sprint 43 GGG2 이후 설계상 "등록 후 활성화해야 사용" 규약을
+지키지 않고 있었던 것.
+
+증상 재해석:
+  - get_status() 의 active_lora=None 은 정상 동작 결과
+  - 하지만 실제 생성은 base checkpoint 만으로 진행됨
+  - 따라서 SFT 재학습 (585 pair / loss 0.2410) 자체는 정상이나
+    그 결과가 inference 에 반영된 적이 한 번도 없었음
+  - 결국 7차 → 8차 → 9차 모두 동일한 base model 생성을 보고 있었음
+
+수정 내용:
+  test_generate.py 에 다음을 추가 —
+    lora_path = "./checkpoints/lora/lora_sft_best.bin"
+    if os.path.isfile(lora_path):
+        engine.register_lora("sft", lora_path)
+        engine.activate_lora("sft")
+  이후 get_status() 에 active_lora='sft' 로 표시되어야 정상.
+  "WARNING — lora_sft_best.bin not found" 가 뜨면 SFT 산출물이
+  빠진 것 (재확인 필요).
+
+────────────────────────────────────────────────────────────────
+[의심 2] min_bars 전달 여부 — 암묵 기본값이 적용되고 있었으나 명시로 전환
+────────────────────────────────────────────────────────────────
+
+engine.generate_to_midi 의 min_bars 기본값은 8 이라 호출부
+생략해도 자동 적용됐을 것. 다만 호출 사이트에서 명시해야 의도
+추적이 쉬움.
+
+수정 내용:
+  test_generate.py 의 generate_to_midi 호출에 다음 파라미터 추가 —
+    min_new_tokens=256,
+    min_bars=8,
+    repetition_penalty=1.1,
+    no_repeat_ngram_size=4,
+
+────────────────────────────────────────────────────────────────
+[추가 — SFT 페어 bar 분포 감사 도구]
+────────────────────────────────────────────────────────────────
+
+커밋 3e48198 (이미 push 됨) — scripts/audit_sft_bar_distribution.py
+
+LoRA 를 제대로 적용해도 훈련 데이터 자체가 짧은 output 만 가지고
+있으면 짧은 생성이 나올 수 밖에 없음. 재학습 전/후에 이 스크립트
+를 돌려서 분포를 먼저 확인해 주세요:
+
+    python scripts/audit_sft_bar_distribution.py ./midigpt_pipeline/sft
+
+출력:
+  - span 평균, p95, 히스토그램
+  - 진단 힌트 (mean<4 이면 EOS 원인 확정 등)
+  - midigpt_pipeline/training_diag.jsonl 에 추세 기록
+
+────────────────────────────────────────────────────────────────
+[다음 테스트 절차 제안]
+────────────────────────────────────────────────────────────────
+
+1) git pull (이 커밋 포함)
+2) python scripts/audit_sft_bar_distribution.py ./midigpt_pipeline/sft
+   → mean span 출력 확인. 4 미만이면 훈련 데이터 문제.
+3) python test_generate.py
+   → 출력 첫 줄에 "[LoRA] registered + activated" 가 있어야 정상.
+     "active_lora=None" 이 뜨면 경로/파일 확인.
+4) python scripts/regress_bar_continuity.py ./output/ --expected-bars 32 --thresh-length 0.75
+   → length_ratio >= 0.75 이어야 PASS.
+
+이 순서로 하면 LoRA 로드 / 훈련 데이터 / 생성 길이 세 축을 차례로
+검증 가능합니다.
+
+────────────────────────────────────────────────────────────────
+[남은 이슈 — 910개 length-skip 은 이번 회신에 미포함]
+────────────────────────────────────────────────────────────────
+
+8차 → 9차 모두 910개가 page skip. window_bars / max_pair_tokens
+조정은 우선 LoRA 로드를 먼저 해결한 뒤 실측해서 결정하는 게
+순서. 만약 LoRA 로드 후에도 생성 결과가 여전히 짧으면 그때
+window_bars=24 로 확장 테스트 제안.
+
+================================================================
+끝 — 2026-04-21 지수
+================================================================
