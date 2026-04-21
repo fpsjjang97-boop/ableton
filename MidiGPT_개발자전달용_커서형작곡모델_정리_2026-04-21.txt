@@ -1,0 +1,403 @@
+﻿MidiGPT 개발자 전달용 정리
+작성일: 2026-04-21
+
+[1. 이 프로젝트의 목표 재정의]
+
+현재 사용자가 원하는 최종 방향은 "MidiGPT가 혼자 곡 전체를 자율 작곡하는 모델"이 아니라
+"작곡가의 커서(cursor)처럼 동작하는 조건부 생성 도구"입니다.
+
+즉, 다음과 같은 사용 시나리오가 핵심입니다.
+
+1) 사용자가 멜로디를 만들면, 그 멜로디에 맞는 반주를 생성
+2) 사용자가 코드 진행과 원하는 악기 파트를 지정하면, 해당 파트를 생성
+3) 이미 여러 트랙이 있는 상태에서, 비어 있는 특정 트랙만 생성
+4) 여러 트랙을 따로 생성하더라도, 최종적으로는 한 곡처럼 통일감 있게 들려야 함
+
+이 관점에서 보면, 현재 모델/추론 구조는 "완전 자율 생성"보다
+"조건부 편집 / 이어쓰기 / 트랙 보완" 쪽으로 재설계하는 것이 맞습니다.
+
+
+[2. 현재 관찰된 문제]
+
+실제 테스트에서 아래 문제가 확인되었습니다.
+
+1) 코드 진행을 넣어도, 생성 결과가 해당 코드 진행대로 명확하게 들리지 않음
+2) 피아노 단일 트랙(accomp)만 생성해도 음악적으로 자연스럽지 않은 경우가 많음
+3) "발라드" 같은 스타일을 명시해도, 기대한 장르 어법이 잘 드러나지 않음
+4) 여러 트랙을 따로 생성하면 서로 어울리는 한 곡이 아니라, 분절된 결과처럼 들릴 가능성이 큼
+
+실제 예시:
+- C-Am-Dm-G 진행으로 32마디 피아노 발라드 트랙을 생성했지만
+  특정 G 마디에서 코드톤 비율이 매우 낮고, 저음도 G 루트에 안정적으로 착지하지 않았음
+- 결과적으로 "코드 진행을 따른 피아노 반주"로 들리기보다
+  "대충 같은 스케일 안에서 움직이는 음들"처럼 들렸음
+
+
+[3. 왜 이런 문제가 생기는가]
+
+핵심 원인은 4가지입니다.
+
+1) 모델 학습 목표가 "조건부 작곡"이 아니라 "다음 토큰 예측" 중심임
+
+- 파일: C:\Users\USER\ableton\midigpt\training\train_pretrain.py
+- 현재 프리트레인은 next-token prediction 기반입니다.
+- 즉, "코드 진행만 보고 처음부터 원하는 반주를 생성"하도록 직접 학습된 모델이 아닙니다.
+
+2) SFT 전략도 "작곡가 커서"보다 "이어쓰기/변주/트랙 복원"에 더 가까움
+
+- 파일: C:\Users\USER\ableton\midigpt\build_sft_pairs.py
+- 현재 전략:
+  continuation
+  variation
+  track_completion
+
+- 이 구조는 "주어진 곡 일부를 이어쓰기"에는 적합하지만
+  "코드 진행 + 타겟 악기 파트" 조건으로 원하는 결과를 정밀하게 만들도록 직접 설계되진 않았습니다.
+
+3) 현재 harmonic constraint가 "코드톤 강제"가 아니라 "스케일 마스크" 수준임
+
+- 파일: C:\Users\USER\ableton\midigpt\inference\engine.py
+- 현재 구현은 off-scale pitch를 막는 구조입니다.
+- 즉, 해당 코드의 1/3/5/7을 강하게 유도하는 것이 아니라
+  "이 코드에 연관된 스케일 밖 음만 막는다"에 가깝습니다.
+
+예:
+- C major 마디라고 해도 D, F, A, B 같은 음이 허용될 수 있음
+- Dm 마디도 현재는 자연단음계 기반 제약에 가까워서
+  실제 반주에서 기대하는 chord-tone 중심성은 보장되지 않음
+- 따라서 귀에는 "코드 진행이 정확히 들린다"기보다
+  "대충 같은 조성 안에 있다"로 들릴 수 있음
+
+4) 스타일 토큰 표현력이 현재 목표와 맞지 않음
+
+- 파일: C:\Users\USER\ableton\midigpt\tokenizer\vocab.py
+- 현재 스타일 목록에는 ambient, classical, pop, cinematic, edm, jazz, lo-fi, experimental 등이 있으나
+  ballad 전용 스타일 토큰은 없음
+- 그래서 "발라드 피아노 반주" 같은 구체적인 어법을 직접 제어하기 어려움
+
+
+[4. accomp는 원인인가?]
+
+결론부터 말하면 accomp 자체가 이번 문제의 핵심 원인은 아닙니다.
+
+- accomp는 현재 시스템 안에서 피아노/키보드 계열 반주 카테고리에 가까운 트랙 이름입니다.
+- 과거에는 accomp 쏠림 버그가 있었지만,
+  지금 사용자가 체감하는 문제는 "트랙 이름"보다
+  "화성 제어 부족"과 "조건부 생성 구조 부족"이 더 본질적입니다.
+
+즉:
+- accomp 하나만 생성되었다는 사실이 문제의 전부가 아니라
+- 그 accomp 내용이 코드 진행과 스타일을 충분히 반영하지 못하는 것이 핵심입니다.
+
+
+[5. 현재 모델을 어떻게 봐야 하는가]
+
+현재 MidiGPT는 "자율 작곡 모델"보다는
+"조건이 주어졌을 때 음악 토큰을 이어서 채우는 모델"로 보는 게 정확합니다.
+
+따라서 이 모델의 이상적인 제품 포지션은 다음과 같습니다.
+
+1) 작곡가가 입력한 재료를 보고
+2) 빈 곳을 채우고
+3) 특정 파트를 생성/보완하고
+4) 이미 존재하는 곡 흐름 안에서 자연스럽게 이어붙이는
+
+"작곡가의 커서" 또는 "MIDI 편집 보조 모델"
+
+이 방향은 현재 모델 특성과도 잘 맞고,
+궁극적으로 DAW 안에서 훨씬 실용적인 제품이 됩니다.
+
+
+[6. 해결책 개요]
+
+해결책은 단순히 "학습을 더 오래 돌린다"가 아니라,
+아래 3층을 같이 손봐야 합니다.
+
+1) 추론 제약 강화
+2) 조건부 태스크 설계 재정비
+3) 멀티트랙 통일감을 위한 상위 SongContext 도입
+
+
+[7. 단기 해결책: 지금 바로 체감 개선 가능한 것]
+
+7-1. strict chord mode 추가
+
+추천 우선순위: 매우 높음
+대상 파일: C:\Users\USER\ableton\midigpt\inference\engine.py
+
+현재는 scale mask만 있으므로, 이를 chord-tone 중심 제약으로 강화해야 합니다.
+
+추천 규칙:
+
+1) 강박(예: 각 마디 1박, 3박)에서는 chord tone만 허용
+   - root, 3rd, 5th, 필요시 7th
+
+2) 약박/패싱 지점에서만 non-chord tone 허용
+   - scale passing tone, neighbor tone 정도만 제한적으로 허용
+
+3) bar 시작 저음은 root 또는 5th 우선
+   - 특히 bass/accomp 생성 시 루트 안정성이 매우 중요
+
+4) 사용자가 준 chord progression을 generation 중에 모델이 임의로 바꾸지 못하게 제한
+   - ChordRoot_/ChordQual_ drift 방지
+
+기대 효과:
+- 코드 진행이 귀에 훨씬 명확하게 들림
+- 피아노 반주가 훨씬 화성적으로 맞는 결과로 바뀜
+
+
+7-2. 하이브리드 생성: 규칙 기반 skeleton + 모델 embellishment
+
+추천 우선순위: 매우 높음
+대상 파일:
+- C:\Users\USER\ableton\agents\composer.py
+- C:\Users\USER\ableton\midigpt\inference\engine.py
+
+프로젝트 안에는 이미 ballad 프리셋과 규칙 기반 chord generation이 있습니다.
+
+관련 위치:
+- STYLE_PRESETS['ballad']
+- generate_chords()
+- generate_bass()
+- generate_guitar()
+
+이걸 활용해 먼저 확실한 뼈대를 만들고,
+모델은 그 위에 장식음/리듬 변주/아르페지오 디테일만 추가하게 하는 방식이
+현재 단계에서 가장 현실적입니다.
+
+예:
+- skeleton 단계:
+  각 마디의 저음, 코드톤, 보이싱, 기본 리듬을 확정
+
+- model 단계:
+  passing note, syncopation, arpeggio 분해, embellishment 생성
+
+장점:
+- 코드 진행 유지
+- 스타일 붕괴 감소
+- 발라드/팝/재즈 같은 어법 차이를 더 안정적으로 제어 가능
+
+
+7-3. generation task를 곡 전체 생성이 아니라 지정 파트 생성으로 제한
+
+추천 우선순위: 높음
+
+현재처럼 코드 진행만 주고 32마디를 통으로 생성하는 건
+현재 모델의 안정권 밖일 수 있습니다.
+
+대신 다음 태스크부터 안정화하는 것이 좋습니다.
+
+1) melody -> accompaniment
+2) chords -> piano comp
+3) partial tracks -> missing bass
+4) bars 9-16 infill
+5) selected region variation
+
+즉, 모델의 역할을 빈 곳 채우기로 좁히면 품질이 훨씬 올라갑니다.
+
+
+[8. 중기 해결책: 모델을 진짜 작곡가 커서로 만드는 방향]
+
+8-1. SongContext 도입
+
+추천 우선순위: 매우 높음
+대상 후보 파일:
+- C:\Users\USER\ableton\agents\orchestrator.py
+- C:\Users\USER\ableton\agents\composer.py
+
+여러 트랙을 따로 생성해도 한 곡처럼 들리게 하려면
+모든 트랙이 공유하는 상위 컨텍스트가 필요합니다.
+
+SongContext에 들어가야 할 정보 예시:
+
+- key
+- bpm
+- time signature
+- section map
+- chord map
+- motif / hook
+- groove template
+- energy curve
+- density budget
+- register budget
+- arrangement role map
+
+핵심:
+- 각 트랙이 독립 생성되면 안 됨
+- 모든 생성 호출이 같은 SongContext를 공유해야 함
+
+
+8-2. 생성 순서 고정
+
+추천 우선순위: 높음
+
+멀티트랙을 통일감 있게 만들려면 생성 순서가 중요합니다.
+
+권장 순서:
+
+1) melody / chords / section skeleton
+2) piano/accomp
+3) bass
+4) drums
+5) pad / strings / 기타 보조 트랙
+
+뒤에서 생성되는 트랙은 앞에서 생성된 트랙을 조건으로 봐야 합니다.
+
+예:
+- bass는 melody + chords + piano를 보고 생성
+- drums는 section energy + groove + existing harmony density를 보고 생성
+- strings/pad는 이미 있는 harmonic density를 보고 빈 공간만 채워야 함
+
+
+8-3. SFT 태스크 확장
+
+추천 우선순위: 매우 높음
+대상 파일: C:\Users\USER\ableton\midigpt\build_sft_pairs.py
+
+현재 continuation/variation/track_completion 외에,
+다음 태스크를 명시적으로 만들어야 합니다.
+
+1) melody_to_accomp
+   - 입력: melody + chord map
+   - 출력: piano/accomp
+
+2) chords_to_piano
+   - 입력: chord progression + style + section
+   - 출력: piano comp/arpeggio
+
+3) partial_song_to_missing_track
+   - 입력: existing tracks
+   - 출력: target track only
+
+4) bar_infill
+   - 입력: 앞/뒤 마디 + chord context
+   - 출력: 중간 비어 있는 마디 채우기
+
+5) motif_preserving_variation
+   - 입력: motif + section role
+   - 출력: motif를 유지한 variation
+
+이렇게 해야 작곡가의 커서에 필요한 실제 행동을 모델이 배웁니다.
+
+
+8-4. task token / target token 추가
+
+추천 우선순위: 높음
+대상 파일: C:\Users\USER\ableton\midigpt\tokenizer\vocab.py
+
+현재 vocab만으로는 무슨 작업을 시키는지가 애매합니다.
+아래 같은 명시적 토큰을 고려할 수 있습니다.
+
+예시:
+
+- Task_Harmonize
+- Task_TrackFill
+- Task_Infill
+- Task_Variation
+- TargetTrack_accomp
+- TargetTrack_bass
+- TargetTrack_drums
+- TargetTrack_strings
+- Style_ballad
+- RegionStart / RegionEnd
+- MaskStart / MaskEnd
+
+이렇게 하면 모델이 무엇을 만들어야 하는지를 훨씬 정확히 이해할 수 있습니다.
+
+
+[9. 장기 해결책: 멀티트랙 통일감 문제의 본질적 해결]
+
+궁극적으로는 트랙별 생성이 아니라
+곡 전체 컨텍스트 하의 역할 분담 생성으로 가야 합니다.
+
+즉:
+- piano는 공간을 다 먹으면 안 되고
+- bass는 루트/리듬 앵커 역할을 하고
+- drums는 section energy를 표현하고
+- strings/pad는 harmonic fill을 담당하고
+- melody와 충돌하지 않도록 register / density를 공유해야 합니다
+
+이건 단순 token generation만으로는 어렵고,
+위에서 말한 SongContext + generation order + reviewer pass가 같이 필요합니다.
+
+
+[10. Reviewer 단계 추가 권장]
+
+추천 우선순위: 높음
+관련 후보:
+- C:\Users\USER\ableton\agents\reviewer.py
+
+생성 후 자동 검사 항목 예시:
+
+1) chord-tone ratio
+2) strong beat landing quality
+3) bass root stability
+4) track overlap / register collision
+5) rhythmic density conflict
+6) motif reuse consistency
+7) section-wise energy consistency
+
+점수가 낮으면 재생성하거나, 후보 중 더 나은 결과를 선택하도록 만들 수 있습니다.
+
+
+[11. 추천 구현 순서]
+
+가장 추천하는 실제 작업 순서는 아래와 같습니다.
+
+1단계
+- inference에 strict chord mode 추가
+- bar strong-beat chord-tone enforcement 추가
+- low register root/5th anchoring 추가
+
+2단계
+- composer.py의 ballad / chord generator를 활용한 skeleton 생성기 정리
+- skeleton + model embellishment 하이브리드 경로 추가
+
+3단계
+- build_sft_pairs.py에
+  melody_to_accomp / chords_to_piano / bar_infill / missing_track 태스크 추가
+
+4단계
+- vocab에 Task_* / TargetTrack_* / Style_ballad 등 조건 토큰 확장
+
+5단계
+- SongContext 구조 도입
+- 멀티트랙 generation order 통합
+
+6단계
+- reviewer 기반 후처리/재랭킹 추가
+
+
+[12. 제품 관점 결론]
+
+이 프로젝트는 AI가 혼자 곡을 작곡한다보다
+사용자가 이미 만든 음악적 의도를 따라가며, 필요한 파트를 채워주는 도구로 가야 성공 확률이 높습니다.
+
+즉 MidiGPT의 정체성은 다음과 같습니다.
+
+- 완전 자율 작곡기
+  보다는
+- 작곡가의 커서
+- MIDI 편집 보조기
+- 파트 생성/보완 도구
+
+이 방향으로 가면:
+
+1) 현재 모델 구조와 더 잘 맞고
+2) 품질 문제를 더 빠르게 줄일 수 있고
+3) 실제 DAW 워크플로우에 더 자연스럽게 들어갈 수 있습니다
+
+
+[13. 핵심 한 줄 요약]
+
+현재 문제의 본질은 모델이 멍청하다가 아니라
+현재 MidiGPT가 코드 진행 기반 정밀 작곡기로 학습/제약되어 있지 않은 상태에서
+그 역할을 요구받고 있다는 점입니다.
+
+따라서 해결 방향은:
+
+자율 작곡을 더 세게 시키는 것이 아니라
+조건부 편집/파트 생성/빈 구간 채우기에 맞게
+추론 제약 + 학습 태스크 + SongContext 구조를 재설계하는 것
+
+이 가장 맞습니다.
