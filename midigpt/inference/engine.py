@@ -1280,6 +1280,10 @@ class MidiGPTInference:
         use_grammar: bool = True,
         grammar_forward_bar_jump: int = 1,
         grammar_dedup_pitches: bool = True,
+        task: str = "variation",           # UUU — variation|continuation|bar_infill|track_completion
+        start_bar: int = 0,                 # UUU — target bar range start (inclusive)
+        end_bar: int = 0,                   # UUU — target bar range end (exclusive). 0 = unused
+        target_track: str = "",             # UUU — category name ("drums", "bass", …)
     ) -> str:
         """Generate variation and save as MIDI file.
 
@@ -1292,6 +1296,23 @@ class MidiGPTInference:
         if self.model is None:
             raise RuntimeError("Model not loaded")
 
+        # Sprint UUU — range ↔ min_bars coupling. If caller asks for an
+        # explicit end_bar, tighten min_bars so the model keeps generating
+        # until it actually covers the range. Absent range → caller's
+        # min_bars stays as-is.
+        if end_bar > start_bar:
+            min_bars = max(min_bars, end_bar - start_bar)
+
+        # Sprint UUU — diagnostic log per request so partner's §5-4 "빈
+        # 마디" debugging has the task/range/target that produced it.
+        try:
+            print(f"[engine] task={task} start_bar={start_bar} "
+                  f"end_bar={end_bar} target_track={target_track or '-'} "
+                  f"min_bars={min_bars} active_lora={self._active_lora}",
+                  flush=True)
+        except Exception:
+            pass
+
         input_ids = self.encoder.encode_file(midi_path, meta=meta, chords=chords)
         if input_ids and input_ids[-1] == self.vocab.eos_id:
             input_ids = input_ids[:-1]
@@ -1299,6 +1320,16 @@ class MidiGPTInference:
         # Only add SEP when SFT-trained LoRA is active (see generate_variation)
         if self._active_lora is not None:
             input_ids.append(self.vocab.sep_id)
+
+        # Sprint UUU — target track identity seed. If the caller names a
+        # TRACK_TYPES category, append Track_<cat> right after SEP so the
+        # decoder's "default accomp fallback" (partner §7-3 / §20-3) doesn't
+        # absorb tokens that should carry the target track's identity.
+        if target_track:
+            track_tok = f"Track_{target_track}"
+            tid = self.vocab.encode_token(track_tok)
+            if tid != self.vocab.unk_id:
+                input_ids.append(tid)
 
         input_tensor = torch.tensor([input_ids], dtype=torch.long, device=self.device)
 

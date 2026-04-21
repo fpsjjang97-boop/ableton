@@ -321,6 +321,17 @@ class GenerateJsonRequest(BaseModel):
     # Sprint 42 FFF1: FSM grammar (대부분 True 유지 권장; False 는 디버깅용)
     use_grammar: bool = True
     grammar_dedup_pitches: bool = True
+    # Sprint UUU — DAW ↔ server task/range plumbing (partner review §20-1).
+    # task ∈ {variation, continuation, bar_infill, track_completion}.
+    # start_bar / end_bar bound the region of interest. target_track is
+    # the category name ("drums", "bass", "piano", "strings", "guitar",
+    # "accomp", ...); when set, generation is biased toward that track
+    # category's tokens.
+    task: str = "variation"
+    start_bar: int = 0
+    end_bar: int = 8
+    min_bars: int = 8
+    target_track: str = ""
 
 
 @app.post("/generate_json")
@@ -348,18 +359,29 @@ def generate_json(req: GenerateJsonRequest):
         meta = SongMeta(key=req.key, style=req.style,
                         section=req.section, tempo=req.tempo)
 
+        # Sprint UUU — derive min_bars from range when caller specifies
+        # a bar window. Falls back to the explicit min_bars otherwise.
+        effective_min_bars = req.min_bars
+        if req.end_bar > req.start_bar:
+            effective_min_bars = max(1, req.end_bar - req.start_bar)
+
         _inference.generate_to_midi(
             midi_path=str(tmp_in),
             output_path=str(tmp_out),
             meta=meta,
             max_tokens=req.max_tokens,
             min_new_tokens=req.min_new_tokens,
+            min_bars=effective_min_bars,
             temperature=req.temperature,
             repetition_penalty=req.repetition_penalty,
             no_repeat_ngram_size=req.no_repeat_ngram_size,
             use_kv_cache=True,
             use_grammar=req.use_grammar,
             grammar_dedup_pitches=req.grammar_dedup_pitches,
+            task=req.task,
+            start_bar=req.start_bar,
+            end_bar=req.end_bar,
+            target_track=req.target_track,
         )
 
         out_bytes = tmp_out.read_bytes()

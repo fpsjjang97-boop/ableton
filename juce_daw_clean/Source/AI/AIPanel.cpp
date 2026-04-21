@@ -228,44 +228,102 @@ void AIPanel::onGenerate()
     statusLabel.setColour(juce::Label::textColourId, juce::Colours::yellow);
 
     aiBridge.requestVariationAsync(inputSeq, params,
-        [this, trackPtr = track](AIBridge::Result result)
+        [this, trackPtr = track, task = params.task,
+         startBar = params.startBar, endBar = params.endBar]
+        (AIBridge::Result result)
         {
-            if (result.success)
-            {
-                // Add generated MIDI as a new clip on the same track.
-                // Guard against the track's clip list being empty (the
-                // only existing clip could have been deleted between the
-                // request and this callback); default to beat 0 in that
-                // case so the generated content still lands somewhere
-                // sensible.
-                MidiClip newClip;
-                if (trackPtr != nullptr && ! trackPtr->clips.empty())
-                {
-                    const auto& last = trackPtr->clips.back();
-                    newClip.startBeat = last.startBeat + last.lengthBeats;
-                }
-                else
-                {
-                    newClip.startBeat = 0.0;
-                }
-                newClip.sequence = std::move(result.generatedSequence);
-
-                // Calculate clip length from sequence
-                double maxBeat = 0;
-                for (int i = 0; i < newClip.sequence.getNumEvents(); ++i)
-                    maxBeat = juce::jmax(maxBeat,
-                        newClip.sequence.getEventPointer(i)->message.getTimeStamp());
-                newClip.lengthBeats = juce::jmax(4.0, std::ceil(maxBeat / 4.0) * 4.0);
-
-                trackPtr->clips.push_back(std::move(newClip));
-
-                statusLabel.setText("Generated!", juce::dontSendNotification);
-                statusLabel.setColour(juce::Label::textColourId, juce::Colours::limegreen);
-            }
-            else
+            if (! result.success)
             {
                 statusLabel.setText(result.errorMessage, juce::dontSendNotification);
                 statusLabel.setColour(juce::Label::textColourId, juce::Colours::red);
+                return;
             }
+            if (trackPtr == nullptr)
+            {
+                statusLabel.setText("Target track disappeared", juce::dontSendNotification);
+                statusLabel.setColour(juce::Label::textColourId, juce::Colours::orange);
+                return;
+            }
+
+            // Sprint UUU — task-specific placement (partner review §20-2).
+            // bar_infill / track_completion replace the selected bar range
+            // on an existing clip; continuation / variation still append
+            // a new clip (since continuation is semantically "what comes
+            // after"). This matches the product shape the partner wants:
+            // a DAW composer cursor that edits the selected region, not
+            // a tape recorder that adds to the end.
+            const double beatsPerBar = 4.0; // meter-aware variant in WWW
+            const double rangeStart = startBar * beatsPerBar;
+            const double rangeEnd   = juce::jmax(rangeStart + beatsPerBar,
+                                                  endBar * beatsPerBar);
+
+            const bool inPlace = (task == "bar_infill"
+                                   || task == "track_completion");
+
+            if (inPlace && ! trackPtr->clips.empty())
+            {
+                // Find the clip that overlaps the target range (first hit).
+                MidiClip* host = nullptr;
+                for (auto& c : trackPtr->clips)
+                {
+                    if (rangeStart < c.startBeat + c.lengthBeats
+                        && rangeEnd > c.startBeat)
+                    { host = &c; break; }
+                }
+                if (host == nullptr) host = &trackPtr->clips.front();
+
+                // Delete events inside the range (clip-relative coords).
+                const double relStart = rangeStart - host->startBeat;
+                const double relEnd   = rangeEnd   - host->startBeat;
+                for (int i = host->sequence.getNumEvents() - 1; i >= 0; --i)
+                {
+                    const double t = host->sequence.getEventPointer(i)
+                                         ->message.getTimeStamp();
+                    if (t >= relStart && t < relEnd)
+                        host->sequence.deleteEvent(i, true);
+                }
+
+                // Splice generated events into the cleared window. The
+                // server returns events timestamped from 0; shift by
+                // relStart so they land inside the range.
+                for (int i = 0; i < result.generatedSequence.getNumEvents(); ++i)
+                {
+                    auto m = result.generatedSequence.getEventPointer(i)->message;
+                    m.setTimeStamp(m.getTimeStamp() + relStart);
+                    host->sequence.addEvent(m);
+                }
+                host->sequence.updateMatchedPairs();
+                host->sequence.sort();
+
+                // Extend clip length if the splice overruns.
+                host->lengthBeats = juce::jmax(host->lengthBeats, relEnd);
+
+                statusLabel.setText("In-place generate OK ("
+                                     + juce::String((int) (endBar - startBar))
+                                     + " bars)",
+                                     juce::dontSendNotification);
+                statusLabel.setColour(juce::Label::textColourId, juce::Colours::limegreen);
+                return;
+            }
+
+            // Non-infill tasks keep the historical "append" behavior.
+            MidiClip newClip;
+            if (! trackPtr->clips.empty())
+            {
+                const auto& last = trackPtr->clips.back();
+                newClip.startBeat = last.startBeat + last.lengthBeats;
+            }
+            newClip.sequence = std::move(result.generatedSequence);
+
+            double maxBeat = 0;
+            for (int i = 0; i < newClip.sequence.getNumEvents(); ++i)
+                maxBeat = juce::jmax(maxBeat,
+                    newClip.sequence.getEventPointer(i)->message.getTimeStamp());
+            newClip.lengthBeats = juce::jmax(4.0, std::ceil(maxBeat / 4.0) * 4.0);
+
+            trackPtr->clips.push_back(std::move(newClip));
+
+            statusLabel.setText("Generated!", juce::dontSendNotification);
+            statusLabel.setColour(juce::Label::textColourId, juce::Colours::limegreen);
         });
 }
