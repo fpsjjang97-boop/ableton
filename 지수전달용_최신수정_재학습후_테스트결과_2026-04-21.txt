@@ -1,0 +1,300 @@
+지수 전달용: 최신 수정 반영 + 재학습 후 테스트 결과
+작성일: 2026-04-21
+
+0. 목적
+
+이 문서는 2026-04-21 기준 최신 Git 반영본에서,
+
+1) 실제로 어떤 수정이 들어갔는지
+2) 최신 코드 기준으로 다시 학습을 돌렸는지
+3) 그 결과 생성 품질이 실제로 좋아졌는지
+4) 아직 남은 핵심 문제가 무엇인지
+
+를 빠르게 공유하기 위한 테스트 보고서입니다.
+
+
+1. 테스트 환경
+
+- 안전 테스트 폴더: C:\Users\USER\ableton_main_test
+- 테스트 시점 최신 HEAD: 70e06c0
+- Python: C:\Users\USER\ableton\venv\Scripts\python.exe
+- GPU: RTX 4080
+
+기존 원본 폴더는 건드리지 않고, 별도 테스트 폴더에서만 확인했습니다.
+
+
+2. 최신 Git 반영 확인
+
+테스트 시점에 origin/main 기준으로 아래 커밋들이 새로 올라와 있음을 확인했습니다.
+
+- 68aeff3: DAW↔서버 task/range 정합 + in-place infill
+- da6a8ca: decoder accomp fallback 축소 + empty-bar reviewer 루프
+- 3adaf51: SongContext 승격 + role metadata 데이터 구조
+- 70e06c0: drums_from_context / task pairs / capture 스키마 / user adapter
+
+즉 이번 업데이트는 단순한 주변 기능이 아니라,
+이전 리뷰에서 핵심 문제로 지적된 부분을 직접 겨냥한 수정입니다.
+
+
+3. 코드상으로 실제 확인된 점
+
+3-1. DAW → 서버 → 엔진으로 task/start_bar/end_bar/target_track가 내려감
+
+이전에는 UI는 구간 편집처럼 보여도 서버/엔진이 그 정보를 거의 안 쓰는 문제가 있었는데,
+최신 코드에서는 아래 정보가 실제 request path에 들어가는 것을 확인했습니다.
+
+- task
+- start_bar
+- end_bar
+- target_track
+
+즉 "구간 지정"과 "타겟 트랙 지정"은 코드상으로는 실제 generation 경로에 연결되었습니다.
+
+3-2. decoder 기본 fallback이 완화됨
+
+이전에는 명시적 track token이 약하면 default가 accomp에 너무 쉽게 떨어졌습니다.
+최신 코드에서는 decoder initial track hint / other fallback 방향으로 수정이 들어가,
+예전보다 "무조건 accomp" 성향은 줄었습니다.
+
+3-3. empty-bar reviewer 루프가 추가됨
+
+engine 쪽에 regenerate_on_empty_bars 관련 reviewer loop가 추가된 것을 확인했습니다.
+
+단, 아래 실제 출력 결과를 보면 이 루프만으로는 아직 충분하지 않습니다.
+
+3-4. task pair builder가 추가됨
+
+최신 코드에는 아래 edit-task용 pair builder가 추가되었습니다.
+
+- drums_from_context
+- bass_from_chords
+- piano_from_chords
+- strings_from_context
+- guitar_from_context
+
+즉 방향은 분명히 "generic continuation"에서 "task-specific edit" 쪽으로 가고 있습니다.
+
+
+4. 최신 코드 기준 재학습 여부
+
+결론부터 말하면:
+
+"예, 최신 코드 기준으로 다시 학습을 돌렸습니다."
+
+다만 그냥 예전 LoRA를 재사용한 것이 아니라,
+최신 코드 구조에 맞는 새 LoRA를 별도로 다시 만들었습니다.
+
+4-1. 왜 재학습이 필요했는가
+
+처음 최신 코드를 그대로 테스트했을 때,
+예전 LoRA는 shape mismatch 때문에 활성화되지 않았습니다.
+
+실제 증상:
+
+- 예전 LoRA는 r=16 기반
+- 최신 코드는 r=32 기대
+- activate 시 shape mismatch 발생
+- 결과적으로 active_lora=None
+
+즉 그냥 테스트만 하면 base model만 보는 상태였고,
+이 상태에서는 최신 업데이트의 실제 품질을 공정하게 판단하기 어려웠습니다.
+
+4-2. 이번 재학습 방식
+
+최신 코드 기준으로 아래 순서로 진행했습니다.
+
+1) task-specific pair 생성
+2) 기존 continuation/track_completion SFT pair 생성
+3) 둘을 합쳐 새 SFT 데이터셋 구성
+4) single-worker + LoRA r=32/alpha=64로 재학습
+
+4-3. 실제 task pair 생성 수
+
+최신 task pair builder 결과:
+
+- drums_from_context: 9 pairs
+- bass_from_chords: 6 pairs
+- piano_from_chords: 3 pairs
+- strings_from_context: 0 pairs
+- guitar_from_context: 1 pair
+
+즉 task pair 구조는 들어왔지만, 현재 raw output 양은 아직 매우 적습니다.
+
+4-4. 최종 학습 데이터 규모
+
+- 일반 SFT pair: 586
+- task pair 추가 병합: 19
+- 총 usable pair: 605
+
+4-5. 학습 결과
+
+- 학습 산출물: C:\Users\USER\Documents\codex\latest_lora_20260421\lora_sft_best.bin
+- best loss: 0.2200
+- 이번 테스트에서는 실제로 active_lora='sft' 상태를 확인함
+
+즉 이번에는 "학습은 했는데 생성 시 LoRA가 안 켜져 있던 상태"가 아닙니다.
+
+
+5. 실제 생성 테스트 결과
+
+최신 코드 + 최신 재학습 LoRA 기준으로 같은 방식의 재검증을 수행했습니다.
+
+테스트 파일:
+
+- drums test:
+  C:\Users\USER\Documents\codex\latest_update_check_outputs\drums_from_context_latest.mid
+
+- strings test:
+  C:\Users\USER\Documents\codex\latest_update_check_outputs\strings_from_context_latest.mid
+
+
+6. 좋아진 점
+
+6-1. target track 의식은 일부 좋아짐
+
+드럼 테스트에서는 첫 트랙이 실제로 drums로 나왔고,
+스트링 테스트에서는 첫 트랙이 실제로 strings로 나왔습니다.
+
+이전처럼 시작부터 무조건 accomp로 떨어지는 패턴은 줄었습니다.
+
+6-2. LoRA가 실제로 반영된 상태에서 테스트됨
+
+이번에는 active_lora='sft'가 실제로 확인되었기 때문에,
+"최신 코드 기준 재학습 후 결과"라는 점은 분명합니다.
+
+즉 이번 결과는 최소한 base-only 착시는 아닙니다.
+
+
+7. 아직 해결되지 않은 핵심 문제
+
+7-1. 빈 마디 문제가 여전히 매우 심함
+
+가장 중요한 결과입니다.
+
+두 테스트 모두 8마디 생성을 요구했지만,
+실제 note start는 거의 1마디에만 몰리고 나머지 7마디는 사실상 비었습니다.
+
+실측:
+
+- drums_from_context_latest
+  - per_bar_note_starts = [19, 0, 0, 0, 0, 0, 0, 0]
+  - empty_bar_ratio = 0.875
+  - longest_empty_run = 7
+
+- strings_from_context_latest
+  - per_bar_note_starts = [25, 0, 0, 0, 0, 0, 0, 0]
+  - empty_bar_ratio = 0.875
+  - longest_empty_run = 7
+
+즉 reviewer loop가 들어갔더라도, 실제 제품 품질 관점에서는 빈 마디 문제가 아직 해결되지 않았습니다.
+
+7-2. strings는 아직도 role leakage가 남아 있음
+
+strings test 결과 트랙 구성:
+
+- strings
+- accomp
+- drums
+- guitar
+- lead
+- pad
+
+즉 strings 타겟으로 생성했는데도 strings만 깔끔하게 나오는 것이 아니라
+다른 역할/트랙이 함께 섞여 나왔습니다.
+
+이전보다 "첫 트랙이 strings로 잡힌다"는 점은 좋아졌지만,
+아직 "target track purity"는 부족합니다.
+
+7-3. drums도 길이 문제는 여전
+
+drums test는 track purity 자체는 전보다 낫습니다.
+실제로 첫 트랙이 drums 하나로 나온 점은 긍정적입니다.
+
+하지만 가장 중요한 시간축 문제,
+즉 8마디를 실제로 채우는 능력은 여전히 부족합니다.
+
+
+8. 왜 이런 결과가 나왔다고 보는가
+
+8-1. reviewer loop만으로는 insufficient
+
+지금 빈 마디 문제는 단순히 "다시 뽑아봐" 수준으로는 부족해 보입니다.
+
+필요한 것은 reviewer 추가만이 아니라,
+아예 generation constraint 수준에서:
+
+- 선택된 target range 내부는 bar별 최소 밀도를 가져야 한다
+- 긴 empty run은 허용하지 않는다
+- track_completion/bar_infill에서는 bar coverage를 강제한다
+
+같은 제약이 더 강하게 들어가야 합니다.
+
+8-2. task-specific data가 아직 너무 적음
+
+이번 최신 구조의 핵심은 task-specific pair인데,
+실제 생성 수를 보면 아직 너무 적습니다.
+
+특히:
+
+- strings_from_context = 0
+- guitar_from_context = 1
+- piano_from_chords = 3
+
+이 수준이면 "구조는 생겼지만 아직 학습 신호는 거의 없는 상태"에 가깝습니다.
+
+8-3. strings 전용 학습 경로는 아직 사실상 성립하지 않음
+
+strings_from_context가 0개라는 것은,
+현재 빌더 기준에서는 strings task를 학습할 usable pair가 사실상 만들어지지 않았다는 뜻입니다.
+
+따라서 strings 품질이 불안정한 것은 자연스러운 결과일 가능성이 큽니다.
+
+
+9. 이번 테스트에서 얻은 가장 중요한 결론
+
+이번 최신 수정은 "헛수고"가 아닙니다.
+실제로 아래는 확인됐습니다.
+
+- task/range plumbing 반영
+- decoder fallback 완화
+- target track 인식 일부 개선
+- 최신 구조용 LoRA 재학습 가능
+
+하지만 동시에 아래도 매우 분명합니다.
+
+- empty-bar 문제는 아직 실제 결과 기준으로 해결되지 않았다
+- strings 쪽 target purity는 아직 부족하다
+- task-specific data pipeline은 방향은 맞지만 양과 성립 조건이 아직 약하다
+
+즉 이번 업데이트는 "핵심 구조를 건드린 유의미한 전진"은 맞지만,
+"이제 제품 품질 문제가 해결되었다"는 단계는 아닙니다.
+
+
+10. 지금 당장 추천하는 다음 액션
+
+우선순위대로 적으면 아래입니다.
+
+1) strings_from_context가 왜 0 pair인지부터 원인 분석
+   - 분류 문제인지
+   - context/target 조건이 너무 빡센지
+   - 길이 제한 때문에 다 탈락하는지
+
+2) empty-bar reviewer를 넘어서 generation 제약 강화
+   - target range 안 bar coverage 강제
+   - per-bar 최소 note density 제약
+   - longest_empty_run hard reject
+
+3) task-specific inference를 더 강하게 분리
+   - generic track_completion만으로 보지 말고
+   - drums / bass / piano / strings별로 다른 generation bias 또는 prompt/task token 강화
+
+4) strings/piano/bass용 usable pair를 실제로 늘리는 방향 검토
+   - 빌더 조건 완화
+   - context set 조정
+   - max_pair_tokens 조건 재검토
+
+
+11. 한 줄 최종 결론
+
+"최신 수정은 분명 올바른 방향이고, 일부 구조 문제는 실제로 개선되었다. 다만 최신 코드 기준 재학습 후에도 빈 마디 문제는 여전히 심각하며, 특히 strings 계열은 task-specific data 부족과 role leakage가 아직 큰 문제로 남아 있다."
+
