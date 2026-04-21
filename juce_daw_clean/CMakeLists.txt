@@ -178,6 +178,8 @@ target_sources(MidiGPTDAW PRIVATE
     Source/UI/CCLane.cpp
     Source/UI/StepSeqView.h
     Source/UI/StepSeqView.cpp
+    Source/UI/ScoreView.h
+    Source/UI/ScoreView.cpp
 )
 
 # -----------------------------------------------------------------------------

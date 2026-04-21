@@ -18,6 +18,7 @@
 #include "UI/MixerPanel.h"
 #include "UI/CCLane.h"
 #include "UI/StepSeqView.h"
+#include "UI/ScoreView.h"
 #include "AI/AIPanel.h"
 #include "Plugin/PluginHost.h"
 
@@ -117,6 +118,7 @@ public: // VV2 — needs access from closeButtonPressed
         PianoRoll         pianoRoll;
         CCLane            ccLane;
         StepSeqView       stepSeqView;
+        ScoreView         scoreView;
         MixerPanel        mixerPanel;
         AIPanel           aiPanel;
         StatusBar         statusBar;

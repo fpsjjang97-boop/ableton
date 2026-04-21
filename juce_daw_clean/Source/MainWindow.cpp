@@ -168,6 +168,7 @@ MainWindow::MainContent::MainContent()
     bottomTabs.addTab("Piano Roll", juce::Colour(MetallicLookAndFeel::bgPanel),    &pianoRoll,    false);
     bottomTabs.addTab("CC Lane",    juce::Colour(MetallicLookAndFeel::bgPanel),    &ccLane,       false);
     bottomTabs.addTab("Step Seq",   juce::Colour(MetallicLookAndFeel::bgPanel),    &stepSeqView,  false);
+    bottomTabs.addTab("Score",      juce::Colour(MetallicLookAndFeel::bgPanel),    &scoreView,    false);  // B MVP
     bottomTabs.addTab("Mixer",      juce::Colour(MetallicLookAndFeel::bgPanel),    &mixerPanel,   false);
     addAndMakeVisible(bottomTabs);
     bottomTabs.setCurrentTabIndex(0);     // initial activation (review fix)
@@ -178,6 +179,7 @@ MainWindow::MainContent::MainContent()
         pianoRoll.setClip(clip);
         ccLane.setClip(clip);
         stepSeqView.setClip(clip);
+        scoreView.setClip(clip);          // B MVP
         bottomTabs.setCurrentTabIndex(0);
         mixerPanel.scrollToTrack(arrangementView.getSelectedTrackId());
     };
@@ -1306,8 +1308,8 @@ void MainWindow::MainContent::menuItemSelected(int menuItemID, int)
         case 412: arrangementView.setSnapBeats(1.0); statusBar.setMessage("Snap: 1 Beat"); break;
         case 413: arrangementView.setSnapBeats(0.5); statusBar.setMessage("Snap: 1/8"); break;
         case 414: arrangementView.setSnapBeats(0.25); statusBar.setMessage("Snap: 1/16"); break;
-        case 402: // Mixer (tab index 3 — Piano=0, CC=1, StepSeq=2, Mixer=3)
-            bottomTabs.setCurrentTabIndex(3);
+        case 402: // Mixer — tab index 4 (Piano=0, CC=1, StepSeq=2, Score=3, Mixer=4)
+            bottomTabs.setCurrentTabIndex(4);
             break;
         case 403: // Piano Roll
             bottomTabs.setCurrentTabIndex(0);
