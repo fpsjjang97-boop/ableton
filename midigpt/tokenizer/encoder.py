@@ -7,7 +7,7 @@ Pipeline:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
@@ -53,11 +53,88 @@ class ChordEvent:
 
 @dataclass
 class SongMeta:
-    """Global metadata for a song."""
+    """Global metadata for a song.
+
+    Sprint WWW (종합리뷰 §8-2, §20-7) — SongMeta 는 기존 key/style/section/
+    tempo 4 필드 그대로 유지하고, 새로운 contextual 필드들은 아래
+    SongContext 로 분리한다. 이유:
+      1) 기존 호출부 / 체크포인트 / 커밋 이력이 SongMeta 를 4-field
+         dataclass 로 가정하고 있다 (BREAKING 회피).
+      2) SongContext 는 "generation conditioning" 용 풍부한 객체로,
+         메타데이터와 개념적 층위가 다르다 — 섞으면 혼동.
+      3) 단계적 승격 (generation path 에서 실제로 쓰는 서브셋 만큼
+         점진 수용) 이 쉬워진다.
+    """
     key: str = "C"           # e.g. "C" or "Am"
     style: str = "unknown"
     section: str = "unknown"
     tempo: float = 120.0
+
+
+@dataclass
+class TrackRole:
+    """Partner §8-3 / §20-8 — "이 트랙이 곡 안에서 무슨 역할을 하는가"
+    를 데이터 구조에 명시. 단순 악기 카테고리(TRACK_TYPES) 보다 한 단계
+    상위의 음악적 기능 태그.
+
+    Fields:
+        name: 악기 카테고리 (TRACK_TYPES 의 원소, 예: "strings")
+        role: 역할 태그 (MELODY / COUNTER / ACCOMP / BASS_FOUNDATION /
+              RHYTHMIC_HOOK / PAD_SUSTAIN / LEAD / FILL / 기타)
+        human_playable: 사람 연주감을 보존해야 하는지
+        main:           메인 트랙 (True) vs 보조 트랙 (False)
+    """
+    name: str = "other"
+    role: str = "accomp"
+    human_playable: bool = False
+    main: bool = True
+
+
+@dataclass
+class SongContext:
+    """Partner §20-7 — metadata 수준을 넘어 실제 generation condition 으로
+    승격된 곡 문맥. generate_to_midi 가 받아들이는 "full context" 객체.
+
+    모든 필드는 선택적이라 기존 경로와 호환된다. 채워진 필드만 condition
+    으로 쓰인다 (None / 빈 컨테이너 = "정보 없음"으로 해석).
+
+    관계:
+      - SongMeta 는 key/style/section/tempo 의 minimum-set 로 유지.
+      - SongContext 는 그 위에 target task / range / role map /
+        chord map / groove / density / register 를 얹는다.
+      - 요청 한 건은 (meta, context) 쌍으로 엔진에 전달된다.
+    """
+    # Scope of the current generation call — target section in the song.
+    target_task: str = "variation"   # variation|continuation|bar_infill|track_completion|…
+    target_track: str = ""           # TRACK_TYPES category name
+    start_bar: int = 0
+    end_bar: int = 0                  # 0 = unused / open-ended
+
+    # Other tracks' roles (for multi-track conditioning).
+    tracks: list[TrackRole] = field(default_factory=list)
+
+    # Section boundaries (앞/뒤 섹션 문맥). list of (start_bar, section_name).
+    section_map: list[tuple[int, str]] = field(default_factory=list)
+
+    # Chord map at bar granularity — subset of ChordEvent for lightweight
+    # transport. Full chords[] remains the engine-side structure.
+    chord_map: list[tuple[int, str]] = field(default_factory=list)
+    # (bar, chord_symbol) e.g. (0, "Cmaj7"), (4, "Am")
+
+    # Dynamics / groove profile (coarse 0..1 each).
+    groove:  float = 0.5              # 0=straight, 1=heavy swing
+    density: float = 0.5              # 0=sparse, 1=dense
+    energy:  float = 0.5              # 0=soft, 1=loud
+
+    # Register budget — midi note range the output should respect.
+    register_low:  int = 21
+    register_high: int = 108
+
+    # Melodic anchor — optional pitch(es) that should be prominent.
+    melodic_anchor: list[int] = field(default_factory=list)
+
+    # Free-form user hint (LLM planner output, user note, etc.).
+    user_hint: str = ""
 
 
 class MidiEncoder:

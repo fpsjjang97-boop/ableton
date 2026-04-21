@@ -29,7 +29,7 @@ import torch.nn.functional as F
 from ..model import MidiGPTConfig, MidiGPT
 from ..tokenizer import MidiVocab, MidiEncoder, MidiDecoder
 from ..tokenizer.vocab import VOCAB, NOTE_NAMES, PITCH_MIN, PITCH_MAX
-from ..tokenizer.encoder import SongMeta, ChordEvent
+from ..tokenizer.encoder import SongMeta, ChordEvent, SongContext, TrackRole
 from ..training.lora import (
     LoRAConfig, apply_lora, load_lora, merge_lora,
     load_lora_weights_only, copy_weights_into_model, zero_lora_weights,
@@ -1285,6 +1285,7 @@ class MidiGPTInference:
         end_bar: int = 0,                   # UUU — target bar range end (exclusive). 0 = unused
         target_track: str = "",             # UUU — category name ("drums", "bass", …)
         regenerate_on_empty_bars: int = 2,  # VVV — retry budget if reviewer flags sparse output
+        context: "SongContext | None" = None,  # WWW — elevated generation condition
     ) -> str:
         """Generate variation and save as MIDI file.
 
@@ -1296,6 +1297,20 @@ class MidiGPTInference:
         """
         if self.model is None:
             raise RuntimeError("Model not loaded")
+
+        # Sprint WWW — SongContext overrides. When a SongContext is
+        # supplied, its explicit fields win over the loose keyword args
+        # so callers can pass either the old (flat kwargs) or new
+        # (SongContext object) shape. Loose kwargs still work as defaults.
+        if context is not None:
+            if context.target_task:        task = context.target_task
+            if context.target_track:       target_track = context.target_track
+            if context.end_bar > context.start_bar:
+                start_bar = context.start_bar
+                end_bar   = context.end_bar
+            # Density → min_bars heuristic: denser requests tolerate the
+            # same range, sparse ones might need a longer window, but the
+            # engine can't *extend* a user range, so leave it.
 
         # Sprint UUU — range ↔ min_bars coupling. If caller asks for an
         # explicit end_bar, tighten min_bars so the model keeps generating
