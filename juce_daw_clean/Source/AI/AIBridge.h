@@ -48,6 +48,14 @@ public:
         int          minNewTokens { 256 };         // EOS suppression floor
         float        repetitionPenalty  { 1.1f };
         int          noRepeatNgramSize  { 4 };
+
+        // 2026-04-21 결함 #2 대응 — 생성 단위 선택. 사용자가 "코드 진행만
+        // 주고 32 bar 한 번에" 같은 over-ask 를 피하도록 task + bar range
+        // 를 명시. 서버가 인식 못 하는 값이면 조용히 무시됨 (backward-compat).
+        juce::String task         { "variation" };   // variation|continuation|bar_infill|track_completion
+        int          startBar     { 0 };             // 생성 시작 bar (inclusive)
+        int          endBar       { 8 };             // 생성 끝 bar (exclusive). end-start <= 8 권장
+        int          minBars      { 8 };             // engine.py min_bars (EOS 가드)
     };
 
     //==========================================================================

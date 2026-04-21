@@ -411,6 +411,12 @@ juce::String AIBridge::buildGenerateJsonBody (const juce::MemoryBlock& midiBytes
     obj->setProperty ("min_new_tokens",params.minNewTokens);
     obj->setProperty ("repetition_penalty", params.repetitionPenalty);
     obj->setProperty ("no_repeat_ngram_size", params.noRepeatNgramSize);
+    // 2026-04-21 결함 #2 — 생성 단위 선택. 서버 API 가 task/bar 범위
+    // 필드를 몰라도 무시되므로 backward-compat.
+    obj->setProperty ("task",          params.task);
+    obj->setProperty ("start_bar",     params.startBar);
+    obj->setProperty ("end_bar",       params.endBar);
+    obj->setProperty ("min_bars",      params.minBars);
 
     return juce::JSON::toString (juce::var (obj.get()));
 }

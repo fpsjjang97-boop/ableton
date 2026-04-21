@@ -53,6 +53,16 @@ private:
     juce::Slider variationsSlider;
     juce::Label  variationsLabel { {}, "Variations" };
 
+    // 2026-04-21 결함 #2 — 생성 단위 선택 UI.
+    juce::ComboBox taskBox;
+    juce::Label    taskLabel { {}, "Task" };
+
+    juce::Slider startBarSlider;
+    juce::Label  startBarLabel { {}, "Start bar" };
+
+    juce::Slider endBarSlider;
+    juce::Label  endBarLabel { {}, "End bar" };
+
     juce::Label statusLabel { {}, "Disconnected" };
 
     void onGenerate();

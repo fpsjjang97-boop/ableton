@@ -37,6 +37,37 @@ AIPanel::AIPanel(AudioEngine& engine)
     variationsLabel.attachToComponent(&variationsSlider, true);
     addAndMakeVisible(variationsLabel);
 
+    // 2026-04-21 결함 #2 — 생성 단위 UI.
+    taskBox.addItem("Variation",         1);
+    taskBox.addItem("Continuation",      2);
+    taskBox.addItem("Bar infill",        3);
+    taskBox.addItem("Track completion",  4);
+    taskBox.setSelectedId(1);
+    taskBox.setTooltip("생성 작업 유형. 긴 이어쓰기(variation/continuation)와 "
+                        "부분 보완(infill/completion) 구분.");
+    addAndMakeVisible(taskBox);
+    taskLabel.attachToComponent(&taskBox, true);
+    addAndMakeVisible(taskLabel);
+
+    startBarSlider.setSliderStyle(juce::Slider::IncDecButtons);
+    startBarSlider.setRange(0, 63, 1);
+    startBarSlider.setValue(0);
+    startBarSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+    startBarSlider.setTooltip("생성 시작 bar (0-based). bar_infill / "
+                               "track_completion 에서 사용.");
+    addAndMakeVisible(startBarSlider);
+    startBarLabel.attachToComponent(&startBarSlider, true);
+    addAndMakeVisible(startBarLabel);
+
+    endBarSlider.setSliderStyle(juce::Slider::IncDecButtons);
+    endBarSlider.setRange(1, 64, 1);
+    endBarSlider.setValue(8);
+    endBarSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+    endBarSlider.setTooltip("생성 끝 bar (exclusive). end - start ≤ 8 권장.");
+    addAndMakeVisible(endBarSlider);
+    endBarLabel.attachToComponent(&endBarSlider, true);
+    addAndMakeVisible(endBarLabel);
+
     statusLabel.setJustificationType(juce::Justification::centred);
     statusLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible(statusLabel);
@@ -82,6 +113,13 @@ void AIPanel::resized()
     styleBox.setBounds(labelW + 8, y, ctrlW, 22);
     y += 28;
     variationsSlider.setBounds(labelW + 8, y, ctrlW, 22);
+    y += 28;
+    // 2026-04-21 결함 #2 — task + bar range 위젯.
+    taskBox.setBounds(labelW + 8, y, ctrlW, 22);
+    y += 28;
+    startBarSlider.setBounds(labelW + 8, y, ctrlW, 22);
+    y += 28;
+    endBarSlider.setBounds(labelW + 8, y, ctrlW, 22);
     y += 34;
 
     generateButton.setBounds(8, y, getWidth() - 16, 32);
@@ -168,6 +206,23 @@ void AIPanel::onGenerate()
     params.temperature = static_cast<float>(temperatureSlider.getValue());
     params.numVariations = static_cast<int>(variationsSlider.getValue());
     params.tempo = audioEngine.getTempo();
+
+    // 2026-04-21 결함 #2 — task + bar range 전달. taskBox selection ID
+    // 에 맞춰 서버 측 task 문자열. 서버가 모르는 값이면 GenerateParams
+    // 기본(backward-compat) 로 폴백.
+    switch (taskBox.getSelectedId())
+    {
+        case 2: params.task = "continuation";      break;
+        case 3: params.task = "bar_infill";        break;
+        case 4: params.task = "track_completion";  break;
+        case 1:
+        default: params.task = "variation";        break;
+    }
+    params.startBar = (int) startBarSlider.getValue();
+    params.endBar   = juce::jmax (params.startBar + 1,
+                                   (int) endBarSlider.getValue());
+    // min_bars 는 end-start 로 유추해 EOS 가드를 task 범위와 일치시킴.
+    params.minBars = juce::jmax (1, params.endBar - params.startBar);
 
     statusLabel.setText("Generating...", juce::dontSendNotification);
     statusLabel.setColour(juce::Label::textColourId, juce::Colours::yellow);
