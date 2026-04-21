@@ -160,6 +160,16 @@ MainWindow::MainContent::MainContent()
     ccLane.setRecordingPredicate(recPred);
     stepSeqView.setRecordingPredicate(recPred);
 
+    // Project time-signature provider — Groove + ScoreView consult this
+    // at click-time so 3/4 and 7/8 projects don't silently round to 4/4.
+    auto bpbProvider = [this]
+    {
+        return audioEngine.getMidiEngine().timeSigAt(
+                   audioEngine.getPositionBeats()).num;
+    };
+    pianoRoll.setBeatsPerBarProvider(bpbProvider);
+    scoreView .setBeatsPerBarProvider(bpbProvider);
+
     // Bottom tabs — use palette tokens so background follows LookAndFeel
     // instead of baked-in hex. Piano Roll (index 0) is selected explicitly
     // after mount so the component actually paints on first frame; prior

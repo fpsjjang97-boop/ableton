@@ -6,6 +6,7 @@
 
 #include "PianoRoll.h"
 #include "../Command/EditCommands.h"
+#include "../Core/Groove.h"
 #include "LookAndFeel.h"   // palette tokens (review fix)
 
 PianoRoll::PianoRoll()
@@ -73,6 +74,23 @@ void PianoRoll::drawHeader(juce::Graphics& g)
         if (x >= pianoKeyWidth)
             g.drawText(juce::String(static_cast<int>(beat / 4.0) + 1),
                        (int)x + 2, 0, 30, headerH, juce::Justification::centredLeft);
+    }
+
+    // Take-lane indicator: top-right badge showing "T: N" so the user
+    // can see stashed takes exist on this clip. Discoverability hook for
+    // the 'T' keyboard shortcut which opens the take picker.
+    if (currentClip != nullptr && ! currentClip->takes.empty())
+    {
+        const int badgeW = 48;
+        const int badgeX = getWidth() - badgeW - 4;
+        g.setColour (juce::Colour (MetallicLookAndFeel::accent).withAlpha (0.9f));
+        g.fillRoundedRectangle ((float) badgeX, 2.0f,
+                                 (float) badgeW, (float) headerH - 4.0f, 3.0f);
+        g.setColour (juce::Colour (MetallicLookAndFeel::bgDarkest));
+        g.setFont (10.0f);
+        g.drawText ("T: " + juce::String ((int) currentClip->takes.size()),
+                    badgeX, 0, badgeW, headerH,
+                    juce::Justification::centred);
     }
 }
 
@@ -967,7 +985,96 @@ bool PianoRoll::keyPressed(const juce::KeyPress& key, juce::Component*)
         return true;
     }
 
+    // Take lanes: T = popup to swap/stash takes on the current clip.
+    // First entry is "Stash current as Take N"; following entries
+    // promote a stashed take into the active sequence.
+    if (key == juce::KeyPress('t') && currentClip != nullptr)
+    {
+        juce::PopupMenu menu;
+        const int numTakes = (int) currentClip->takes.size();
+        menu.addItem (1, "Stash current as Take " + juce::String (numTakes + 1));
+        if (numTakes > 0)
+        {
+            menu.addSeparator();
+            for (int i = 0; i < numTakes; ++i)
+            {
+                const auto& lab = currentClip->takes[(size_t) i].name;
+                menu.addItem (100 + i, "Swap to: "
+                    + (lab.isNotEmpty() ? lab : ("Take " + juce::String (i + 1))));
+            }
+        }
+        menu.showMenuAsync (juce::PopupMenu::Options{},
+            [this] (int choice)
+            {
+                if (choice <= 0 || currentClip == nullptr) return;
+                if (choice == 1)
+                {
+                    currentClip->stashCurrentAsTake (
+                        "Take " + juce::String ((int) currentClip->takes.size() + 1));
+                }
+                else if (choice >= 100)
+                {
+                    currentClip->swapTake (choice - 100);
+                }
+                selectedIndices.clear();
+                repaint();
+                if (onNotesChanged) onNotesChanged();
+            });
+        return true;
+    }
+
+    // Groove: G = open picker (popup with built-in templates).
+    if (key == juce::KeyPress('g'))
+    {
+        juce::PopupMenu menu;
+        int id = 1;
+        for (auto& g : GrooveTemplate::registry())
+            menu.addItem (id++, g.name);
+        menu.addSeparator();
+        menu.addItem (100, "Strength: 100%");
+        menu.addItem (75,  "Strength: 75%");
+        menu.addItem (50,  "Strength: 50%");
+
+        menu.showMenuAsync (juce::PopupMenu::Options{},
+            [this] (int choice)
+            {
+                if (choice <= 0) return;
+                if (choice >= 1 && choice <= (int) GrooveTemplate::registry().size())
+                {
+                    const auto& name = GrooveTemplate::registry()[(size_t)(choice - 1)].name;
+                    applyGroove (name, 1.0);
+                }
+            });
+        return true;
+    }
+
     return false;
+}
+
+void PianoRoll::applyGroove (const juce::String& templateName, double strength)
+{
+    if (currentClip == nullptr) return;
+    const auto* tmpl = GrooveTemplate::findByName (templateName);
+    if (tmpl == nullptr) return;
+
+    // Groove applies across the full clip length. Selection-scoped
+    // variant honors the selectedIndices vector.
+    std::vector<int> sel;
+    if (! selectedIndices.empty())
+        sel.assign (selectedIndices.begin(), selectedIndices.end());
+
+    const double beatsPerBar = beatsPerBarProvider
+                                   ? (double) juce::jmax (1, beatsPerBarProvider())
+                                   : 4.0;
+    tmpl->apply (currentClip->sequence,
+                 0.0,
+                 juce::jmax (beatsPerBar, currentClip->lengthBeats),
+                 strength,
+                 sel,
+                 beatsPerBar);
+
+    repaint();
+    if (onNotesChanged) onNotesChanged();
 }
 
 void PianoRoll::quantizeNotes(double strength)

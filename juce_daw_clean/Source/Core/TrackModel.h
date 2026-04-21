@@ -37,6 +37,38 @@ struct MidiClip
      *  every loopLengthBeats within the clip's lengthBeats. */
     bool loopEnabled { false };
     double loopLengthBeats { 4.0 };
+
+    /** Take lanes — alternate captured sequences (for comping).
+     *  sequence is always the "active" take that playback reads.
+     *  takes[] holds stashed alternates; swapping promotes one of them
+     *  into sequence and pushes the current sequence back into takes.
+     *  Each alternate also carries a short label so the UI can show
+     *  "Take 1", "Take 2" etc. without inventing numbers at draw time. */
+    struct Take { juce::String name; juce::MidiMessageSequence sequence; };
+    std::vector<Take> takes;
+
+    /** Promote takes[index] into the active sequence, stashing the
+     *  current sequence back into takes at the same index. No-op if
+     *  index is out of range. Returns true on swap. */
+    bool swapTake (int index)
+    {
+        if (index < 0 || index >= (int) takes.size()) return false;
+        auto tmp = std::move (sequence);
+        sequence = std::move (takes[(size_t) index].sequence);
+        takes[(size_t) index].sequence = std::move (tmp);
+        return true;
+    }
+
+    /** Stash the current sequence as a new take and start fresh. Used
+     *  by future auto-comping ("Record each pass as a new take"). */
+    void stashCurrentAsTake (const juce::String& label)
+    {
+        Take t;
+        t.name = label;
+        t.sequence = std::move (sequence);
+        sequence = juce::MidiMessageSequence();
+        takes.push_back (std::move (t));
+    }
 };
 
 /** PluginSlot — *metadata only*. The actual AudioPluginInstance lives in

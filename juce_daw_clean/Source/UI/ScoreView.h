@@ -37,6 +37,7 @@ public:
     void setClip (MidiClip* clip)           { currentClip = clip; repaint(); }
     void setPlayheadBeat (double b)          { playheadBeat = b; }
     void setRecordingPredicate (std::function<bool()> p) { isRecording = std::move(p); }
+    void setBeatsPerBarProvider (std::function<int()> p) { beatsPerBarProvider = std::move(p); }
 
     // Scroll / zoom
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
@@ -45,6 +46,7 @@ private:
     MidiClip* currentClip { nullptr };
     double   playheadBeat { -1.0 };
     std::function<bool()> isRecording;
+    std::function<int()>  beatsPerBarProvider;
 
     // Layout constants — tweaking is cheap because layout is all-code.
     static constexpr int    clefColumnWidth = 48;

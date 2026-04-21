@@ -58,6 +58,16 @@ public:
     void setSnapBeats(double s) { if (s > 0.0) { snapBeats = s; repaint(); } }
     double getSnapBeats() const { return snapBeats; }
 
+    /** Apply a named groove template to the current clip. If any notes
+     *  are selected, only those notes are affected; otherwise the whole
+     *  clip. `strength` scales both timing and velocity deltas (0..1). */
+    void applyGroove (const juce::String& templateName, double strength = 1.0);
+
+    /** Injected getter for project beats-per-bar (time signature numerator).
+     *  Groove::apply consults this so the grid slot computation respects
+     *  3/4, 6/8, 7/8 instead of assuming 4/4. Defaults to 4 if unset. */
+    void setBeatsPerBarProvider (std::function<int()> p) { beatsPerBarProvider = std::move(p); }
+
 private:
     MidiClip* currentClip { nullptr };
     Tool currentTool { DrawTool };
@@ -76,6 +86,7 @@ private:
 
     juce::UndoManager* undoManager { nullptr }; // W1
     std::function<bool()> isRecording;           // Y1
+    std::function<int()>  beatsPerBarProvider;
 
     enum DragMode { None, DrawNote, MoveNote, ResizeNote, RubberBand, VelocityEdit };
     DragMode dragMode { None };
