@@ -78,6 +78,12 @@ class BatchState:
     # any of those changing. This blocks duplicate (Bar, Pos, Track, Pitch)
     # emissions at the logit stage (6차 리포트 중복 노트 근본 차단).
     pitches_this_slot: set[int] = field(default_factory=set)
+    # S3 — per-bar note counter. Resets on every Bar_* transition, bumps
+    # on every Pitch_* observation. Drives the "no empty bar" mask so the
+    # FSM refuses to let the decoder close one bar and open the next
+    # before the current bar has at least ``min_notes_per_bar`` notes.
+    # 10차 테스트(2026-04-21) empty_bar_ratio 0.875 근본 대응.
+    notes_in_current_bar: int = 0
 
 
 class MidiGrammarFSM:
@@ -88,6 +94,7 @@ class MidiGrammarFSM:
         vocab: MidiVocab | None = None,
         allow_forward_bar_jump: int = 1,
         dedup_pitches: bool = True,
+        min_notes_per_bar: int = 1,
     ):
         """Build a grammar FSM bound to ``vocab``.
 
@@ -99,10 +106,17 @@ class MidiGrammarFSM:
                 values degrade to "no constraint" (default: 1).
             dedup_pitches: When True, mask Pitch_P tokens that were already
                 emitted at the current (Bar, Pos, Track) slot. Default True.
+            min_notes_per_bar: S3 — minimum Pitch emissions required in
+                the current bar before the FSM allows advancing to the
+                next Bar_*. ``0`` disables the guard (legacy behaviour).
+                Default ``1`` — the reviewer's ``check_bar_density`` pass
+                threshold, so FSM and reviewer agree on what "non-empty"
+                means.
         """
         self.vocab = vocab or VOCAB
         self.allow_forward_bar_jump = max(0, int(allow_forward_bar_jump))
         self.dedup_pitches = bool(dedup_pitches)
+        self.min_notes_per_bar = max(0, int(min_notes_per_bar))
 
         # Pre-compute token-id ranges once. Contiguous per vocab._build().
         self._bar_ids = self._range_ids("Bar_", NUM_BARS)
@@ -178,6 +192,18 @@ class MidiGrammarFSM:
                 if bar_n < st.current_bar or bar_n > cap:
                     logits_row[tid] = float("-inf")
 
+        # S3 — bar coverage: once a Bar has been opened, refuse any Bar_*
+        # transition until at least ``min_notes_per_bar`` pitches landed
+        # in the current bar. This closes the "Bar_5 → Bar_6" empty-bar
+        # path that the decoder previously allowed (10차 empty_ratio 0.875).
+        # The first bar (current_bar < 0) is unaffected so the model can
+        # still emit its opening Bar_0.
+        if (self.min_notes_per_bar > 0
+                and st.current_bar >= 0
+                and st.notes_in_current_bar < self.min_notes_per_bar):
+            for tid in self._bar_ids:
+                logits_row[tid] = float("-inf")
+
         # Pitch dedup at current (bar, pos, track) slot.
         if self.dedup_pitches and st.pitches_this_slot:
             for pitch in st.pitches_this_slot:
@@ -216,6 +242,9 @@ class MidiGrammarFSM:
                 st.current_bar = bar_n
                 st.current_pos = -1
                 st.pitches_this_slot = set()
+                # S3 — new bar opened, reset per-bar note counter so the
+                # next Bar_* is gated on this bar filling up.
+                st.notes_in_current_bar = 0
             return
         if tok.startswith("Pos_"):
             try:
@@ -240,6 +269,10 @@ class MidiGrammarFSM:
             except ValueError:
                 return
             st.pitches_this_slot.add(pitch)
+            # S3 — count this pitch against the current bar's coverage
+            # requirement. Counted regardless of Vel/Dur follow-through
+            # because EXPECT_VEL/EXPECT_DUR already force completion.
+            st.notes_in_current_bar += 1
             st.state = GrammarState.EXPECT_VEL
             return
 

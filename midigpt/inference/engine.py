@@ -1280,6 +1280,7 @@ class MidiGPTInference:
         use_grammar: bool = True,
         grammar_forward_bar_jump: int = 1,
         grammar_dedup_pitches: bool = True,
+        grammar_min_notes_per_bar: int = 1,  # S3 — FSM refuses Bar_* transition until current bar has this many pitches
         task: str = "variation",           # UUU — variation|continuation|bar_infill|track_completion
         start_bar: int = 0,                 # UUU — target bar range start (inclusive)
         end_bar: int = 0,                   # UUU — target bar range end (exclusive). 0 = unused
@@ -1371,6 +1372,7 @@ class MidiGPTInference:
                     vocab=self.vocab,
                     allow_forward_bar_jump=grammar_forward_bar_jump,
                     dedup_pitches=grammar_dedup_pitches,
+                    min_notes_per_bar=grammar_min_notes_per_bar,
                 )
                 for tid in input_ids:
                     grammar.observe(tid, batch=0)
