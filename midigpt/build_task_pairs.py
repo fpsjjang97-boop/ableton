@@ -111,7 +111,7 @@ TASKS = {
     "strings_from_context": {
         "context": {"melody", "accomp", "bass"},
         "target":  "strings",
-        "min_context_tracks": 2,
+        "min_context_tracks": 1,
     },
     "guitar_from_context": {
         "context": {"melody", "accomp", "bass"},
