@@ -157,6 +157,24 @@ class MidiGrammarFSM:
         st = self._states.get(batch)
         return st.current_bar if st is not None else -1
 
+    def current_pos(self, batch: int = 0) -> int:
+        """Return the most recent Pos_M index (0..31) or -1 if none emitted.
+
+        Consumed by engine.py's strict chord mode (S4) to pick a beat-
+        strength-aware pitch mask.
+        """
+        st = self._states.get(batch)
+        return st.current_pos if st is not None else -1
+
+    def current_track(self, batch: int = 0) -> str:
+        """Return the most recent Track_* category name, or empty string.
+
+        Consumed by engine.py to apply track-specific harmonic policies
+        (e.g. bass root/5th anchoring at bar starts).
+        """
+        st = self._states.get(batch)
+        return st.current_track if st is not None else ""
+
     def apply(self, logits_row: torch.Tensor, batch: int = 0) -> torch.Tensor:
         """Mask logits that would violate the grammar.
 

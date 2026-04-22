@@ -476,6 +476,9 @@ class MidiGPTInference:
     def _apply_harmonic_mask(
         self, logits: torch.Tensor, context_ids: list[int],
         chord_tone_boost: float = 1.5,
+        strict_chord_mode: bool = False,
+        grammar: Optional[MidiGrammarFSM] = None,
+        batch: int = 0,
     ) -> torch.Tensor:
         """Mask off-scale pitches + boost chord-tone pitches.
 
@@ -484,19 +487,27 @@ class MidiGPTInference:
         동등한 확률로 뽑혔다. 결과적으로 "같은 조성 안에서 헤매는 음"이
         나오고 "해당 코드가 들리는 반주"가 안 됨.
 
-        이번 구현은 두 단계 —
-          (1) off-scale → -inf (기존 동작 유지)
-          (2) chord tone (root/3rd/5th/7th) 의 양수 logit 에 배수 가산
-              점수를 더해 샘플링 확률을 끌어올림. chord_tone_boost=1.5 는
-              softmax 후 대략 chord tone 의 상대 확률을 50% 정도 높이는
-              수준으로 과도한 지배(1.0 확률)를 피하면서 조성감 확보.
-              0 이하는 boost 없음과 동치.
+        기본 동작 (두 단계):
+          (1) off-scale → -inf
+          (2) chord tone (root/3rd/5th/7th) 의 양수 logit 에 배수 가산.
+
+        S4 — strict_chord_mode:
+          현재 Pos_M (FSM 에서 조회) 가 STRONG (Pos_0, Pos_16) 이면 **scale
+          내 non-chord-tone 도 -inf 로 차단**한다. 강박에 chord tone 만
+          허용해 "코드가 들리는 반주" 를 유도 (커서형정리 §7-1). UPBEAT/
+          WEAK/VERY_WEAK 에서는 기존 scale mask 그대로.
 
         Args:
             logits: Raw logits for the next token, shape (vocab_size,)
             context_ids: All token IDs generated so far (used to find active chord)
             chord_tone_boost: multiplier applied to positive logits at chord-
                 tone pitches. 1.0 = 기존 동작. 1.3~1.8 권장.
+            strict_chord_mode: S4 — True 이면 strong beat 에서 chord tone 만
+                허용. grammar 인자 필요 (Pos 조회용). False 또는 grammar=None
+                이면 기존 동작.
+            grammar: S4 — FSM 인스턴스. current_pos(batch) 로 beat strength
+                판정. None 이면 strict mode 자동 비활성.
+            batch: FSM 조회 시 사용할 batch index.
 
         Returns:
             logits with off-scale Pitch tokens set to -inf and chord tones
@@ -509,13 +520,27 @@ class MidiGPTInference:
         root_pc, quality = chord_info
         allowed_pcs = _allowed_pitch_classes(root_pc, quality)
         chord_pcs   = _chord_tone_pitch_classes(root_pc, quality) \
-                      if chord_tone_boost > 1.0 else set()
+                      if (chord_tone_boost > 1.0 or strict_chord_mode) else set()
+
+        # S4 — narrow the allowed set at strong beats when strict mode is on.
+        # beat_strength() is defensive: pos=-1 (no Pos yet) collapses to
+        # VERY_WEAK so strict_allowed_pcs returns the full scale — we only
+        # tighten once the FSM has actually seen a Pos token.
+        effective_allowed = allowed_pcs
+        if strict_chord_mode and grammar is not None:
+            from .harmony import beat_strength, strict_allowed_pcs
+            beat = beat_strength(grammar.current_pos(batch=batch))
+            effective_allowed = strict_allowed_pcs(
+                scale_pcs=allowed_pcs,
+                chord_tone_pcs=chord_pcs if chord_pcs else _chord_tone_pitch_classes(root_pc, quality),
+                beat=beat,
+            )
 
         for token_id, midi_pitch in self._pitch_token_ids.items():
             pc = midi_pitch % 12
-            if pc not in allowed_pcs:
+            if pc not in effective_allowed:
                 logits[token_id] = float("-inf")
-            elif pc in chord_pcs:
+            elif pc in chord_pcs and chord_tone_boost > 1.0:
                 v = logits[token_id].item()
                 # Only upscale positive evidence; leaving negatives alone
                 # avoids "rescuing" pitches the model already didn't want.
@@ -538,6 +563,8 @@ class MidiGPTInference:
         no_repeat_ngram_size: int = 0,
         use_kv_cache: bool = True,
         grammar: Optional[MidiGrammarFSM] = None,
+        strict_chord_mode: bool = False,   # S4 — beat-aware chord tightening
+        chord_tone_boost: float = 1.5,
     ) -> torch.Tensor:
         """Autoregressive generation with harmonic constraint.
 
@@ -634,7 +661,13 @@ class MidiGPTInference:
             # ----- Harmonic constraint (per batch element) -----
             for b in range(logits.size(0)):
                 context = idx[b].tolist()
-                logits[b] = self._apply_harmonic_mask(logits[b], context)
+                logits[b] = self._apply_harmonic_mask(
+                    logits[b], context,
+                    chord_tone_boost=chord_tone_boost,
+                    strict_chord_mode=strict_chord_mode,
+                    grammar=grammar,
+                    batch=b,
+                )
 
             # ----- Grammar FSM (Pitch→Vel→Dur, Bar mono, pitch dedup) -----
             # Inspired by ACE-Step constrained_logits_processor (Apache 2.0).
@@ -1281,6 +1314,8 @@ class MidiGPTInference:
         grammar_forward_bar_jump: int = 1,
         grammar_dedup_pitches: bool = True,
         grammar_min_notes_per_bar: int = 1,  # S3 — FSM refuses Bar_* transition until current bar has this many pitches
+        strict_chord_mode: bool = False,   # S4 — strong beat 에서 chord tone 만 허용 (커서형정리 §7-1)
+        chord_tone_boost: float = 1.5,     # S4 — positive-logit boost at chord tones (1.0 = off)
         task: str = "variation",           # UUU — variation|continuation|bar_infill|track_completion
         start_bar: int = 0,                 # UUU — target bar range start (inclusive)
         end_bar: int = 0,                   # UUU — target bar range end (exclusive). 0 = unused
@@ -1391,6 +1426,8 @@ class MidiGPTInference:
                     no_repeat_ngram_size=no_repeat_ngram_size,
                     use_kv_cache=use_kv_cache,
                     grammar=grammar,
+                    strict_chord_mode=strict_chord_mode,
+                    chord_tone_boost=chord_tone_boost,
                 )
 
             variation_ids = output[0].tolist()[len(input_ids):]
