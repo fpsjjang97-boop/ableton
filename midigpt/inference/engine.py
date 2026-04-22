@@ -1284,7 +1284,7 @@ class MidiGPTInference:
         start_bar: int = 0,                 # UUU — target bar range start (inclusive)
         end_bar: int = 0,                   # UUU — target bar range end (exclusive). 0 = unused
         target_track: str = "",             # UUU — category name ("drums", "bass", …)
-        regenerate_on_empty_bars: int = 2,  # VVV — retry budget if reviewer flags sparse output
+        regenerate_on_empty_bars: int = 4,  # VVV — retry budget if reviewer flags sparse output (10차 테스트 empty_ratio 0.875 대응, 2→4)
         context: "SongContext | None" = None,  # WWW — elevated generation condition
     ) -> str:
         """Generate variation and save as MIDI file.
@@ -1426,10 +1426,10 @@ class MidiGPTInference:
                 break
 
             attempt += 1
-            # Slight temperature nudge so the retry doesn't clone the bad
-            # pass. +0.07 per retry is conservative — enough for token-level
-            # divergence without losing the conditioning signal.
-            current_temp = min(1.5, current_temp + 0.07)
+            # Temperature nudge so the retry doesn't clone the bad pass.
+            # 10차 테스트(2026-04-21)에서 +0.07 × 2회로는 동일 분포 샘플링에
+            # 머물러 empty_ratio 0.875 가 유지됨 → +0.12 로 상향.
+            current_temp = min(1.5, current_temp + 0.12)
 
         # VVV — pass target_track as the decoder's initial-track hint so
         # un-prefixed notes in the output don't collapse to accomp.
