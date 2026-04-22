@@ -355,6 +355,13 @@ class GenerateJsonRequest(BaseModel):
     user_hint: str = ""
     # Personalization (§20-10). "user:<id>/<profile>" 규약.
     active_lora: str = ""
+    # S4 — strict chord mode. downbeat(Pos_0, Pos_16) 에서 chord tone 만
+    # 허용해 "코드 진행이 귀에 안 들리는 반주" 증상 (종합리뷰 §5-1,
+    # 커서형정리 §7-1) 을 막는다. 서버 default 는 True — JUCE 클라이언트가
+    # 필드를 안 보내도 자동 활성화되어 10차 테스트 이후 실측 검증에 바로
+    # 반영된다. False 로 두면 legacy scale-only mask 동작.
+    strict_chord_mode: bool = True
+    chord_tone_boost:  float = 1.5
 
 
 @app.post("/generate_json")
@@ -436,6 +443,8 @@ def generate_json(req: GenerateJsonRequest):
             use_kv_cache=True,
             use_grammar=req.use_grammar,
             grammar_dedup_pitches=req.grammar_dedup_pitches,
+            strict_chord_mode=req.strict_chord_mode,   # S4/S6
+            chord_tone_boost=req.chord_tone_boost,     # S4/S6
             task=req.task,
             start_bar=req.start_bar,
             end_bar=req.end_bar,
