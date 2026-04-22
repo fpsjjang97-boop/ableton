@@ -178,15 +178,34 @@ def _split_pm_by_category(pm, context_cats: set, target_cat: str):
     return pm_ctx, pm_tgt
 
 
+# Drop reason codes emitted by build_pairs_for_task. Kept as plain strings
+# rather than an Enum so the caller's counter dict is trivially JSON-
+# serialisable for the run summary.
+DROP_PARSE_FAIL         = "parse_fail"          # pretty_midi couldn't load the file
+DROP_NO_INSTRUMENTS     = "no_instruments"      # file loaded but empty
+DROP_UNDER_MIN_CONTEXT  = "under_min_context"   # context track count < spec
+DROP_NO_TARGET_TRACK    = "no_target_track"     # target category missing
+DROP_EMPTY_CTX_NOTES    = "empty_ctx_notes"     # context tracks present but silent
+DROP_EMPTY_TGT_NOTES    = "empty_tgt_notes"     # target tracks present but silent
+DROP_ENCODE_FAIL        = "encode_fail"         # encoder threw IndexError/KeyError/ValueError
+DROP_TOO_SHORT          = "too_short"           # ctx or tgt < 10 tokens
+DROP_TOO_LONG           = "too_long"            # ctx + tgt > max_pair_tokens
+
+
 def build_pairs_for_task(
     midi_path: Path,
     task_name: str,
     encoder: MidiEncoder,
     max_pair_tokens: int = 2040,
-) -> list[dict]:
+) -> tuple[list[dict], str | None]:
     """Produce zero or one pair for ``midi_path`` under ``task_name``.
 
-    Returns a list (possibly empty) to match the existing builder pattern.
+    Returns ``(pairs, drop_reason)`` where ``pairs`` is a list (possibly
+    empty, to match the existing builder pattern) and ``drop_reason`` is a
+    short code from the ``DROP_*`` constants when ``pairs`` is empty, or
+    ``None`` when a pair was produced. Emitting the reason lets the CLI
+    summarise *why* each task dropped its input (10차 테스트에서
+    strings=0 / guitar=1 / piano=3 같은 극단적 카운트의 원인 진단용).
     """
     if task_name not in TASKS:
         raise ValueError(f"Unknown task: {task_name}")
@@ -197,28 +216,28 @@ def build_pairs_for_task(
         import pretty_midi as _pm
         pm = _pm.PrettyMIDI(str(midi_path))
     except (OSError, ValueError, IndexError):
-        return []
+        return [], DROP_PARSE_FAIL
 
     if not pm.instruments:
-        return []
+        return [], DROP_NO_INSTRUMENTS
 
     pm_ctx, pm_tgt = _split_pm_by_category(pm, spec["context"], spec["target"])
 
     # Guard: both sides need content.
     if len(pm_ctx.instruments) < spec["min_context_tracks"]:
-        return []
+        return [], DROP_UNDER_MIN_CONTEXT
     if not pm_tgt.instruments:
-        return []
+        return [], DROP_NO_TARGET_TRACK
     if not any(inst.notes for inst in pm_ctx.instruments):
-        return []
+        return [], DROP_EMPTY_CTX_NOTES
     if not any(inst.notes for inst in pm_tgt.instruments):
-        return []
+        return [], DROP_EMPTY_TGT_NOTES
 
     try:
         ctx_ids = encoder.encode_pretty_midi(pm_ctx)
         tgt_ids = encoder.encode_pretty_midi(pm_tgt)
     except (IndexError, ValueError, KeyError):
-        return []
+        return [], DROP_ENCODE_FAIL
 
     # Strip BOS from output, EOS from input (same convention as
     # build_sft_pairs).
@@ -228,9 +247,9 @@ def build_pairs_for_task(
         ctx_ids = ctx_ids[:-1]
 
     if len(ctx_ids) < 10 or len(tgt_ids) < 10:
-        return []
+        return [], DROP_TOO_SHORT
     if len(ctx_ids) + len(tgt_ids) > max_pair_tokens:
-        return []
+        return [], DROP_TOO_LONG
 
     return [{
         "input":  ctx_ids,
@@ -243,7 +262,7 @@ def build_pairs_for_task(
             "input_tokens":   len(ctx_ids),
             "output_tokens":  len(tgt_ids),
         },
-    }]
+    }], None
 
 
 def main():
@@ -282,13 +301,21 @@ def main():
     counts = {t: 0 for t in tasks}
     skipped = {t: 0 for t in tasks}
     per_task_idx = {t: 0 for t in tasks}
+    # S7 — drop reason breakdown per task. Lets the operator see why a
+    # given task ended up with 0/1/few pairs (10차 테스트에서 strings=0
+    # 의 원인이 min_context_tracks 였는지 max_pair_tokens 초과였는지
+    # 재빌드 후 즉시 판별 가능).
+    drop_reasons: dict[str, dict[str, int]] = {t: {} for t in tasks}
 
     for mf in midi_files:
         for task in tasks:
-            pairs = build_pairs_for_task(
+            pairs, reason = build_pairs_for_task(
                 mf, task, encoder, max_pair_tokens=args.max_pair_tokens)
             if not pairs:
                 skipped[task] += 1
+                if reason is not None:
+                    drop_reasons[task][reason] = \
+                        drop_reasons[task].get(reason, 0) + 1
                 continue
             for p in pairs:
                 fn = args.output_dir / f"task_{task}_{per_task_idx[task]:05d}.json"
@@ -301,6 +328,13 @@ def main():
     print(f"Output: {args.output_dir}")
     for t in tasks:
         print(f"  {t:<28} pairs={counts[t]:5d}  skipped={skipped[t]:5d}")
+        # Top drop reasons — show counts sorted desc so the primary
+        # bottleneck is obvious.
+        if drop_reasons[t]:
+            ranked = sorted(drop_reasons[t].items(),
+                            key=lambda kv: -kv[1])
+            reason_str = "  ".join(f"{r}={c}" for r, c in ranked)
+            print(f"    drops: {reason_str}")
     print("=" * 60)
 
 
