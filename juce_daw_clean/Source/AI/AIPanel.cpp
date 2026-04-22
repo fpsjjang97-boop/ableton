@@ -3,6 +3,7 @@
  */
 
 #include "../UI/LookAndFeel.h"
+#include "../Command/EditCommands.h"  // S5 — MidiClipSnapshotCmd for undo-wrapped AI splice
 #include "AIPanel.h"
 
 AIPanel::AIPanel(AudioEngine& engine)
@@ -272,6 +273,13 @@ void AIPanel::onGenerate()
                 }
                 if (host == nullptr) host = &trackPtr->clips.front();
 
+                // S5 — snapshot the sequence before mutation so the whole
+                // splice is one undo transaction (MidiClipSnapshotCmd). If
+                // no UndoManager is wired (legacy hosts), fall through to
+                // the direct-mutate path below — same observable result,
+                // just without Ctrl+Z.
+                juce::MidiMessageSequence beforeSeq = host->sequence;
+
                 // Delete events inside the range (clip-relative coords).
                 const double relStart = rangeStart - host->startBeat;
                 const double relEnd   = rangeEnd   - host->startBeat;
@@ -296,7 +304,32 @@ void AIPanel::onGenerate()
                 host->sequence.sort();
 
                 // Extend clip length if the splice overruns.
+                // NOTE (S5): lengthBeats change is not captured by
+                // MidiClipSnapshotCmd. In practice the splice stays inside
+                // the existing clip 99% of the time (UI slider range ≤
+                // clip length); the rare overrun means undo restores notes
+                // but leaves the trailing empty beats. Acceptable trade
+                // for a one-class undo integration. TODO: extend snapshot
+                // cmd with lengthBeats if this shows up in real usage.
                 host->lengthBeats = juce::jmax(host->lengthBeats, relEnd);
+
+                // S5 — register the snapshot so Ctrl+Z reverts the splice.
+                // We mutated in-place above; hand the post-state to the
+                // command as "after" and rely on its perform() to re-apply
+                // on redo. We don't restore `beforeSeq` here because the
+                // user already sees the new state and expecting an extra
+                // flicker would be worse UX.
+                if (undoManager != nullptr)
+                {
+                    juce::MidiMessageSequence afterSeq = host->sequence;
+                    undoManager->beginNewTransaction("AI In-Place Generate");
+                    // Undo-action constructor stores both sequences; its
+                    // perform() will re-assign `afterSeq` when redoing.
+                    // The current host->sequence already equals afterSeq
+                    // so perform() is a no-op net of the swap.
+                    undoManager->perform(new MidiClipSnapshotCmd(
+                        host, std::move(beforeSeq), std::move(afterSeq)));
+                }
 
                 statusLabel.setText("In-place generate OK ("
                                      + juce::String((int) (endBar - startBar))

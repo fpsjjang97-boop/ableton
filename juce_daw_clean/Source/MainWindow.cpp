@@ -153,6 +153,7 @@ MainWindow::MainContent::MainContent()
     // W1 — wire undo manager into editors
     pianoRoll.setUndoManager(&undoManager);
     arrangementView.setUndoManager(&undoManager);
+    aiPanel.setUndoManager(&undoManager);  // S5 — AI in-place splice becomes undoable
     // Y1 + Z1 — recording predicate on every content editor
     auto recPred = [this] { return audioEngine.isRecording(); };
     pianoRoll.setRecordingPredicate(recPred);
