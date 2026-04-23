@@ -1,0 +1,507 @@
+================================================================
+지수 전달용
+MidiGPT_아키텍처_개선제안서_v2 검토 의견
+작성일: 2026-04-23
+검토 대상 문서:
+C:\Users\USER\Desktop\피드백\MidiGPT_아키텍처_개선제안서_v2.docx
+================================================================
+
+[0] 결론 요약
+
+이 제안서는 방향이 좋다.
+특히 아래 3가지는 지금 우리 프로젝트가 막히는 지점을 정확하게 짚고 있다.
+
+1. 악기보다 역할(Role)을 먼저 봐야 한다
+2. AI가 애매한 것을 혼자 판단하지 말고 작곡가에게 되물어야 한다
+3. 섹션 구조와 의도적 공백은 작곡가가 먼저 정의해야 한다
+
+내 판단:
+
+- 이 문서는 "좋은 아이디어 모음"이 아니라
+  현재 MidiGPT가 왜 flat continuation 성격에서 못 벗어나는지
+  설명해주는 방향 문서에 가깝다.
+- 따라서 이 제안은 받아들이는 것이 맞다.
+- 다만 "ROLE 토큰 하나 추가" 같은 작은 개선으로 다 해결될 문제는 아니고,
+  제품/데이터/추론 구조를 한 단계 더 분리하는 아키텍처 축으로 다뤄야 한다.
+
+
+[1] 제안서가 현재 문제를 잘 짚은 이유
+
+현재 우리 모델의 실제 문제는 아래와 같다.
+
+1. 통곡 continuation 성격이 강하다
+- 선택 구간 편집보다 "뒤를 이어 쓰기" 습관이 강하다
+- 그래서 선택한 8마디를 끝까지 채우지 못하고 첫 마디만 차는 현상이 반복된다
+
+2. 악기명 중심 분류에 의존한다
+- violin, pad, piano 같은 이름은 읽지만
+- "이게 지금 반주인지, 대선율인지, 패드인지, 코드 보강인지"를
+  주 학습 축으로 삼고 있지 않다
+
+3. 의도적 공백과 실패 공백을 구분하지 못한다
+- 지금 empty bar는 reviewer가 사후 검사할 뿐
+- 이 공백이 작곡가의 의도인지, 모델 실패인지 구조적으로 구분하지 못한다
+
+4. 섹션 구조가 생성 정책의 주인이 아니다
+- section_map 같은 필드는 일부 들어와 있지만
+- 실제 생성 품질을 결정하는 중심 축은 아직 아니다
+
+제안서의 핵심 철학은 이 문제들에 정확히 대응한다.
+
+
+[2] 현재 코드와의 접점: 이미 들어온 것 / 아직 안 들어온 것
+
+2-1. 이미 일부 들어와 있는 것
+
+현재 코드에는 아래 발판이 이미 있다.
+
+- SongContext
+  파일: C:\Users\USER\ableton_main_test\midigpt\tokenizer\encoder.py
+  역할:
+    - target_task
+    - target_track
+    - start_bar / end_bar
+    - tracks
+    - section_map
+    - chord_map
+    - groove / density / energy
+    - register_low / register_high
+    - melodic_anchor
+    - user_hint
+
+- TrackRole
+  파일: C:\Users\USER\ableton_main_test\midigpt\tokenizer\encoder.py
+  필드:
+    - name
+    - role
+    - human_playable
+    - main
+
+- inference_server에서 SongContext를 실제로 받아서 engine으로 넘김
+  파일: C:\Users\USER\ableton_main_test\midigpt\inference_server.py
+
+- engine에서는 target_task / target_track / start_bar / end_bar를 실제 생성에 반영
+  파일: C:\Users\USER\ableton_main_test\midigpt\inference\engine.py
+
+즉 지금도 완전히 빈 상태는 아니다.
+이미 "작곡가 주도 컨텍스트"로 갈 수 있는 틀은 일부 들어와 있다.
+
+
+2-2. 아직 안 들어온 것
+
+하지만 중요한 것은,
+"필드가 있다"와 "모델이 그걸 배운다"는 완전히 다르다.
+
+현재 상태를 정확히 말하면:
+
+- SongContext는 transport/metadata 레벨에는 들어왔다
+- 하지만 role이 모델의 핵심 학습축으로 들어간 것은 아니다
+
+확인된 사실:
+
+- 코드상 TrackRole.role 필드는 존재한다
+- 그러나 현재 토큰 시퀀스에 ROLE 토큰이 실제로 직렬화되는 구조는 보이지 않는다
+- 검색 기준으로 ROLE: 또는 ROLE_* 같은 토큰 흐름은 확인되지 않았다
+
+즉 현재 role은
+"엔진에 전달되는 부가 metadata"에 더 가깝고,
+"모델이 학습하는 1급 토큰 구조"는 아니다.
+
+이 점이 제안서와 현재 구조의 가장 큰 차이다.
+
+
+[3] 이 제안서에서 가장 좋은 부분
+
+3-1. Role first, instrument second
+
+이 부분은 매우 좋다.
+
+왜냐하면 음악적으로는 아래가 비슷한 패턴이기 때문이다.
+
+- string pad가 코드 sustain
+- synth pad가 코드 sustain
+- e.piano가 코드 comping
+- muted guitar가 rhythmic comping
+
+지금 구조는 이들을 악기명 중심으로 더 세게 분리해버린다.
+그러다 보니 적은 데이터 환경에서는 공통 패턴을 잘 공유하지 못한다.
+
+Role layer를 넣으면 적은 데이터에서도 아래가 가능해진다.
+
+- ACCOMP 패턴 학습
+- PAD_SUSTAIN 패턴 학습
+- COUNTER/COUNTERMELODY 패턴 학습
+- BASS_FOUNDATION 패턴 학습
+
+그리고 악기 차이는 그 위에 얹는 방식으로 분리할 수 있다.
+
+이건 현재 우리가 겪는
+"strings/accomp 혼동", "악기마다 새로 배워야 하는 문제"를 줄일 가능성이 크다.
+
+
+3-2. 작곡가가 애매한 부분을 직접 결정한다
+
+이 철학도 매우 좋다.
+
+지금 우리 모델은 아래를 혼자 판단하기 어렵다.
+
+- 이 트랙이 대선율인지 counter인지
+- 이 구간 공백이 의도적인지 아닌지
+- 이 트랙이 main인지 sub인지
+- 이 구간을 채워야 하는지, 그냥 두어야 하는지
+
+이걸 모델이 억지로 혼자 판단하면,
+DAW 작업 보조가 아니라 "알아서 해버리는 불안한 생성기"가 된다.
+
+작곡가에게 낮은 확신 구간만 되묻는 구조는
+오히려 제품 정체성에 잘 맞는다.
+
+
+3-3. 섹션 구조를 작곡가가 먼저 정의한다
+
+이 부분도 매우 중요하다.
+
+지금 section_map이 transport 수준으로는 들어왔지만,
+실제 생성에서 "섹션 경계가 법"처럼 강하게 작동하지는 않는다.
+
+그 결과 아래가 가능해진다.
+
+- bridge를 chorus처럼 채우려 함
+- 비워둔 build-up 구간을 그냥 메꾸려 함
+- verse/chorus의 energy 구분이 약함
+
+섹션 구조를 먼저 정의하고,
+AI는 그 범위 안에서만 움직이게 하면
+"기승전결을 작곡가가 정하고 AI는 그 안에서 일하는 구조"가 만들어진다.
+
+이건 제품 방향과 아주 잘 맞는다.
+
+
+[4] 이 제안서를 그대로 구현하면 위험한 부분
+
+4-1. note마다 ROLE 토큰을 붙이는 방식
+
+문서 예시처럼 모든 note 근처에
+[ROLE:ACCOMP] [INST:PAD] [NOTE:C4] [DUR:2.0]
+형태로 넣는 것은 조심해야 한다.
+
+이유:
+
+- 지금도 token 길이 초과 때문에 pair가 버려지는 문제가 자주 있었다
+- 여기에 role 토큰을 note마다 넣으면 시퀀스가 더 길어진다
+- 긴 곡/다트랙/편집형 task에서는 오히려 usable pair가 줄 수 있다
+
+추천:
+
+- ROLE은 note마다 넣지 말고
+- track header, segment header, SongContext side-channel 중 하나로 먼저 넣는 것이 낫다
+
+예:
+
+- [TRACK:STRINGS] [ROLE:PAD_SUSTAIN]
+- [TRACK:EPIANO] [ROLE:ACCOMP]
+
+또는
+
+- SongContext.tracks 안에 role을 강하게 넣고
+- 모델 입력에서는 compact한 header token만 추가
+
+
+4-2. 모든 애매한 상황을 사용자에게 다 묻는 방식
+
+철학은 좋지만, 구현은 절제되어야 한다.
+
+작곡가는 디테일 제어를 좋아하지만,
+모든 단계에서 팝업이 뜨면 작업 흐름이 깨진다.
+
+추천:
+
+- 기본은 자동 추정
+- 확신도가 낮을 때만 질문
+- 질문은 생성 전에 한 번에 묶어서 보여주기
+- Yes / No / 수정의 짧은 인터랙션 유지
+
+
+4-3. 역할과 악기를 한 필드로 섞어 처리하는 방식
+
+이건 피해야 한다.
+
+역할(role)과 악기(instrument)는 분리해야 한다.
+
+왜냐하면 우리가 원하는 건
+"역할은 공유하지만 악기는 다를 수 있음"을 배우는 구조이기 때문이다.
+
+예:
+
+- role = ACCOMP, instrument = STRINGS
+- role = ACCOMP, instrument = EPIANO
+- role = PAD_SUSTAIN, instrument = STRINGS
+- role = PAD_SUSTAIN, instrument = SYNTHPAD
+
+즉 role과 instrument는 교차 조합이어야지,
+하나의 label로 합쳐지면 일반화 이점을 잃는다.
+
+
+[5] 현재 아키텍처에 넣는다면 어떤 형태가 맞는가
+
+이 제안은 단순 tokenizer 개선안으로 넣기보다,
+아래 4개 레이어 구조로 재정리하는 것이 맞다.
+
+5-1. Layer A: Capture / Analysis
+
+DAW나 import 단계에서 아래를 수집한다.
+
+- instrument
+- role
+- main/sub
+- human_playable
+- section
+- intentional_silence
+- locked bars
+- genre
+- tempo
+- user note / hint
+
+자동 추정 + 낮은 확신 시 사용자 확인.
+
+이 레이어의 목적:
+"곡이 어떤 구조인지 먼저 선언"
+
+
+5-2. Layer B: Plan / Constraint
+
+SongContext를 진짜 planner input으로 승격한다.
+
+예:
+
+- target_task = fill_strings_from_context
+- start_bar = 24
+- end_bar = 32
+- target_track = strings
+- allowed_roles = PAD_SUSTAIN
+- disallowed_tracks = drums, bass
+- intentional_silence bars = 28, 29
+- locked bars = 24, 25
+- section = bridge
+- density = sparse
+
+이 레이어의 목적:
+"AI가 어디까지 개입할 수 있는지 경계 정의"
+
+
+5-3. Layer C: Task-specific Generator
+
+여기서 중요한 것은
+generic continuation을 조금 비틀어 쓰지 말고,
+작업형 태스크를 전용 모드로 분리하는 것이다.
+
+예:
+
+- fill_drums_from_context
+- fill_strings_from_context
+- fill_bass_from_chords
+- fill_piano_from_chords
+- fix_register_collision
+- reharmonize_accomp_under_melody
+
+즉 "뒷부분 이어쓰기 모델"이 아니라
+"선택 구간 편집 모델"로 명시적으로 분리해야 한다.
+
+
+5-4. Layer D: Personalization / User Memory
+
+이 레이어는 문서의 철학과도 잘 맞는다.
+
+공통 음악 문법은 base model이 배우고,
+유저 스타일은 아래로 분리하는 것이 좋다.
+
+- retrieval memory
+- style profile
+- small adapter / LoRA
+- task-specific user preference
+
+이 레이어의 목적:
+"사용자 복사본 작곡가"
+
+즉 유저가 몇 곡만 쌓여도
+보이싱, 리듬, 악기 배치 습관을 점점 더 잘 따라가게 만드는 층이다.
+
+
+[6] 지금 코드 기준으로 어디서부터 시작하면 좋은가
+
+6-1. 가장 먼저 할 것
+
+SongContext와 TrackRole을 "운반용 metadata"에서
+"실제 학습/생성 축"으로 승격해야 한다.
+
+즉 지금은 필드가 존재하는 수준인데,
+다음 단계는 아래다.
+
+- role-aware task pair 생성
+- role-aware prompt 형식 통일
+- role-aware inference conditioning
+
+
+6-2. role을 토큰에 넣는다면 최소 단위로
+
+권장 방식:
+
+- track header role token
+- section header token
+- planner token
+
+비권장 방식:
+
+- note마다 role token 반복 삽입
+
+
+6-3. intentional silence와 locked bars를 먼저 지원
+
+이건 product impact가 크다.
+
+왜냐하면 지금 empty bar 문제는 단순 품질 문제가 아니라
+"빈 구간을 어떻게 해석해야 하는가"의 문제이기 때문이다.
+
+필요한 필드:
+
+- intentional_silence_ranges
+- editable_ranges
+- locked_ranges
+
+이 3개만 있어도
+"이 bar는 비워둬도 됨"과 "이 bar는 반드시 채워야 함"을 구분할 수 있다.
+
+
+6-4. task builder와 inference prompt를 1:1로 맞추기
+
+지금 우리가 계속 겪는 문제 중 하나는
+학습한 task format과 실제 inference call의 체감 분포가 어긋날 수 있다는 점이다.
+
+role layer를 넣을 때는 반드시 아래를 통일해야 한다.
+
+- task name
+- target track
+- target role
+- section
+- editable range
+- context ordering
+- output start convention
+
+이게 맞지 않으면 role을 넣어도 실제 성능이 안 오른다.
+
+
+[7] 이 제안이 저데이터 환경에서 왜 특히 중요하냐
+
+우리는 현실적으로 작곡가 2명이 수만 곡의 고품질 MIDI를 만드는 구조가 아니다.
+그러므로 데이터 효율이 매우 중요하다.
+
+Role layer가 중요한 이유:
+
+현재는
+"strings accompaniment", "piano accompaniment", "pad accompaniment"
+를 각각 따로 배워야 하는 경향이 있다.
+
+하지만 role-first 구조라면
+"accompaniment" 패턴을 먼저 배우고,
+악기 차이는 후처리/조건부 생성으로 분리할 수 있다.
+
+이건 적은 데이터 환경에서 매우 큰 이점이다.
+
+즉 이 제안은 단순 UX 철학이 아니라
+"데이터가 적은 팀에게 더 유리한 구조"이기도 하다.
+
+
+[8] 이 제안이 현재 문제 해결에 직접 연결되는 지점
+
+8-1. strings/accomp 혼동
+
+현재:
+- 악기명은 읽지만 역할 중심이 아님
+- 그래서 strings가 accomp처럼 섞이거나,
+  반대로 accomp 패턴을 strings가 못 이어받기도 한다
+
+role-first 도입 시 기대 효과:
+- strings의 악기성보다
+  "지금 이 strings는 pad sustain 역할인가, counter line인가"를 먼저 구분 가능
+
+
+8-2. middle empty bars
+
+현재:
+- empty bar를 품질 문제로만 보고 있다
+- 하지만 실제론 "비워야 할 구간인지 아닌지"가 먼저 정의돼야 한다
+
+role/section/intention-first 도입 시 기대 효과:
+- bridge의 intentional silence와
+  chorus accompaniment missing을 구분 가능
+
+
+8-3. personalization
+
+현재:
+- 유저 스타일을 base model이 다 떠안으려는 발상이 되기 쉽다
+
+제안 방향:
+- 음악 문법은 공통 base
+- 유저 선택 습관은 personal memory / adapter
+
+이 방향이 훨씬 현실적이다.
+
+
+[9] 구현 우선순위 제안
+
+Priority 1
+
+- role schema를 DAW/UI/JSON request에 정식 필드로 고정
+- SongContext.tracks.role을 실제 task pair builder에서 사용
+- section / intentional silence / locked range 필드 도입
+
+Priority 2
+
+- role-aware task pair 생성
+- role-aware inference prompt 형식 정의
+- target role + target track + section을 함께 받는 전용 task 모드 정의
+
+Priority 3
+
+- task-specific generator 분리
+- fill_strings_from_context
+- fill_drums_from_context
+- fill_bass_from_chords
+- fill_piano_from_chords
+
+Priority 4
+
+- user style memory / adapter / retrieval layer 추가
+- "작곡가 복사본" 기능으로 확장
+
+
+[10] 최종 판단
+
+이 제안서는 현재 MidiGPT 방향과 잘 맞는다.
+오히려 지금 우리 프로젝트가 왜 자꾸 flat continuation 성격으로 돌아가는지
+설명해주는 문서라고 보는 편이 맞다.
+
+다만 아래처럼 해석해야 한다.
+
+잘못된 해석:
+- "ROLE 토큰 조금 추가하면 해결된다"
+
+올바른 해석:
+- "Instrument-first에서 Role-first + Composer-in-the-loop + Section/intention-first로
+   아키텍처 중심축을 이동해야 한다"
+
+따라서 이 문서는 채택 가치가 높다.
+단, tokenizer tweak 문서가 아니라
+"제품 아키텍처 전환 제안서"로 다루는 것이 적절하다.
+
+
+[11] 한 줄 결론
+
+이 제안은 넣는 것이 맞다.
+그리고 그 방식은 "역할 태그 몇 개 추가"가 아니라,
+"분석 - 계획 - 작업형 생성 - 개인화"로 구조를 분리하는 아키텍처 전환이어야 한다.
+
+================================================================
+끝
+================================================================
