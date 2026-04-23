@@ -1,0 +1,397 @@
+================================================================
+지수 전달용 패치 반영 재학습 결과 보고서
+작성일: 2026-04-23
+================================================================
+
+[1] 이번 보고서 목적
+
+이번 보고서는 아래 순서로 진행한 작업의 결과를 정리한 문서다.
+
+1. 최신 git 수정 반영
+2. full retrain 이후에도 남아 있던 문제 원인 분석
+3. 코드 패치 적용
+4. 패치 반영 기준으로 SFT/task pair 재구성
+5. patched retrain 재실행
+6. 드럼/스트링 sanity generation 재검증
+
+핵심적으로 확인하려고 한 것은 아래 3가지였다.
+
+- task pair가 실제 학습에 들어가는지
+- strings task data가 실제로 살아나는지
+- middle empty bars 문제가 패치 후 개선되는지
+
+
+[2] 이번 테스트의 성격
+
+중요:
+이번 "다시 학습"은 pretrain 10 epoch를 다시 돌린 것이 아니라,
+직전 full retrain에서 만든 base model 위에
+패치 반영된 SFT/task 데이터로 LoRA를 다시 학습한 것이다.
+
+즉 구조는 아래와 같다.
+
+- base model:
+  C:\Users\USER\Documents\codex\full_retrain_20260423\checkpoints\midigpt_best.pt
+
+- patched retrain root:
+  C:\Users\USER\Documents\codex\patched_retrain_20260423
+
+- new LoRA output:
+  C:\Users\USER\Documents\codex\patched_retrain_20260423\checkpoints\lora\lora_sft_best.bin
+
+이 판단을 한 이유는, 이번에 수정한 핵심이 base pretrain 로직이 아니라
+SFT/task data 연결과 inference constraint 쪽이었기 때문이다.
+
+
+[3] full retrain 이후 확인된 기존 문제
+
+패치 전에 full retrain까지 끝낸 상태에서도 아래 문제가 남아 있었다.
+
+1. task pair가 실제 SFT 학습에 거의 반영되지 않음
+2. strings_from_context pair가 0개
+3. target track purity가 약해서 strings 생성 시 accomp/drums/bass 등이 같이 섞임
+4. reviewer가 환경에 따라 조용히 꺼질 수 있음
+5. 가장 중요하게는 8마디 생성 요청에서도 실제 노트는 거의 1마디만 차고
+   나머지 7마디가 비는 현상이 유지됨
+
+실측 기준:
+
+- empty_bar_ratio = 0.875
+- longest_empty_run = 7
+
+
+[4] 이번에 적용한 코드 패치
+
+1. dataset.py 수정
+
+- 기존에는 sft_*.json만 읽고 task_*.json은 무시하고 있었다.
+- 수정 후에는 sft_*.json + task_*.json 둘 다 읽는다.
+- 따라서 task pair가 실제 학습에 들어간다.
+
+2. build_task_pairs.py 수정
+
+- 긴 곡은 통째로 pair를 만들다 버려지는 경우가 많았다.
+- 수정 후에는 bar window 방식으로 잘라서 task pair를 생성한다.
+- 특히 strings/guitar/piano/drums 같은 역할 기반 task에서 usable pair가 늘어나도록 바꿨다.
+
+3. constrained.py 수정
+
+- bar coverage를 Pitch token 기준이 아니라 completed note 기준으로 세도록 바꿨다.
+- forced target track을 넣어 non-target Track_* token을 마스킹하도록 바꿨다.
+
+4. engine.py 수정
+
+- reviewer import 실패 시 이유를 로그로 보이게 바꿨다.
+- forced target track을 grammar로 내려보내도록 바꿨다.
+
+5. reviewer.py 수정
+
+- import 시점에 디렉토리 생성하다 죽는 부작용을 제거했다.
+- 실제 write 시점에만 폴더를 만들게 바꿨다.
+
+
+[5] 패치 후 task pair 생성 결과
+
+patched task pair smoke test 결과:
+
+- drums_from_context: 263
+- bass_from_chords: 112
+- piano_from_chords: 157
+- strings_from_context: 147
+- guitar_from_context: 63
+
+이 수치에서 가장 중요한 부분은 아래다.
+
+- 기존: strings_from_context = 0
+- 패치 후: strings_from_context = 147
+
+즉 strings task data path가 실제로 살아났다.
+
+
+[6] 패치 후 SFT 데이터 실제 로딩 결과
+
+patched retrain root 기준 실제 로딩 수치:
+
+- generic sft pairs: 588
+- task pairs: 742
+- total loaded sft pairs: 1330
+
+즉 기존의 "task pair를 만들긴 했는데 학습에는 안 들어감" 문제는
+이번 패치로 해결됐다고 보는 것이 맞다.
+
+
+[7] patched retrain 결과
+
+LoRA retrain 결과:
+
+- dataset: 1330 pairs
+- batches/epoch: 333
+- best loss: 0.2727
+
+결과 파일:
+
+- best LoRA:
+  C:\Users\USER\Documents\codex\patched_retrain_20260423\checkpoints\lora\lora_sft_best.bin
+
+- latest LoRA:
+  C:\Users\USER\Documents\codex\patched_retrain_20260423\checkpoints\lora\lora_sft_latest.bin
+
+추론 경로에서 LoRA 상태:
+
+- active_lora = 'sft'
+
+즉 이번 테스트는 LoRA가 실제로 적용된 상태에서 본 결과다.
+
+
+[8] sanity generation 결과
+
+출력 파일:
+
+- drums:
+  C:\Users\USER\Documents\codex\patched_retrain_20260423\sanity_outputs\drums_from_context_patched_retrain.mid
+
+- strings:
+  C:\Users\USER\Documents\codex\patched_retrain_20260423\sanity_outputs\strings_from_context_patched_retrain.mid
+
+
+8-1. drums case
+
+- target track: drums
+- output track purity: drums only
+- total note_ons: 63
+- per_bar_note_starts: [25, 0, 0, 0, 0, 0, 0, 0]
+- empty_bar_ratio = 0.875
+- longest_empty_run = 7
+
+
+8-2. strings case
+
+- target track: strings
+- output track purity: strings only
+- total note_ons: 107
+- per_bar_note_starts: [20, 0, 0, 0, 0, 0, 0, 0]
+- empty_bar_ratio = 0.875
+- longest_empty_run = 7
+
+
+[9] reviewer loop 상태
+
+이번에는 reviewer가 조용히 꺼진 상태가 아니라 실제로 동작했다.
+
+실제 로그:
+
+- VVV gate attempt=0 empty=7 longest_empty_run=7 pass=False
+- VVV gate attempt=1 empty=7 longest_empty_run=7 pass=False
+- VVV gate attempt=2 empty=7 longest_empty_run=7 pass=False
+- VVV gate attempt=3 empty=7 longest_empty_run=7 pass=False
+
+이건 중요한 신호다.
+
+즉 현재 문제는
+"reviewer가 안 돌아서 빈 마디가 통과된 것"이 아니라,
+"reviewer가 빈 마디를 인식하고 여러 번 재생성했는데도
+ 모델이 같은 형태의 실패 출력을 반복한다" 쪽이다.
+
+
+[10] 이번 패치로 실제로 좋아진 점
+
+1. task pair가 실제 학습에 들어간다
+
+- 이건 이번 패치의 가장 큰 구조적 개선이다.
+- retrain을 반복해도 task pair가 안 먹는 구조적 버그는 이제 아니다.
+
+2. strings task data가 살아났다
+
+- 기존 0개에서 147개까지 올라왔다.
+- strings 전용 학습 부재라는 병목은 1차 해결됐다.
+
+3. target track purity가 개선됐다
+
+- 예전엔 strings 생성 시 accomp/drums/bass/guitar/pad/lead 등이 섞였음
+- 이번엔 strings 결과가 strings 하나로만 나옴
+- drums도 drums 하나로만 나옴
+
+4. reviewer가 실제로 작동한다
+
+- import 문제로 비활성화되던 상태가 아니라 실제로 empty bar를 검출한다.
+
+
+[11] 이번 패치로도 해결되지 않은 핵심 문제
+
+가장 중요한 문제는 그대로 남아 있다.
+
+- 요청한 8마디를 연속해서 채우지 못한다
+- 실제 노트는 거의 첫 마디에 몰리고 이후 bar는 비어 있다
+- reviewer가 여러 번 재시도해도 이 패턴이 반복된다
+
+즉 지금 시점의 진단은 다음과 같다.
+
+"데이터 연결 문제"는 많이 해결됐지만,
+"모델이 원하는 작업 형식대로 bar를 연속해서 채우는 생성 능력"은
+ 아직 제대로 형성되지 않았다.
+
+
+[12] 지금 상태를 어떻게 해석해야 하는가
+
+이번 결과는 아래처럼 해석하는 것이 맞다.
+
+1. 실패 원인 일부는 이미 해결됐다
+
+- task data 미반영
+- strings pair 0
+- reviewer silent disable
+- target track leakage
+
+이 부분은 실제로 개선됐다.
+
+2. 그런데 가장 큰 병목은 더 깊은 곳에 있다
+
+현재는 단순히 "학습 데이터가 안 들어갔다"가 아니라,
+
+- inference prompt format
+- task conditioning strength
+- generation objective
+- bar-fill policy
+
+이 네 축이 아직 제품 목표와 안 맞는 것으로 보인다.
+
+
+[13] 왜 empty middle bars가 아직 남는가에 대한 현재 가설
+
+가설 A. inference prompt와 task pair 분포가 아직 충분히 일치하지 않는다
+
+- 학습에서는 task pair를 넣었지만
+- 추론에서는 여전히 generic continuation/track_completion 흐름 위에서
+  target_track만 힌트처럼 얹는 성격이 남아 있을 수 있다
+
+가설 B. 모델이 "한 bar라도 성공하면 나머지는 버려도 된다"는 식으로
+출력을 수렴시키고 있다
+
+- reviewer가 reject는 하지만
+- regenerate를 해도 비슷한 실패 샘플을 반복한다
+- 이는 모델 내부 분포가 bar-wise fill objective를 아직 못 배운다는 뜻에 가깝다
+
+가설 C. 현재 task pair 양은 늘었지만, generic SFT와 섞였을 때
+task-specific objective가 충분히 강하지 않다
+
+- total 1330 중 task 742는 의미 있는 비중이지만
+- 실제 생성에서 요구하는 형태가 더 명시적이어야 할 수 있다
+
+
+[14] 지금 필요한 다음 수정 방향
+
+우선순위 기준으로 정리하면 아래 순서가 맞다.
+
+1. task-specific inference path를 분리
+
+현재 generic continuation/track_completion 위에 덧씌우는 방식보다,
+아예 아래와 같은 전용 태스크로 나누는 편이 맞다.
+
+- fill_drums_from_context
+- fill_strings_from_context
+- fill_bass_from_chords
+- fill_piano_from_chords
+- fill_guitar_from_context
+
+즉 "target_track 힌트"가 아니라
+"이 악기만, 이 범위 bar를, 이 문맥을 보고 채워라"를
+전용 모드로 강하게 정의해야 한다.
+
+2. training pair와 inference prompt 포맷을 1:1로 맞추기
+
+- 지금 학습에서 본 입력 형식과
+- 실제 DAW/engine이 추론 때 넣는 입력 형식이
+  조금이라도 다르면 task generalization이 약해질 수 있다
+
+따라서 아래를 정확히 맞춰야 한다.
+
+- task token
+- start_bar / end_bar
+- target_track
+- context track ordering
+- separator placement
+- output start convention
+
+3. bar-fill objective를 더 강하게 만들기
+
+현재 reviewer는 사후 검사에 가깝다.
+이제는 생성 중에도 아래 제약이 더 강하게 필요하다.
+
+- 요청된 모든 bar에 completed note가 최소 1개 이상 있어야 함
+- 특정 수의 empty bars가 생기면 즉시 invalid branch 처리
+- first bar only collapse 패턴이 나오면 sample 자체를 폐기
+
+4. task pair oversampling 또는 task-only SFT stage 도입
+
+현재는 generic continuation과 task pair를 같이 학습한다.
+다음 실험으로는 아래가 필요해 보인다.
+
+- task pair에 높은 sampling weight 부여
+또는
+- generic SFT 후 task-only LoRA stage를 한번 더 수행
+
+즉 "작업형 편집" 능력을 별도로 강하게 밀어줘야 한다.
+
+
+[15] 제품 관점에서의 현재 의미
+
+이번 결과는 실망할 필요보다 방향 확인에 가까운 결과다.
+
+좋은 신호:
+
+- 우리가 의심한 구조적 연결 문제는 실제로 맞았고
+- 그 문제를 패치하자 데이터 경로와 purity는 실제로 좋아졌다
+
+아직 부족한 신호:
+
+- 제품 핵심인 "선택 구간을 자연스럽게 채우는 능력"은 아직 확보되지 않았다
+
+즉 현재 결론은:
+
+"프로젝트 방향이 틀린 것"은 아니다.
+다만 현재 모델/추론 구조는 아직
+"통곡 continuation 모델"의 성격이 강하고,
+우리가 원하는 "DAW 작업형 infill assistant" 구조로는
+한 단계 더 분리해서 설계해야 한다.
+
+
+[16] 개발 우선순위 제안
+
+Priority 1
+
+- task-specific inference mode 분리
+- prompt/train format 1:1 alignment
+
+Priority 2
+
+- bar-fill hard constraint 강화
+- task-only or task-heavy retrain 실험
+
+Priority 3
+
+- DAW selection -> engine task schema -> output insertion
+  end-to-end 실사용 테스트
+
+
+[17] 한 줄 결론
+
+이번 패치 반영 재학습으로
+
+- task pair 실제 학습 반영
+- strings pair 생성
+- target track purity 개선
+- reviewer 실제 동작
+
+까지는 확인됐다.
+
+하지만 제품 핵심 문제인
+"요청한 여러 마디를 연속해서 자연스럽게 채우는 생성"
+은 아직 해결되지 않았다.
+
+따라서 다음 단계는 단순 재학습 반복이 아니라,
+"task-specific generation 구조"로 한 단계 더 명시적으로
+분리하는 설계 수정이 필요하다.
+
+================================================================
+끝
+================================================================
