@@ -152,6 +152,7 @@ class MidiEncoder:
         meta: SongMeta | None = None,
         chords: list[ChordEvent] | None = None,
         max_bars: int = 64,
+        exclude_tracks: list[str] | None = None,
     ) -> list[int]:
         """Encode a MIDI file to a token ID sequence.
 
@@ -161,6 +162,9 @@ class MidiEncoder:
             chords: Optional pre-analyzed chord events. If None, basic
                     estimation is performed.
             max_bars: Maximum number of bars to encode.
+            exclude_tracks: S12 — track categories to drop before
+                encoding. Passed through to ``encode_pretty_midi``; see
+                that method for rationale.
 
         Returns:
             List of token IDs.
@@ -169,7 +173,10 @@ class MidiEncoder:
             raise ImportError("pretty_midi is required for encoding MIDI files")
 
         pm = pretty_midi.PrettyMIDI(midi_path)
-        return self.encode_pretty_midi(pm, meta=meta, chords=chords, max_bars=max_bars)
+        return self.encode_pretty_midi(
+            pm, meta=meta, chords=chords, max_bars=max_bars,
+            exclude_tracks=exclude_tracks,
+        )
 
     def encode_pretty_midi(
         self,
@@ -177,14 +184,26 @@ class MidiEncoder:
         meta: SongMeta | None = None,
         chords: list[ChordEvent] | None = None,
         max_bars: int = 64,
+        exclude_tracks: list[str] | None = None,
     ) -> list[int]:
-        """Encode a PrettyMIDI object to token IDs."""
+        """Encode a PrettyMIDI object to token IDs.
+
+        Args:
+            exclude_tracks: S12 — list of track-type category names
+                (e.g. ["drums"]) to remove before tokenisation. This
+                aligns the inference prompt with the SFT training
+                distribution: ``build_task_pairs`` drops the target
+                track from the context side, so the inference path
+                needs the same filter when the caller knows which
+                track the model is supposed to produce. Default None =
+                no filtering (backwards compat).
+        """
         # Estimate metadata if not provided
         if meta is None:
             meta = self._estimate_meta(pm)
 
         # Extract notes
-        notes = self._extract_notes(pm)
+        notes = self._extract_notes(pm, exclude_tracks=exclude_tracks)
         if not notes:
             return [self.vocab.bos_id, self.vocab.eos_id]
 
@@ -398,14 +417,31 @@ class MidiEncoder:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _extract_notes(self, pm: "pretty_midi.PrettyMIDI") -> list[NoteEvent]:
-        """Extract all notes from a PrettyMIDI object."""
+    def _extract_notes(
+        self,
+        pm: "pretty_midi.PrettyMIDI",
+        exclude_tracks: list[str] | None = None,
+    ) -> list[NoteEvent]:
+        """Extract all notes from a PrettyMIDI object.
+
+        Args:
+            pm: PrettyMIDI to read.
+            exclude_tracks: S12 — if set, instruments whose
+                ``_classify_track`` result is in this list are dropped.
+                Used by the inference path (engine.generate_to_midi) to
+                match the training distribution — SFT task pairs never
+                see the target track in their input context.
+        """
+        drop = set(exclude_tracks) if exclude_tracks else set()
         notes = []
         for inst in pm.instruments:
             if inst.is_drum:
                 track_type = "drums"
             else:
                 track_type = self._classify_track(inst)
+
+            if track_type in drop:
+                continue
 
             for note in inst.notes:
                 notes.append(NoteEvent(

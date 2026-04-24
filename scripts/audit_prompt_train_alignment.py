@@ -211,7 +211,16 @@ def main():
     ap.add_argument("--task", default="drums_from_context",
                     choices=list(TASKS.keys()))
     ap.add_argument("--max_pair_tokens", type=int, default=2040)
+    ap.add_argument("--inference_excludes_target", action="store_true",
+                    default=True,
+                    help="S12: inference 경로가 target 트랙을 encode 전에 "
+                         "제외한다고 가정. default True (S12 도입 이후 기본).")
+    ap.add_argument("--legacy_inference", action="store_true",
+                    help="S12 이전 동작(전체 MIDI encode) 시뮬. audit 로그에 "
+                         "비포/애프터 비교용.")
     args = ap.parse_args()
+    if args.legacy_inference:
+        args.inference_excludes_target = False
 
     if not args.midi_path.is_absolute():
         args.midi_path = REPO_ROOT / args.midi_path
@@ -243,10 +252,15 @@ def main():
     train_combined = pair["input"] + [VOCAB.sep_id] + pair["output"]
 
     # ----- Inference path -----
-    # generate_to_midi encodes the WHOLE MIDI, drops trailing EOS, then
-    # appends SEP + Track_<target>.
+    # generate_to_midi encodes the (optionally target-filtered) MIDI,
+    # drops trailing EOS, then appends SEP + Track_<target>.
+    # S12 — when exclude_target_from_context is on (default), target
+    # track is removed before tokenisation, matching the SFT training
+    # distribution produced by build_task_pairs.
     meta = SongMeta(key="C", style="pop", section="chorus", tempo=120.0)
-    infer_input_ids = encoder.encode_file(str(args.midi_path), meta=meta)
+    exclude_tracks = [target_track] if args.inference_excludes_target else None
+    infer_input_ids = encoder.encode_file(
+        str(args.midi_path), meta=meta, exclude_tracks=exclude_tracks)
     if infer_input_ids and infer_input_ids[-1] == VOCAB.eos_id:
         infer_input_ids = infer_input_ids[:-1]
     # Assume LoRA active (testers' path)

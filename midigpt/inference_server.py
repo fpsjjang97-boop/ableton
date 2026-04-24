@@ -362,6 +362,11 @@ class GenerateJsonRequest(BaseModel):
     # 반영된다. False 로 두면 legacy scale-only mask 동작.
     strict_chord_mode: bool = True
     chord_tone_boost:  float = 1.5
+    # S12 — exclude_target_from_context. S11 audit 가 찾은 prompt/train
+    # format 불일치 근본 원인 대응: target_track 을 input 에서 자동 제외해
+    # SFT 학습 분포(target 없는 context) 와 정렬. default True 로 새 JUCE
+    # 클라이언트는 자동 혜택. False 면 legacy whole-MIDI prompt.
+    exclude_target_from_context: bool = True
 
 
 @app.post("/generate_json")
@@ -445,6 +450,7 @@ def generate_json(req: GenerateJsonRequest):
             grammar_dedup_pitches=req.grammar_dedup_pitches,
             strict_chord_mode=req.strict_chord_mode,   # S4/S6
             chord_tone_boost=req.chord_tone_boost,     # S4/S6
+            exclude_target_from_context=req.exclude_target_from_context,  # S12
             task=req.task,
             start_bar=req.start_bar,
             end_bar=req.end_bar,

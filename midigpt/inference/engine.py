@@ -1316,6 +1316,7 @@ class MidiGPTInference:
         grammar_min_notes_per_bar: int = 1,  # S3 — FSM refuses Bar_* transition until current bar has this many pitches
         strict_chord_mode: bool = False,   # S4 — strong beat 에서 chord tone 만 허용 (커서형정리 §7-1)
         chord_tone_boost: float = 1.5,     # S4 — positive-logit boost at chord tones (1.0 = off)
+        exclude_target_from_context: bool = True,  # S12 — SFT 학습 분포 정렬: input 에서 target 트랙 제거
         task: str = "variation",           # UUU — variation|continuation|bar_infill|track_completion
         start_bar: int = 0,                 # UUU — target bar range start (inclusive)
         end_bar: int = 0,                   # UUU — target bar range end (exclusive). 0 = unused
@@ -1365,7 +1366,22 @@ class MidiGPTInference:
         except Exception:
             pass
 
-        input_ids = self.encoder.encode_file(midi_path, meta=meta, chords=chords)
+        # S12 — align inference prompt with SFT training distribution.
+        # build_task_pairs removes the target track from the context side;
+        # without the same filter here, the model sees "drums already
+        # exist, add drums again" instead of the training-time "drums
+        # missing, write them". S11 audit confirmed this is the dominant
+        # format mismatch (CRITICAL #1). Opt-out via the parameter if a
+        # caller wants the legacy whole-MIDI prompt.
+        exclude_tracks = (
+            [target_track]
+            if (exclude_target_from_context and target_track)
+            else None
+        )
+        input_ids = self.encoder.encode_file(
+            midi_path, meta=meta, chords=chords,
+            exclude_tracks=exclude_tracks,
+        )
         if input_ids and input_ids[-1] == self.vocab.eos_id:
             input_ids = input_ids[:-1]
 
