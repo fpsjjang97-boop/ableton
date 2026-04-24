@@ -1398,6 +1398,7 @@ class MidiGPTInference:
 
         attempt = 0
         current_temp = temperature
+        current_top_k = top_k  # S8 — collapse 감지 시 축소해 분포 변경 폭 키움
         while True:
             # Fresh grammar per call; warm with the prompt so Bar/Pos/Track
             # state carries into generation.
@@ -1419,7 +1420,7 @@ class MidiGPTInference:
                     min_new_tokens=min_new_tokens,
                     min_bars=min_bars,
                     temperature=current_temp,
-                    top_k=top_k,
+                    top_k=current_top_k,
                     top_p=top_p,
                     eos_id=self.vocab.eos_id,
                     repetition_penalty=repetition_penalty,
@@ -1453,10 +1454,12 @@ class MidiGPTInference:
                 end_bar=end_bar if end_bar > start_bar else None,
                 min_notes_per_bar=1,
             )
+            collapsed = bool(gate.get("collapse_to_first_bar"))
             try:
                 print(f"[engine] VVV gate attempt={attempt} "
                       f"empty={gate.get('empty_bars')} "
                       f"longest_empty_run={gate.get('longest_empty_run')} "
+                      f"collapse={collapsed} "
                       f"pass={gate.get('pass')}", flush=True)
             except Exception:
                 pass
@@ -1465,10 +1468,18 @@ class MidiGPTInference:
                 break
 
             attempt += 1
-            # Temperature nudge so the retry doesn't clone the bad pass.
-            # 10차 테스트(2026-04-21)에서 +0.07 × 2회로는 동일 분포 샘플링에
-            # 머물러 empty_ratio 0.875 가 유지됨 → +0.12 로 상향.
-            current_temp = min(1.5, current_temp + 0.12)
+            # S8 — collapse-aware retry. 10차 재학습 결과(2026-04-23)에서
+            # +0.12 × 4회 재시도도 [25,0,0,...] 패턴을 같은 분포로 반복했다.
+            # collapse 가 감지되면 분포 변경 폭을 훨씬 크게:
+            #   - 온도 +0.25 (기존 +0.12 의 약 2배)
+            #   - top_k 를 절반으로 축소해 확률 상위권 집중 분포를 깨뜨림
+            # collapse 가 아니면 기존 +0.12 유지 — sparse 하지만 분산된
+            # 실패 (의도적 희소 섹션 근접) 까지 과하게 흔들지 않기 위함.
+            if collapsed:
+                current_temp = min(1.5, current_temp + 0.25)
+                current_top_k = max(8, current_top_k // 2)
+            else:
+                current_temp = min(1.5, current_temp + 0.12)
 
         # VVV — pass target_track as the decoder's initial-track hint so
         # un-prefixed notes in the output don't collapse to accomp.

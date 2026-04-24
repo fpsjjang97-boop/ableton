@@ -232,6 +232,25 @@ def check_bar_density(notes_with_beat, start_bar: int = 0,
         else:
             run = 0
 
+    # S8 — first-bar collapse detection. 10차 재학습 결과(2026-04-23)에서
+    # FSM bar-coverage guard 가 정상 동작함에도 생성은 여전히 [25, 0, 0,
+    # 0, 0, 0, 0, 0] 형태로 첫 bar 에 노트가 쏠리는 현상이 반복됐다.
+    # 원인은 FSM 바깥(모델 분포 / decoder time 매핑 / LoRA 학습) 에 있을
+    # 가능성이 크나, reviewer 수준에서 이 패턴을 명시적으로 감지해 engine
+    # 재생성 루프가 온도·top_k 를 더 공격적으로 튕길 수 있게 한다.
+    #
+    # 조건 (모두 만족해야 True):
+    #   - 첫 bar 의 노트 수 > `collapse_first_bar_min` (기본 8 — 10차 실측 25)
+    #   - 나머지 bar 평균 노트 수 < 1.0 (의도적 희소 섹션과 구분 여유)
+    #   - 총 bar 가 최소 3 이상 (2-bar 생성에는 collapse 개념이 약함)
+    collapse_first_bar_min = 8
+    collapse_to_first_bar = False
+    if total >= 3 and histogram[0] > collapse_first_bar_min:
+        tail = histogram[1:]
+        tail_avg = sum(tail) / max(1, len(tail))
+        if tail_avg < 1.0:
+            collapse_to_first_bar = True
+
     return {
         "total_bars":        total,
         "empty_bars":        empty_bars,
@@ -239,6 +258,7 @@ def check_bar_density(notes_with_beat, start_bar: int = 0,
         "density":           density,
         "longest_empty_run": longest,
         "pass":              empty_bars == 0 and longest <= 0,
+        "collapse_to_first_bar": collapse_to_first_bar,
         "histogram":         histogram,
     }
 
