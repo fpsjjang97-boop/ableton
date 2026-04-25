@@ -1,0 +1,244 @@
+================================================================
+지수 전달용
+S12 서버 재기동 기준 empty_bar_ratio 재측정 결과
+작성일: 2026-04-25
+================================================================
+
+[0] 결론 요약
+
+S12 수정(3fb2223) 반영 후,
+서버 경로(generate_json) 기준으로 다시 실측했지만
+empty_bar_ratio 는 개선되지 않았다.
+
+실측 결과:
+
+- drums case: empty_bar_ratio = 0.875, longest_empty_run = 7
+- strings case: empty_bar_ratio = 0.875, longest_empty_run = 7
+
+즉 이번 수정만으로는
+"가운데가 안 벌어지는가"에 대해 YES라고 말할 수 없다.
+
+
+[1] 이번 검증에서 실제로 한 것
+
+1. 최신 origin/main 기준 클린 폴더 생성
+   - 경로:
+     C:\Users\USER\Documents\codex\ableton_main_test_clean_20260425
+
+2. 최신 코드 기준 inference_server 앱 로딩
+   - midigpt.inference_server 의 /status, /generate_json 경로 실제 사용
+
+3. base model + 기존 LoRA 그대로 사용
+   - base model:
+     C:\Users\USER\Documents\codex\full_retrain_20260423\checkpoints\midigpt_best.pt
+   - LoRA:
+     C:\Users\USER\Documents\codex\patched_retrain_20260423\checkpoints\lora\lora_sft_best.bin
+
+4. /status 로 active_lora 확인
+
+5. sanity case 2개를 다시 실행하고
+   - per_bar_note_starts
+   - empty_bar_ratio
+   - longest_empty_run
+   - VVV gate 로그
+   - 출력 MIDI 파일
+   까지 확인
+
+
+[2] 이번 검증이 "지수 요청"과 얼마나 일치하는가
+
+거의 같은 취지로 검증했지만, 아래 caveat 는 있다.
+
+2-1. 지수 요청과 일치한 부분
+
+- 최신 git 수정 반영된 코드 사용
+- inference_server 경로 사용
+- active_lora='sft' 확인
+- 기존 LoRA 체크포인트 재사용
+- same class of sanity test (drums / strings) 재실행
+- per_bar_note_starts / empty_bar_ratio / longest_empty_run / VVV gate 확인
+- 출력 MIDI 저장 및 청취 가능 상태로 보관
+
+2-2. 완전히 동일 재현이 아닌 부분
+
+- OS 레벨에서 "python -m midigpt.inference_server" 를
+  독립 프로세스로 오래 유지하는 방식은 Windows 환경에서 불안정해서,
+  같은 FastAPI app 을 한 프로세스 안에서 uvicorn 으로 띄우는 방식으로 우회함
+  (경로는 동일하게 /status, /generate_json 사용)
+
+- "이전에 돌린 exact same sanity input / exact same seed" 는
+  저장된 스크립트가 명확히 남아 있지 않고,
+  server API 에 seed 인자가 노출되어 있지 않아 100% 동일 조건 고정은 불가했음
+
+즉:
+"같은 server code path로 재측정"은 맞지만,
+"완전히 동일 seed 재현"까지 했다고 말하면 안 된다.
+
+
+[3] active_lora 확인
+
+/status 결과:
+
+- loaded = true
+- device = cuda
+- active_lora = "sft"
+- vocab_size = 527
+- model_params = "48.1M"
+- gpu = NVIDIA GeForce RTX 4080
+- vram_gb = 17.2
+
+즉 LoRA 는 정상 적용된 상태였다.
+
+
+[4] 재측정에 사용한 sanity case
+
+Case 1. drums_from_context_server_exactish
+
+- input:
+  C:\Users\USER\Documents\codex\ableton_main_test_clean_20260425\TEST MIDI\J POP MELODY+PIANO.mid
+- tempo = 140
+- key = C
+- style = j_pop
+- section = verse
+- task = track_completion
+- start_bar = 0
+- end_bar = 8
+- target_track = drums
+- active_lora = sft
+- exclude_target_from_context = True
+
+Case 2. strings_from_context_server_exactish
+
+- input:
+  C:\Users\USER\Documents\codex\ableton_main_test_clean_20260425\TEST MIDI\CITY POP 105 4-4 DRUM E.PIANO.mid
+- tempo = 105
+- key = C
+- style = city_pop
+- section = verse
+- task = track_completion
+- start_bar = 0
+- end_bar = 8
+- target_track = strings
+- active_lora = sft
+- exclude_target_from_context = True
+
+
+[5] 실측 결과 — drums
+
+출력 파일:
+
+- C:\Users\USER\Documents\codex\server_remeasure_20260425_fast\drums_from_context_server_exactish.mid
+
+track summary:
+
+- drums: 61 note_on
+
+per_bar_note_starts:
+
+- [12, 0, 0, 0, 0, 0, 0, 0]
+
+metrics:
+
+- empty_bar_ratio = 0.875
+- longest_empty_run = 7
+
+VVV gate log:
+
+- attempt=0 empty=7 longest_empty_run=7 collapse=True pass=False
+- attempt=1 empty=7 longest_empty_run=7 collapse=True pass=False
+- attempt=2 empty=7 longest_empty_run=7 collapse=True pass=False
+- attempt=3 empty=7 longest_empty_run=7 collapse=True pass=False
+
+해석:
+
+- 첫 bar collapse 패턴이 그대로 유지됨
+- reviewer 가 collapse 를 인식해도 결과는 바뀌지 않음
+
+
+[6] 실측 결과 — strings
+
+출력 파일:
+
+- C:\Users\USER\Documents\codex\server_remeasure_20260425_fast\strings_from_context_server_exactish.mid
+
+track summary:
+
+- strings: 2 note_on
+- drums: 55 note_on
+- accomp: 11 note_on
+
+per_bar_note_starts:
+
+- [68, 0, 0, 0, 0, 0, 0, 0]
+
+metrics:
+
+- empty_bar_ratio = 0.875
+- longest_empty_run = 7
+
+VVV gate log:
+
+- attempt=0 empty=7 longest_empty_run=7 collapse=True pass=False
+- attempt=1 empty=7 longest_empty_run=7 collapse=True pass=False
+- attempt=2 empty=7 longest_empty_run=7 collapse=True pass=False
+- attempt=3 empty=7 longest_empty_run=7 collapse=True pass=False
+
+해석:
+
+- strings target 인데도 strings purity 가 무너짐
+- 첫 bar collapse 패턴 역시 그대로 유지됨
+
+
+[7] 청취/체감 품질
+
+drums:
+- 거의 첫 마디에만 몰려 있고 이후 bar 가 비어 있음
+- 실사용 가능한 "선택 구간 채우기" 품질이라고 보기 어려움
+
+strings:
+- 더 안 좋음
+- strings 만 생성되지 않고 drums/accomp 가 같이 섞임
+- 역시 첫 마디 몰빵 패턴
+
+
+[8] S12 가 실제로 개선한 부분
+
+S12 가 완전히 의미 없었던 것은 아니다.
+
+prompt/train alignment audit 기준:
+
+- Before (legacy inference): CRITICAL mismatches = 2
+- After  (S12 default)    : CRITICAL mismatches = 1
+
+즉 target_track 이 input context 에 들어가던
+CRITICAL #1 은 실제로 줄어든 것으로 보인다.
+
+하지만 생성 품질 실측 기준으로는
+이 수정 하나만으로 empty_bar 문제가 풀리지는 않았다.
+
+
+[9] 현재 판단
+
+이번 재측정 결과를 기준으로 하면:
+
+- S12 는 "원인 후보 하나"를 줄이는 수정으로는 의미가 있다
+- 하지만 empty_bar_ratio / longest_empty_run / first-bar collapse 에
+  실질적인 개선은 없다
+
+따라서 현재 해석은 다음이 맞다.
+
+1. CRITICAL #1 만으로는 설명이 부족하다
+2. 남은 CRITICAL #2 (Post-SEP 첫 토큰 불일치)
+   또는 더 깊은 학습 목표 문제의 비중이 크다
+3. 단순 서버 재기동만으로 해결되는 문제는 아니다
+
+
+[10] 지수 요청에 대한 한 줄 답변
+
+"서버 재기동 + 최신 S12 코드 기준으로 다시 실측해봤지만,
+active_lora='sft' 상태에서도 empty_bar_ratio 는 그대로 0.875 였고,
+first-bar collapse 역시 그대로 재현됐다."
+
+================================================================
+끝
+================================================================
