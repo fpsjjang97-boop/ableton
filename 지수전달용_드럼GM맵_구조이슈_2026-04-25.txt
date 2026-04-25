@@ -1,0 +1,251 @@
+제목: 드럼 트랙을 GM 악기 클래스 관점으로 분리해야 하는지에 대한 검토
+작성일: 2026-04-25
+
+[1] 핵심 결론
+
+결론부터 말하면, 드럼 트랙은 melodic 악기와 같은 방식으로 "음정(pitch)" 중심으로
+보면 안 되고, GM drum map 또는 drum-class 관점으로 별도 취급하는 것이 더 맞다.
+
+다만 현재 우리가 보고 있는 핵심 장애인
+
+  - 첫 마디 몰빵
+  - 가운데 bar 공백
+  - empty_bar_ratio 0.875
+
+문제의 1순위 원인을 전부 "드럼 note를 pitch처럼 봐서"라고 단정하기는 어렵다.
+그 이유는 동일한 붕괴 패턴이 strings 생성에서도 거의 동일하게 발생했기 때문이다.
+
+즉, 이 이슈는
+
+  - 분명한 구조적 약점이고
+  - 드럼 품질과 일반화를 깎는 원인일 가능성은 높지만
+  - 현재 empty-bar / first-bar collapse의 주원인이라기보다는
+    2차 구조 문제에 더 가깝다
+
+라고 보는 것이 더 정확하다.
+
+
+[2] 현재 코드에서 실제로 어떻게 처리되고 있는지
+
+현재 최신 clean code 기준으로는:
+
+1. 드럼 트랙 자체는 구분한다.
+   - inst.is_drum 이면 track_type = "drums" 로 분류
+
+2. 그러나 드럼 노트의 내부 표현은 melodic 악기와 동일하다.
+   - note.pitch 값을 그대로 사용해서 Pitch_36, Pitch_38 식으로 토큰화
+
+3. 디코더도 이를 다시 일반 MIDI note number로 복원한다.
+   - drums일 때 program_change만 생략하고
+   - note value 자체는 "킥/스네어 클래스"로 재해석하지 않는다
+
+즉 현재 모델은 드럼을
+
+  "Kick / Snare / ClosedHat"
+
+로 배우는 것이 아니라,
+
+  "drums 트랙 안에 있는 Pitch_36 / Pitch_38 / Pitch_42"
+
+처럼 배우고 있다.
+
+이 구조는 drum semantics를 충분히 살리지 못한다.
+
+
+[3] 왜 이 구조가 약한가
+
+드럼 트랙에서 C1(예: 36)은 보통 "도"라는 음정 의미가 아니라
+"킥"이라는 타격 악기 슬롯 의미를 가진다.
+
+따라서 현재처럼 이를 일반 Pitch namespace 안에서 처리하면 다음 약점이 생긴다.
+
+1. 의미 축이 잘못된다.
+   - melodic pitch는 음높이 관계가 중요하지만
+   - drum note는 킷 내 역할(킥/스네어/햇/탐/클랩)이 더 중요하다
+
+2. 일반화가 약해진다.
+   - 모델이 "36은 킥이다"를 명시적으로 배우는 게 아니라
+     숫자 패턴으로만 우회 학습하게 된다
+
+3. role-aware generation과 잘 안 맞는다.
+   - 우리가 원하는 건 "이 문맥에서 킥은 이렇게, 스네어는 이렇게"인데
+   - 현재 표현은 "Pitch_36 패턴"을 모사하는 방식에 가깝다
+
+4. 유저 샘플러/비GM 환경으로 확장이 어렵다.
+   - Battery, Kontakt, 사용자 sampler pad 맵까지 가면
+   - 단순 note number만으로는 실제 악기 역할을 안정적으로 추론하기 어렵다
+
+
+[4] 하지만 이게 지금 empty-bar 붕괴의 주원인 같지는 않은 이유
+
+이번까지의 실측을 보면:
+
+  - drums task 에서도 첫 마디 몰빵
+  - strings task 에서도 첫 마디 몰빵
+  - 둘 다 empty_bar_ratio = 0.875
+
+가 반복됐다.
+
+이건 "드럼만" 이상한 것이 아니라,
+현재 task generation 전체에서
+
+  - 학습/추론 포맷 불일치
+  - SEP 뒤 첫 토큰 불일치
+  - task pair 포맷 문제
+  - 8마디 전부 채우는 objective 부족
+
+이 더 큰 원인으로 작동하고 있다는 뜻이다.
+
+즉,
+
+  드럼을 pitch처럼 보는 문제 = 맞는 지적
+  하지만 지금 붕괴의 1순위 원인 = 아님
+
+으로 정리하는 것이 맞다.
+
+
+[5] 우선순위 제안
+
+A. 지금 먼저 고칠 것 (1차)
+
+1. prompt/train format mismatch 해소
+2. SEP 뒤 첫 토큰 포맷 정렬
+3. task pair 와 inference prompt 분포 일치
+4. bar coverage / completion objective 강화
+5. requested range 전체를 채우지 못하면 강하게 reject
+
+이 부분이 먼저 안정화되어야 "모델이 task 자체를 수행할 수 있는지"를 제대로 평가할 수 있다.
+
+
+B. 그 다음 반드시 구조 개선할 것 (2차)
+
+드럼 전용 표현 계층을 도입해야 한다.
+
+최소안:
+  - melodic Pitch_36 과 drums용 DrumPitch_36 를 namespace 분리
+
+권장안:
+  - Drum_Kick
+  - Drum_Snare
+  - Drum_HatClosed
+  - Drum_HatOpen
+  - Drum_Clap
+  - Drum_TomLow
+  - Drum_TomMid
+  - Drum_TomHigh
+  - Drum_Crash
+  - Drum_Ride
+
+같은 drum-class 토큰 체계 도입
+
+이렇게 해야 모델이 "음정"이 아니라 "타격 악기 역할"로 드럼을 배울 수 있다.
+
+
+C. 장기적으로 더 좋은 방향 (3차)
+
+GM 고정만으로 끝내지 말고,
+DAW capture 단계에서 user/project별 drum map metadata 를 함께 저장하는 구조가 이상적이다.
+
+예:
+
+  - 이 트랙은 MIDI drum track 인가?
+  - note 36은 Kick 인가?
+  - note 38은 Snare 인가?
+  - note 42는 ClosedHat 인가?
+  - 이 프로젝트는 custom sampler map 인가?
+
+이런 정보를 저장하면:
+
+  - GM 기반 프로젝트
+  - 유저 sampler 프로젝트
+  - third-party drum library
+
+까지 모두 같은 추상 계층으로 통합할 수 있다.
+
+
+[6] 구현 옵션 비교
+
+옵션 1. DrumPitch_36 식 분리
+
+장점:
+  - 구현이 가장 단순
+  - 기존 구조를 크게 깨지 않음
+
+단점:
+  - 여전히 semantics가 숫자 중심
+  - 킥/스네어/햇 역할 해석력이 제한적
+
+
+옵션 2. DrumClass 토큰 도입 (권장)
+
+예:
+  - Drum_Kick
+  - Drum_Snare
+  - Drum_HatClosed
+
+장점:
+  - 모델이 drum role을 직접 배움
+  - 패턴 학습이 더 직관적
+  - "킥-스네어-햇" 상호작용을 더 잘 배울 가능성
+
+단점:
+  - 토크나이저 변경 필요
+  - dataset 재생성 필요
+  - 재학습 필요
+
+
+옵션 3. DrumClass + User Drum Map Metadata (장기 권장)
+
+장점:
+  - 제품 방향과 가장 잘 맞음
+  - 유저의 실제 작업 환경을 반영 가능
+  - 복제본 작곡가 / personalized assistant 방향과 잘 맞음
+
+단점:
+  - DAW 캡처 UI/스키마까지 같이 설계해야 함
+  - 구현 비용이 큼
+
+
+[7] 실제 작업 관점에서의 제안
+
+현 시점에서는 다음 순서가 합리적이다.
+
+1. empty bar 붕괴의 1차 원인부터 먼저 해결
+   - format mismatch
+   - task pair/inference 정렬
+   - completion objective 강화
+
+2. 그 다음 드럼 표현 구조를 개편
+   - 최소한 drums용 token namespace 분리
+
+3. 제품 단계에서는 drum map metadata 까지 확장
+   - DAW 캡처 시 유저가 직접 보정 가능하게
+
+
+[8] 최종 정리
+
+사용자 관점에서 제기한 문제의식은 타당하다.
+
+  "드럼 트랙은 음정이 아니라 악기 역할로 봐야 한다"
+
+이 방향은 맞다.
+
+현재 구조는 이를 충분히 반영하지 못하고 있고,
+드럼 품질/일반화 측면에서 분명 약점이다.
+
+다만 지금 실측되고 있는
+
+  - 첫 마디 몰빵
+  - 가운데 공백
+  - 8마디 중 1마디만 생성
+
+문제의 주원인은 이것 하나가 아니라,
+더 큰 학습/추론 포맷 불일치와 task generation objective 문제 쪽에 있다.
+
+따라서 권장 판단은:
+
+  1) 당장 붕괴 원인부터 해결
+  2) 그 다음 드럼 표현을 GM/class 기반으로 분리
+  3) 장기적으로 user drum map metadata 까지 가져가기
+
+가 맞다.
